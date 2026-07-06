@@ -171,7 +171,11 @@
     margin-bottom:-8px;
   }
   .way-sub{ display:flex; align-items:flex-end; justify-content:space-between; gap:24px; }
-  .way-msg{ font-weight:700; font-size:23px; padding:0 0 2px 4px; white-space:nowrap; }
+  .way-msg{
+    font-weight:700; font-size:23px; padding:0 0 2px 4px; max-width:560px;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+    overflow:hidden; text-overflow:ellipsis;
+  }
   .way-box{ background:#fff; width:170px; flex-shrink:0; }
 
   /* Title banner sign */
@@ -369,17 +373,10 @@ function fit(el){
   }
   const big = el && el.querySelector('.sec-big,.ban-big,.way-big');
   if (!big) return;
-  const msg = el.querySelector('.way-msg');
   big.style.fontSize = '';
-  if (msg) msg.style.fontSize = '';
   for (let i = 0; i < 4 && el.offsetWidth > MAX_W; i++){
     const cur = parseFloat(getComputedStyle(big).fontSize);
     big.style.fontSize = Math.max(40, Math.floor(cur * MAX_W / el.offsetWidth) - 1) + 'px';
-  }
-  /* if a long wayfinding message is what overflows, shrink it too */
-  if (msg) for (let i = 0; i < 4 && el.offsetWidth > MAX_W; i++){
-    const cur = parseFloat(getComputedStyle(msg).fontSize);
-    msg.style.fontSize = Math.max(14, Math.floor(cur * MAX_W / el.offsetWidth) - 1) + 'px';
   }
 }
 function fitAll(container){ container.querySelectorAll('.sign').forEach(fit); }
