@@ -199,7 +199,7 @@
     body[data-print="sheet"] #preview{ display:none !important; }
     body[data-print="single"] #sheet{ display:none !important; }
     #sheet{ display:block; }
-    .slot{ display:inline-block; vertical-align:top; margin:0 0.24in 0.24in 0; }
+    .slot{ display:inline-block; vertical-align:top; margin:0 0.1in 0.1in 0; }
   }
 </style>
 </head>
@@ -444,10 +444,6 @@ function addToSheet(){
   queue.push({ ...state });
   persist();
   renderQueue();
-  const b = $('#addBtn');
-  b.textContent = 'Added ✓';
-  clearTimeout(b._t);
-  b._t = setTimeout(() => { b.innerHTML = 'Add to sheet&nbsp;&nbsp;⏎'; }, 900);
 }
 
 /* build the category buttons */
