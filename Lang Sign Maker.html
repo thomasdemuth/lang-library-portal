@@ -32,6 +32,12 @@
   .fg{ display:flex; flex-direction:column; gap:7px; }
   .fg>label,.fg>.lbl{ font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.9px; color:var(--muted); }
   .hint{ font-size:11.5px; color:var(--muted); font-weight:500; }
+  .check{
+    display:flex; align-items:center; gap:7px; cursor:pointer;
+    font-size:12.5px; font-weight:600; color:var(--ink);
+    text-transform:none; letter-spacing:0;
+  }
+  .check input{ accent-color:var(--ink); width:15px; height:15px; margin:0; cursor:pointer; }
 
   .seg{ display:flex; gap:3px; background:var(--bg); border-radius:10px; padding:3px; width:max-content; }
   .seg button{
@@ -91,7 +97,7 @@
   .sec{
     background:#fff; border:8px solid var(--c);
     border-radius:0 62px 0 0; overflow:hidden;
-    height:200px; min-width:252px;
+    height:182px; min-width:252px;
   }
   .sec-main{
     flex:1; display:flex; align-items:center; justify-content:space-between;
@@ -99,11 +105,11 @@
   }
   .sec-big{
     font-weight:800; font-size:132px; line-height:1; letter-spacing:0;
-    color:var(--c); white-space:nowrap; transform:translateY(-3px);
+    color:var(--c); white-space:nowrap; transform:translateY(5px);
   }
   .sec-range{
     flex-shrink:0; color:#000;
-    font-weight:800; font-size:31px; letter-spacing:.5px; white-space:nowrap;
+    font-weight:600; font-size:31px; letter-spacing:.5px; white-space:nowrap;
   }
   .strip{ display:flex; align-items:center; justify-content:space-between; gap:26px; }
   .sec .strip{ background:var(--c); color:#fff; height:42px; padding:0 13px 0 17px; }
@@ -165,6 +171,7 @@
     <label for="secText">Letter / topic &amp; range</label>
     <input type="text" id="secText" placeholder="AM-AZ" autocomplete="off" spellcheck="false">
     <span class="hint">Try “A”, “AM-AZ”, “POEMS”, or “TRANSPORT BA-BZ”</span>
+    <label class="check"><input type="checkbox" id="showSub" checked> Show subtitle</label>
   </div>
 
   <div class="fg" id="fSub" hidden>
@@ -211,7 +218,7 @@ const MAX_W = 980; // ≈10.2in — widest sign that fits a landscape Letter pag
 const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
-let state = { sign:'section', cat:'fiction', secText:'', subText:'', shelf:'' };
+let state = { sign:'section', cat:'fiction', secText:'', subText:'', shelf:'', showSub:true };
 let queue = [];
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -222,7 +229,7 @@ const printedDate = () => {
 };
 
 /* "AM-AZ" → big A, small AM-AZ · "A" → big A, small AA-AZ
-   "POEMS" → big POEMS, small AA-AZ · "POEMS BA-BZ" → big POEMS, small BA-BZ */
+   3+ chars ("POEMS") → big POEMS, small A-Z · "POEMS BA-BZ" → big POEMS, small BA-BZ */
 function parseSection(raw){
   const t = (raw || '').trim().replace(/\s+/g,' ').toUpperCase();
   if (!t) return { big:'A', small:'AA-AZ' };
@@ -234,7 +241,7 @@ function parseSection(raw){
   m = t.match(/^(.+?)\s+([A-Z]{1,4})\s*[-–]\s*([A-Z]{1,4})$/);
   if (m) return { big:m[1], small:m[2] + '-' + m[3] };
   if (/^[A-Z]$/.test(t)) return { big:t, small:t + 'A-' + t + 'Z' };
-  return { big:t, small:'AA-AZ' };
+  return { big:t, small: t.length > 2 ? 'A-Z' : 'AA-AZ' };
 }
 
 const fmtShelf = s => {
@@ -249,7 +256,8 @@ function signHTML(d){
     const p = parseSection(d.secText);
     return '<div class="sign sec" style="--c:' + c.color + '">' +
       '<div class="sec-main"><span class="sec-big">' + esc(p.big) + '</span>' +
-      '<span class="sec-range">' + esc(p.small) + '</span></div>' +
+      (d.showSub !== false ? '<span class="sec-range">' + esc(p.small) + '</span>' : '') +
+      '</div>' +
       '<div class="strip"><span class="cat">' + c.strip + '</span>' + brand + '</div></div>';
   }
   const sub = (d.subText || '').trim() || 'A-Z';
@@ -317,6 +325,7 @@ function syncControls(){
   $('#secText').value = state.secText;
   $('#subText').value = state.subText;
   $('#shelfText').value = state.shelf;
+  $('#showSub').checked = state.showSub !== false;
 }
 
 function addToSheet(){
@@ -351,6 +360,11 @@ $('#catSeg').addEventListener('click', e => {
   el.addEventListener('keydown', e => {
     if (e.key === 'Enter'){ e.preventDefault(); addToSheet(); el.select(); }
   });
+});
+
+$('#showSub').addEventListener('change', () => {
+  state.showSub = $('#showSub').checked;
+  renderPreview(); persist();
 });
 
 $('#addBtn').addEventListener('click', addToSheet);
