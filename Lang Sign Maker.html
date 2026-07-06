@@ -124,6 +124,33 @@
   .brand b{ font-weight:700; }
   .brand i{ font-style:normal; font-weight:500; }
 
+  /* Continuation tab sign */
+  .con{
+    background:#fff; border:8px solid var(--c);
+    border-radius:0 62px 0 0; overflow:hidden;
+    height:180px; min-width:300px;
+  }
+  .con-main{ flex:1; display:flex; align-items:center; padding:0 34px 0 24px; }
+  .con .strip{
+    background:#fff; color:var(--c); border-top:6px solid var(--c);
+    height:40px; flex-shrink:0; align-items:flex-end;
+    padding:0 13px 4px 24px; gap:30px;
+  }
+  .con-label{ font-size:21px; font-weight:600; letter-spacing:.2px; white-space:nowrap; }
+
+  /* Wayfinding banner sign */
+  .way{
+    background:var(--c); color:#fff; flex-direction:row; align-items:stretch;
+    gap:26px; padding:14px 16px 14px 20px; min-width:560px;
+  }
+  .way-left{ display:flex; flex-direction:column; justify-content:space-between; gap:10px; }
+  .way-big{
+    font-weight:800; font-size:112px; line-height:1; letter-spacing:1px; white-space:nowrap;
+  }
+  .way-msg{ font-weight:700; font-size:23px; padding:0 0 2px 4px; white-space:nowrap; }
+  .way-side{ display:flex; align-items:flex-end; margin-left:auto; padding-bottom:2px; }
+  .way-box{ background:#fff; width:170px; flex-shrink:0; }
+
   /* Title banner sign */
   .ban{ background:var(--c); padding:10px 12px 12px; min-width:430px; }
   .ban-big{
@@ -162,6 +189,8 @@
     <div class="seg" id="signSeg">
       <button type="button" data-sign="section">Section · letter tab</button>
       <button type="button" data-sign="title">Title · big banner</button>
+      <button type="button" data-sign="continuation">Continuation</button>
+      <button type="button" data-sign="wayfinding">Wayfinding</button>
     </div>
   </div>
 
@@ -174,7 +203,7 @@
     <label for="secText">Letter / topic &amp; range</label>
     <input type="text" id="secText" placeholder="AM-AZ" autocomplete="off" spellcheck="false">
     <span class="hint">Try “A”, “AM-AZ”, “POEMS”, or “TRANSPORT BA-BZ”</span>
-    <label class="check"><input type="checkbox" id="showSub" checked> Show subtitle</label>
+    <label class="check" id="showSubWrap"><input type="checkbox" id="showSub" checked> Show subtitle</label>
   </div>
 
   <div class="fg" id="fSub" hidden>
@@ -187,6 +216,12 @@
     <label for="shelfText">Shelf rack #</label>
     <input type="text" id="shelfText" placeholder="04" autocomplete="off" spellcheck="false">
     <span class="hint">Leave blank to hide</span>
+  </div>
+
+  <div class="fg" id="fMsg" hidden>
+    <label for="msgText">Message</label>
+    <input type="text" id="msgText" placeholder="This genre has a new home!" autocomplete="off" spellcheck="false">
+    <span class="hint">Shown under the big word</span>
   </div>
 
   <div class="actions">
@@ -221,7 +256,7 @@ const MAX_W = 980; // ≈10.2in — widest sign that fits a landscape Letter pag
 const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
-let state = { sign:'section', cat:'fiction', secText:'', subText:'', shelf:'', showSub:true };
+let state = { sign:'section', cat:'fiction', secText:'', subText:'', shelf:'', msgText:'', showSub:true };
 let queue = [];
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -254,14 +289,28 @@ const fmtShelf = s => {
 
 function signHTML(d){
   const c = CATS[d.cat];
-  const brand = '<span class="brand"><b>Lang Library</b><i>Printed ' + printedDate() + '</i></span>';
+  const brand = pre => '<span class="brand"><b>Lang Library</b><i>' + pre + printedDate() + '</i></span>';
   if (d.sign === 'section'){
     const p = parseSection(d.secText);
     return '<div class="sign sec" style="--c:' + c.color + '">' +
       '<div class="sec-main"><span class="sec-big">' + esc(p.big) + '</span>' +
       (d.showSub !== false ? '<span class="sec-range">' + esc(p.small) + '</span>' : '') +
       '</div>' +
-      '<div class="strip"><span class="cat">' + c.strip + '</span>' + brand + '</div></div>';
+      '<div class="strip"><span class="cat">' + c.strip + '</span>' + brand('Printed ') + '</div></div>';
+  }
+  if (d.sign === 'continuation'){
+    const p = parseSection(d.secText);
+    return '<div class="sign con" style="--c:' + c.color + '">' +
+      '<div class="con-main"><span class="sec-big">' + esc(p.big) + '</span></div>' +
+      '<div class="strip"><span class="con-label">Section Continues</span>' + brand('') + '</div></div>';
+  }
+  if (d.sign === 'wayfinding'){
+    const msg = (d.msgText || '').trim() || 'This genre has a new home!';
+    return '<div class="sign way" style="--c:' + c.color + '">' +
+      '<div class="way-left"><span class="way-big">' + c.banner + '</span>' +
+      '<span class="way-msg">' + esc(msg) + '</span></div>' +
+      '<div class="way-side">' + brand('Printed ') + '</div>' +
+      '<div class="way-box"></div></div>';
   }
   const sub = (d.subText || '').trim() || 'A-Z';
   const shelf = fmtShelf(d.shelf);
@@ -269,12 +318,12 @@ function signHTML(d){
     '<div class="ban-big">' + c.banner + '</div>' +
     '<div class="strip"><span class="sub"><b>' + esc(sub) + '</b>' +
     (shelf ? '<span class="dot">•</span>Shelf Rack ' + esc(shelf) : '') +
-    '</span>' + brand + '</div></div>';
+    '</span>' + brand('Printed ') + '</div></div>';
 }
 
 /* Shrink oversized text (long topics) so the sign always fits the page */
 function fit(el){
-  const big = el && el.querySelector('.sec-big,.ban-big');
+  const big = el && el.querySelector('.sec-big,.ban-big,.way-big');
   if (!big) return;
   big.style.fontSize = '';
   for (let i = 0; i < 4 && el.offsetWidth > MAX_W; i++){
@@ -323,11 +372,14 @@ function restore(){
 function syncControls(){
   $$('#signSeg button').forEach(b => b.classList.toggle('on', b.dataset.sign === state.sign));
   $$('#catSeg button').forEach(b => b.classList.toggle('on', b.dataset.cat === state.cat));
-  $('#fSection').hidden = state.sign !== 'section';
+  $('#fSection').hidden = state.sign !== 'section' && state.sign !== 'continuation';
+  $('#showSubWrap').hidden = state.sign !== 'section';
   $('#fSub').hidden = $('#fShelf').hidden = state.sign !== 'title';
+  $('#fMsg').hidden = state.sign !== 'wayfinding';
   $('#secText').value = state.secText;
   $('#subText').value = state.subText;
   $('#shelfText').value = state.shelf;
+  $('#msgText').value = state.msgText || '';
   $('#showSub').checked = state.showSub !== false;
 }
 
@@ -357,7 +409,7 @@ $('#catSeg').addEventListener('click', e => {
   syncControls(); renderPreview(); persist();
 });
 
-[['secText','secText'],['subText','subText'],['shelfText','shelf']].forEach(([id, key]) => {
+[['secText','secText'],['subText','subText'],['shelfText','shelf'],['msgText','msgText']].forEach(([id, key]) => {
   const el = $('#' + id);
   el.addEventListener('input', () => { state[key] = el.value; renderPreview(); persist(); });
   el.addEventListener('keydown', e => {
