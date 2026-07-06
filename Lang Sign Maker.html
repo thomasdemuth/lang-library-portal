@@ -124,6 +124,22 @@
   .brand b{ font-weight:700; }
   .brand i{ font-style:normal; font-weight:500; }
 
+  /* Spine label — compact companion printed alongside every letter tab, capped at 1in tall */
+  .spine{
+    background:var(--c); color:#fff; flex-direction:row; align-items:center;
+    height:1in; padding:0.12in 0.2in 0.12in 0.12in; gap:0.18in; box-sizing:border-box;
+  }
+  .spine-box{
+    background:#fff; height:100%; aspect-ratio:1/1; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; padding:0 6px;
+  }
+  .spine-letter{ color:var(--c); font-weight:800; font-size:0.5in; line-height:1; white-space:nowrap; }
+  .spine-right{ display:flex; flex-direction:column; justify-content:center; gap:0.04in; }
+  .spine-cat{ font-weight:500; font-size:0.42in; line-height:1; white-space:nowrap; }
+  .spine-date{ font-weight:500; font-size:0.15in; white-space:nowrap; }
+
+  .pair{ display:flex; flex-direction:column; gap:14px; align-items:flex-start; break-inside:avoid; page-break-inside:avoid; }
+
   /* Continuation tab sign */
   .con{
     background:#fff; border:8px solid var(--c);
@@ -322,8 +338,29 @@ function signHTML(d){
     '</span>' + brand('Printed ') + '</div></div>';
 }
 
+/* Compact 1in-tall spine label printed as a second copy alongside every letter tab */
+function spineHTML(d){
+  const c = CATS[d.cat];
+  const p = parseSection(d.secText);
+  return '<div class="sign spine" style="--c:' + c.color + '">' +
+    '<div class="spine-box"><span class="spine-letter">' + esc(p.big) + '</span></div>' +
+    '<div class="spine-right"><span class="spine-cat">' + c.strip + '</span>' +
+    '<span class="spine-date">Lang Library &bull; Printed ' + printedDate() + '</span></div></div>';
+}
+
 /* Shrink oversized text (long topics) so the sign always fits the page */
 function fit(el){
+  const spineLetter = el && el.querySelector('.spine-letter');
+  if (spineLetter){
+    const box = el.querySelector('.spine-box');
+    spineLetter.style.fontSize = '';
+    const avail = box.clientWidth - 4;
+    for (let i = 0; i < 6 && spineLetter.scrollWidth > avail; i++){
+      const cur = parseFloat(getComputedStyle(spineLetter).fontSize);
+      spineLetter.style.fontSize = Math.max(16, Math.floor(cur * avail / spineLetter.scrollWidth) - 1) + 'px';
+    }
+    return;
+  }
   const big = el && el.querySelector('.sec-big,.ban-big,.way-big');
   if (!big) return;
   const msg = el.querySelector('.way-msg');
@@ -339,11 +376,13 @@ function fit(el){
     msg.style.fontSize = Math.max(14, Math.floor(cur * MAX_W / el.offsetWidth) - 1) + 'px';
   }
 }
+function fitAll(container){ container.querySelectorAll('.sign').forEach(fit); }
+function cardHTML(d){ return d.sign === 'section' ? '<div class="pair">' + signHTML(d) + spineHTML(d) + '</div>' : signHTML(d); }
 
 function renderPreview(){
   const box = $('#preview');
-  box.innerHTML = signHTML(state);
-  fit(box.firstElementChild);
+  box.innerHTML = cardHTML(state);
+  fitAll(box);
 }
 
 function renderQueue(){
@@ -352,13 +391,13 @@ function renderQueue(){
   queue.forEach((d, i) => {
     const slot = document.createElement('div');
     slot.className = 'slot';
-    slot.innerHTML = signHTML(d);
+    slot.innerHTML = cardHTML(d);
     const rm = document.createElement('button');
     rm.className = 'rm'; rm.type = 'button'; rm.title = 'Remove this sign'; rm.textContent = '×';
     rm.onclick = () => { queue.splice(i,1); persist(); renderQueue(); };
     slot.appendChild(rm);
     box.appendChild(slot);
-    fit(slot.firstElementChild);
+    fitAll(slot);
   });
   $('#sheetCount').textContent = queue.length
     ? queue.length + ' sign' + (queue.length > 1 ? 's' : '') + ' — these print together'
