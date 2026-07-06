@@ -171,10 +171,11 @@
     margin-bottom:-8px;
   }
   .way-sub{ display:flex; align-items:flex-end; justify-content:space-between; gap:24px; }
-  .way-msg{
-    font-weight:700; font-size:23px; padding:0 0 2px 4px; max-width:560px;
+  .way-msg{ max-width:560px; }
+  .way-msg-text{
+    font-weight:700; font-size:23px; padding:0 0 2px 4px; line-height:1.25;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
-    overflow:hidden; text-overflow:ellipsis;
+    overflow:hidden; text-overflow:ellipsis; overflow-wrap:break-word;
   }
   .way-box{ background:#fff; width:170px; flex-shrink:0; }
 
@@ -336,7 +337,7 @@ function signHTML(d){
     const msg = (d.msgText || '').trim() || 'This genre has a new home!';
     return '<div class="sign way" style="--c:' + c.color + '">' +
       '<div class="way-left"><span class="way-big">' + c.banner + '</span>' +
-      '<div class="way-sub"><span class="way-msg">' + esc(msg) + '</span>' + brand('') + '</div></div>' +
+      '<div class="way-sub"><span class="way-msg"><span class="way-msg-text">' + esc(msg) + '</span></span>' + brand('') + '</div></div>' +
       '<div class="way-box"></div></div>';
   }
   const sub = (d.subText || '').trim() || 'A-Z';
