@@ -134,9 +134,14 @@
     display:flex; align-items:center; justify-content:center; padding:0 4px;
   }
   .spine-letter{ color:var(--c); font-weight:800; font-size:0.68in; line-height:1; white-space:nowrap; }
-  .spine-right{ display:flex; flex-direction:column; justify-content:center; gap:0.04in; }
+  .spine-right{ display:flex; flex-direction:column; justify-content:center; gap:0.05in; }
   .spine-cat{ font-weight:500; font-size:0.42in; line-height:1; white-space:nowrap; }
-  .spine-date{ font-weight:500; font-size:0.15in; white-space:nowrap; }
+  .spine-brand{
+    display:flex; flex-direction:column; align-items:flex-start;
+    line-height:1.25; font-size:0.085in; white-space:nowrap;
+  }
+  .spine-brand b{ font-weight:700; }
+  .spine-brand i{ font-style:normal; font-weight:500; }
 
   .pair{ display:flex; flex-direction:column; gap:14px; align-items:flex-start; break-inside:avoid; page-break-inside:avoid; }
 
@@ -345,7 +350,7 @@ function spineHTML(d){
   return '<div class="sign spine" style="--c:' + c.color + '">' +
     '<div class="spine-box"><span class="spine-letter">' + esc(p.big) + '</span></div>' +
     '<div class="spine-right"><span class="spine-cat">' + c.strip + '</span>' +
-    '<span class="spine-date">Lang Library &bull; ' + printedDate() + '</span></div></div>';
+    '<span class="spine-brand"><b>Lang Library</b><i>' + printedDate() + '</i></span></div></div>';
 }
 
 /* Shrink oversized text (long topics) so the sign always fits the page */
