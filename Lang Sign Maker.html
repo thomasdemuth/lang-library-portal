@@ -314,7 +314,7 @@ function signHTML(d){
       '<div class="sec-main"><span class="sec-big">' + esc(p.big) + '</span>' +
       (d.showSub !== false ? '<span class="sec-range">' + esc(p.small) + '</span>' : '') +
       '</div>' +
-      '<div class="strip"><span class="cat">' + c.strip + '</span>' + brand('Printed ') + '</div></div>';
+      '<div class="strip"><span class="cat">' + c.strip + '</span>' + brand('') + '</div></div>';
   }
   if (d.sign === 'continuation'){
     const p = parseSection(d.secText);
@@ -326,7 +326,7 @@ function signHTML(d){
     const msg = (d.msgText || '').trim() || 'This genre has a new home!';
     return '<div class="sign way" style="--c:' + c.color + '">' +
       '<div class="way-left"><span class="way-big">' + c.banner + '</span>' +
-      '<div class="way-sub"><span class="way-msg">' + esc(msg) + '</span>' + brand('Printed ') + '</div></div>' +
+      '<div class="way-sub"><span class="way-msg">' + esc(msg) + '</span>' + brand('') + '</div></div>' +
       '<div class="way-box"></div></div>';
   }
   const sub = (d.subText || '').trim() || 'A-Z';
@@ -335,7 +335,7 @@ function signHTML(d){
     '<div class="ban-big">' + c.banner + '</div>' +
     '<div class="strip"><span class="sub"><b>' + esc(sub) + '</b>' +
     (shelf ? '<span class="dot">•</span>Shelf Rack ' + esc(shelf) : '') +
-    '</span>' + brand('Printed ') + '</div></div>';
+    '</span>' + brand('') + '</div></div>';
 }
 
 /* Compact 1in-tall spine label printed as a second copy alongside every letter tab */
@@ -345,7 +345,7 @@ function spineHTML(d){
   return '<div class="sign spine" style="--c:' + c.color + '">' +
     '<div class="spine-box"><span class="spine-letter">' + esc(p.big) + '</span></div>' +
     '<div class="spine-right"><span class="spine-cat">' + c.strip + '</span>' +
-    '<span class="spine-date">Lang Library &bull; Printed ' + printedDate() + '</span></div></div>';
+    '<span class="spine-date">Lang Library &bull; ' + printedDate() + '</span></div></div>';
 }
 
 /* Shrink oversized text (long topics) so the sign always fits the page */
