@@ -124,21 +124,21 @@
   .brand b{ font-weight:700; }
   .brand i{ font-style:normal; font-weight:500; }
 
-  /* Spine label — compact companion printed alongside every letter tab, capped at 1in tall */
+  /* Spine label — compact companion printed alongside every letter tab, capped at 0.6in tall */
   .spine{
     background:var(--c); color:#fff; flex-direction:row; align-items:center;
-    height:96px; padding:6px 15px 6px 6px; gap:13px; box-sizing:border-box;
+    height:58px; padding:4px 9px 4px 4px; gap:8px; box-sizing:border-box;
   }
   .spine-box{
     background:#fff; height:100%; aspect-ratio:1/1; flex-shrink:0;
-    display:flex; align-items:center; justify-content:center; padding:0 4px;
+    display:flex; align-items:center; justify-content:center; padding:0 3px;
   }
-  .spine-letter{ color:var(--c); font-weight:800; font-size:65px; line-height:1; white-space:nowrap; }
-  .spine-right{ display:flex; flex-direction:column; justify-content:center; gap:5px; }
-  .spine-cat{ font-weight:500; font-size:40px; line-height:1; white-space:nowrap; }
+  .spine-letter{ color:var(--c); font-weight:800; font-size:39px; line-height:1; white-space:nowrap; }
+  .spine-right{ display:flex; flex-direction:column; justify-content:center; gap:3px; }
+  .spine-cat{ font-weight:500; font-size:24px; line-height:1; white-space:nowrap; }
   .spine-brand{
     display:flex; flex-direction:column; align-items:flex-start;
-    line-height:1.25; font-size:8px; white-space:nowrap;
+    line-height:1.25; font-size:5px; white-space:nowrap;
   }
   .spine-brand b{ font-weight:700; }
   .spine-brand i{ font-style:normal; font-weight:500; }
@@ -227,6 +227,7 @@
     <input type="text" id="secText" placeholder="AM-AZ" autocomplete="off" spellcheck="false">
     <span class="hint">Try “A”, “AM-AZ”, “POEMS”, or “TRANSPORT BA-BZ”</span>
     <label class="check" id="showSubWrap"><input type="checkbox" id="showSub" checked> Show subtitle</label>
+    <label class="check" id="tabOnlyWrap"><input type="checkbox" id="tabOnly"> Small tab only (skip the big letter tab)</label>
   </div>
 
   <div class="fg" id="fSub" hidden>
@@ -279,7 +280,7 @@ const MAX_W = 980; // ≈10.2in — widest sign that fits a landscape Letter pag
 const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
-let state = { sign:'section', cat:'fiction', secText:'', subText:'', shelf:'', msgText:'', showSub:true };
+let state = { sign:'section', cat:'fiction', secText:'', subText:'', shelf:'', msgText:'', showSub:true, tabOnly:false };
 let queue = [];
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -382,7 +383,11 @@ function fit(el){
   }
 }
 function fitAll(container){ container.querySelectorAll('.sign').forEach(fit); }
-function cardHTML(d){ return d.sign === 'section' ? '<div class="pair">' + signHTML(d) + spineHTML(d) + '</div>' : signHTML(d); }
+function cardHTML(d){
+  if (d.sign !== 'section') return signHTML(d);
+  if (d.tabOnly) return spineHTML(d);
+  return '<div class="pair">' + signHTML(d) + spineHTML(d) + '</div>';
+}
 
 function renderPreview(){
   const box = $('#preview');
@@ -425,7 +430,8 @@ function syncControls(){
   $$('#signSeg button').forEach(b => b.classList.toggle('on', b.dataset.sign === state.sign));
   $$('#catSeg button').forEach(b => b.classList.toggle('on', b.dataset.cat === state.cat));
   $('#fSection').hidden = state.sign !== 'section' && state.sign !== 'continuation';
-  $('#showSubWrap').hidden = state.sign !== 'section';
+  $('#tabOnlyWrap').hidden = state.sign !== 'section';
+  $('#showSubWrap').hidden = state.sign !== 'section' || !!state.tabOnly;
   $('#fSub').hidden = $('#fShelf').hidden = state.sign !== 'title';
   $('#fMsg').hidden = state.sign !== 'wayfinding';
   $('#secText').value = state.secText;
@@ -433,6 +439,7 @@ function syncControls(){
   $('#shelfText').value = state.shelf;
   $('#msgText').value = state.msgText || '';
   $('#showSub').checked = state.showSub !== false;
+  $('#tabOnly').checked = !!state.tabOnly;
 }
 
 function addToSheet(){
@@ -472,6 +479,10 @@ $('#catSeg').addEventListener('click', e => {
 $('#showSub').addEventListener('change', () => {
   state.showSub = $('#showSub').checked;
   renderPreview(); persist();
+});
+$('#tabOnly').addEventListener('change', () => {
+  state.tabOnly = $('#tabOnly').checked;
+  syncControls(); renderPreview(); persist();
 });
 
 $('#addBtn').addEventListener('click', addToSheet);
