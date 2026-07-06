@@ -130,7 +130,8 @@
     border-radius:0 62px 0 0; overflow:hidden;
     height:184px; min-width:300px;
   }
-  .con-main{ flex:1; display:flex; align-items:center; padding:0 34px 0 24px; }
+  .con-main{ flex:1; display:flex; align-items:center; padding:0 20px 0 24px; }
+  .con-arrow{ flex:1; min-width:130px; }
   .con .strip{
     background:var(--c); color:#fff;
     height:36px; flex-shrink:0; align-items:flex-end;
@@ -148,8 +149,8 @@
     font-weight:800; font-size:112px; line-height:1; letter-spacing:1px; white-space:nowrap;
     margin-bottom:-8px;
   }
+  .way-sub{ display:flex; align-items:flex-end; justify-content:space-between; gap:24px; }
   .way-msg{ font-weight:700; font-size:23px; padding:0 0 2px 4px; white-space:nowrap; }
-  .way-side{ display:flex; align-items:flex-end; margin-left:auto; padding-bottom:2px; }
   .way-box{ background:#fff; width:170px; flex-shrink:0; }
 
   /* Title banner sign */
@@ -302,15 +303,14 @@ function signHTML(d){
   if (d.sign === 'continuation'){
     const p = parseSection(d.secText);
     return '<div class="sign con" style="--c:' + c.color + '">' +
-      '<div class="con-main"><span class="sec-big">' + esc(p.big) + '</span></div>' +
+      '<div class="con-main"><span class="sec-big">' + esc(p.big) + '</span><span class="con-arrow"></span></div>' +
       '<div class="strip"><span class="con-label">Section Continues</span>' + brand('') + '</div></div>';
   }
   if (d.sign === 'wayfinding'){
     const msg = (d.msgText || '').trim() || 'This genre has a new home!';
     return '<div class="sign way" style="--c:' + c.color + '">' +
       '<div class="way-left"><span class="way-big">' + c.banner + '</span>' +
-      '<span class="way-msg">' + esc(msg) + '</span></div>' +
-      '<div class="way-side">' + brand('Printed ') + '</div>' +
+      '<div class="way-sub"><span class="way-msg">' + esc(msg) + '</span>' + brand('Printed ') + '</div></div>' +
       '<div class="way-box"></div></div>';
   }
   const sub = (d.subText || '').trim() || 'A-Z';
