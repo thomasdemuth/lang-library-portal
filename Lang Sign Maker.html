@@ -55,6 +55,7 @@
   }
   input[type=text]:focus{ border-color:#6c7ff2; }
   #shelfText{ width:110px; }
+  #advSub,#advBody{ width:320px; }
 
   .actions{ display:flex; gap:9px; align-items:center; padding-top:19px; }
   .btn{
@@ -190,6 +191,18 @@
   .ban .sub b{ font-weight:800; }
   .ban .sub .dot{ margin:0 9px; }
 
+  /* General Advisory sign */
+  .adv{ min-width:480px; }
+  .adv-black{ background:#000; color:#fff; text-align:center; padding:28px 36px 32px; }
+  .adv-title{
+    display:inline-block; font-weight:800; font-size:76px; line-height:1.05;
+    letter-spacing:.3px; max-width:740px; overflow-wrap:break-word;
+  }
+  .adv-white{ background:#fff; color:#000; align-items:flex-end; padding:18px 24px; }
+  .adv-text{ display:flex; align-items:flex-end; gap:28px; flex:1; min-width:0; }
+  .adv-sub{ font-weight:800; font-size:27px; line-height:1.2; max-width:400px; overflow-wrap:break-word; }
+  .adv-body{ font-weight:500; font-size:17px; line-height:1.35; max-width:360px; overflow-wrap:break-word; }
+
   /* ── Print ──────────────────────────────────── */
   @page{ size:letter landscape; margin:0.35in; }
   @media print{
@@ -219,10 +232,11 @@
       <button type="button" data-sign="title">Title · big banner</button>
       <button type="button" data-sign="continuation">Continuation</button>
       <button type="button" data-sign="wayfinding">Wayfinding</button>
+      <button type="button" data-sign="advisory">General Advisory</button>
     </div>
   </div>
 
-  <div class="fg">
+  <div class="fg" id="fCat">
     <span class="lbl">Category</span>
     <div class="seg" id="catSeg"></div>
   </div>
@@ -251,6 +265,30 @@
     <label for="msgText">Message</label>
     <input type="text" id="msgText" placeholder="This genre has a new home!" autocomplete="off" spellcheck="false">
     <span class="hint">Shown under the big word</span>
+  </div>
+
+  <div class="fg advField" id="fAdvPreset" hidden>
+    <span class="lbl">Preset</span>
+    <div class="seg" id="advPresetSeg">
+      <button type="button" data-preset="reach">Can’t Reach?</button>
+      <button type="button" data-preset="find">Can’t find the right book?</button>
+    </div>
+  </div>
+
+  <div class="fg advField" id="fAdvTitle" hidden>
+    <label for="advTitle">Title</label>
+    <input type="text" id="advTitle" placeholder="Can’t Reach?" autocomplete="off" spellcheck="false">
+  </div>
+
+  <div class="fg advField" id="fAdvSub" hidden>
+    <label for="advSub">Subtitle</label>
+    <input type="text" id="advSub" placeholder="Please don’t climb the bookshelves. Ask for help!" autocomplete="off" spellcheck="false">
+  </div>
+
+  <div class="fg advField" id="fAdvBody" hidden>
+    <label for="advBody">Body</label>
+    <input type="text" id="advBody" placeholder="All Lang Staff members would be happy to help." autocomplete="off" spellcheck="false">
+    <span class="hint">Shown smaller, next to the subtitle</span>
   </div>
 
   <div class="actions">
@@ -285,8 +323,21 @@ const MAX_W = 980; // ≈10.2in — widest sign that fits a landscape Letter pag
 const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
-let state = { sign:'section', cat:'fiction', secText:'', subText:'', shelf:'', msgText:'', showSub:true, tabOnly:false };
+let state = { sign:'section', cat:'fiction', secText:'', subText:'', shelf:'', msgText:'', showSub:true, tabOnly:false, advTitle:'', advSub:'', advBody:'' };
 let queue = [];
+
+const ADV_PRESETS = {
+  reach: {
+    title: "Can’t Reach?",
+    sub: "Please don’t climb the bookshelves. Ask for help!",
+    body: "All Lang Staff members and Upper School Students would be happy to reach a book for you."
+  },
+  find: {
+    title: "Can’t find the right book?",
+    sub: "The book you are looking for may be in storage or in use.",
+    body: "All Lang Library Personnel are happy to look up, find, or order a book for you. Just ask! We’re here to help."
+  }
+};
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pad2 = n => String(n).padStart(2,'0');
@@ -319,6 +370,17 @@ const fmtShelf = s => {
 function signHTML(d){
   const c = CATS[d.cat];
   const brand = pre => '<span class="brand"><b>Lang Library</b><i>' + pre + printedDate() + '</i></span>';
+  if (d.sign === 'advisory'){
+    const title = (d.advTitle || '').trim() || 'General Advisory';
+    const sub = (d.advSub || '').trim();
+    const body = (d.advBody || '').trim();
+    return '<div class="sign adv">' +
+      '<div class="adv-black"><span class="adv-title">' + esc(title) + '</span></div>' +
+      '<div class="strip adv-white"><div class="adv-text">' +
+      (sub ? '<span class="adv-sub">' + esc(sub) + '</span>' : '') +
+      (body ? '<span class="adv-body">' + esc(body) + '</span>' : '') +
+      '</div>' + brand('') + '</div></div>';
+  }
   if (d.sign === 'section'){
     const p = parseSection(d.secText);
     return '<div class="sign sec" style="--c:' + c.color + '">' +
@@ -372,7 +434,7 @@ function fit(el){
     }
     return;
   }
-  const big = el && el.querySelector('.sec-big,.ban-big,.way-big');
+  const big = el && el.querySelector('.sec-big,.ban-big,.way-big,.adv-title');
   if (!big) return;
   big.style.fontSize = '';
   for (let i = 0; i < 4 && el.offsetWidth > MAX_W; i++){
@@ -427,15 +489,20 @@ function restore(){
 function syncControls(){
   $$('#signSeg button').forEach(b => b.classList.toggle('on', b.dataset.sign === state.sign));
   $$('#catSeg button').forEach(b => b.classList.toggle('on', b.dataset.cat === state.cat));
+  $('#fCat').hidden = state.sign === 'advisory';
   $('#fSection').hidden = state.sign !== 'section' && state.sign !== 'continuation';
   $('#tabOnlyWrap').hidden = state.sign !== 'section';
   $('#showSubWrap').hidden = state.sign !== 'section' || !!state.tabOnly;
   $('#fSub').hidden = $('#fShelf').hidden = state.sign !== 'title';
   $('#fMsg').hidden = state.sign !== 'wayfinding';
+  $$('.advField').forEach(el => { el.hidden = state.sign !== 'advisory'; });
   $('#secText').value = state.secText;
   $('#subText').value = state.subText;
   $('#shelfText').value = state.shelf;
   $('#msgText').value = state.msgText || '';
+  $('#advTitle').value = state.advTitle || '';
+  $('#advSub').value = state.advSub || '';
+  $('#advBody').value = state.advBody || '';
   $('#showSub').checked = state.showSub !== false;
   $('#tabOnly').checked = !!state.tabOnly;
 }
@@ -462,7 +529,7 @@ $('#catSeg').addEventListener('click', e => {
   syncControls(); renderPreview(); persist();
 });
 
-[['secText','secText'],['subText','subText'],['shelfText','shelf'],['msgText','msgText']].forEach(([id, key]) => {
+[['secText','secText'],['subText','subText'],['shelfText','shelf'],['msgText','msgText'],['advTitle','advTitle'],['advSub','advSub'],['advBody','advBody']].forEach(([id, key]) => {
   const el = $('#' + id);
   el.addEventListener('input', () => { state[key] = el.value; renderPreview(); persist(); });
   el.addEventListener('keydown', e => {
@@ -476,6 +543,12 @@ $('#showSub').addEventListener('change', () => {
 });
 $('#tabOnly').addEventListener('change', () => {
   state.tabOnly = $('#tabOnly').checked;
+  syncControls(); renderPreview(); persist();
+});
+$('#advPresetSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const p = ADV_PRESETS[b.dataset.preset]; if (!p) return;
+  state.advTitle = p.title; state.advSub = p.sub; state.advBody = p.body;
   syncControls(); renderPreview(); persist();
 });
 
