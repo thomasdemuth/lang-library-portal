@@ -305,7 +305,8 @@
 
   <div class="fg" style="max-width:270px; padding-top:21px">
     <span class="hint">Prints on Letter, landscape. If colors come out white, turn on
-    “Background graphics” in the print dialog. Date updates automatically.</span>
+    “Background graphics” in the print dialog. Date updates automatically.
+    Type [nl] in any text box to force a line break.</span>
   </div>
 </section>
 
@@ -346,6 +347,8 @@ const ADV_PRESETS = {
 };
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* user text: escape, then turn a typed [nl] into a real line break */
+const fmt = s => esc(s).replace(/\s*\[nl\]\s*/gi, '<br>');
 const pad2 = n => String(n).padStart(2,'0');
 const printedDate = () => {
   const d = new Date();
@@ -381,39 +384,39 @@ function signHTML(d){
     const sub = (d.advSub || '').trim();
     const body = (d.advBody || '').trim();
     return '<div class="sign adv">' +
-      '<div class="adv-title">' + esc(title) + '</div>' +
+      '<div class="adv-title">' + fmt(title) + '</div>' +
       '<div class="adv-strip"><div class="adv-para">' +
-      (sub ? '<span class="adv-sub">' + esc(sub) + '</span>' : '') +
-      (body ? ' <span class="adv-body">' + esc(body) + '</span>' : '') +
+      (sub ? '<span class="adv-sub">' + fmt(sub) + '</span>' : '') +
+      (body ? ' <span class="adv-body">' + fmt(body) + '</span>' : '') +
       '</div>' + brand('') + '</div></div>';
   }
   if (d.sign === 'section'){
     const p = parseSection(d.secText);
     return '<div class="sign sec" style="--c:' + c.color + '">' +
-      '<div class="sec-main"><span class="sec-big">' + esc(p.big) + '</span>' +
-      (d.showSub !== false ? '<span class="sec-range">' + esc(p.small) + '</span>' : '') +
+      '<div class="sec-main"><span class="sec-big">' + fmt(p.big) + '</span>' +
+      (d.showSub !== false ? '<span class="sec-range">' + fmt(p.small) + '</span>' : '') +
       '</div>' +
       '<div class="strip"><span class="cat">' + c.strip + '</span>' + brand('') + '</div></div>';
   }
   if (d.sign === 'continuation'){
     const p = parseSection(d.secText);
     return '<div class="sign con" style="--c:' + c.color + '">' +
-      '<div class="con-main"><span class="sec-big">' + esc(p.big) + '</span><span class="con-arrow"></span></div>' +
+      '<div class="con-main"><span class="sec-big">' + fmt(p.big) + '</span><span class="con-arrow"></span></div>' +
       '<div class="strip"><span class="con-label">Section Continues</span>' + brand('') + '</div></div>';
   }
   if (d.sign === 'wayfinding'){
     const msg = (d.msgText || '').trim() || 'This genre has a new home!';
     return '<div class="sign way" style="--c:' + c.color + '">' +
       '<div class="way-left"><span class="way-big">' + c.banner + '</span>' +
-      '<div class="way-sub"><span class="way-msg"><span class="way-msg-text">' + esc(msg) + '</span></span>' + brand('') + '</div></div>' +
+      '<div class="way-sub"><span class="way-msg"><span class="way-msg-text">' + fmt(msg) + '</span></span>' + brand('') + '</div></div>' +
       '<div class="way-box"></div></div>';
   }
   const sub = (d.subText || '').trim() || 'A-Z';
   const shelf = fmtShelf(d.shelf);
   return '<div class="sign ban" style="--c:' + c.color + '">' +
     '<div class="ban-big">' + c.banner + '</div>' +
-    '<div class="strip"><span class="sub"><b>' + esc(sub) + '</b>' +
-    (shelf ? '<span class="dot">•</span>Shelf Rack ' + esc(shelf) : '') +
+    '<div class="strip"><span class="sub"><b>' + fmt(sub) + '</b>' +
+    (shelf ? '<span class="dot">•</span>Shelf Rack ' + fmt(shelf) : '') +
     '</span>' + brand('') + '</div></div>';
 }
 
@@ -422,7 +425,7 @@ function spineHTML(d){
   const c = CATS[d.cat];
   const p = parseSection(d.secText);
   return '<div class="sign spine" style="--c:' + c.color + '">' +
-    '<div class="spine-box"><span class="spine-letter">' + esc(p.big) + '</span></div>' +
+    '<div class="spine-box"><span class="spine-letter">' + fmt(p.big) + '</span></div>' +
     '<div class="spine-right"><span class="spine-cat">' + c.strip + '</span>' +
     '<span class="spine-brand"><b>Lang Library</b><i>' + printedDate() + '</i></span></div></div>';
 }
