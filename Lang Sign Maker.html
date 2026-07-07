@@ -247,6 +247,12 @@
     <div class="seg" id="catSeg"></div>
   </div>
 
+  <div class="fg" id="fOtherLabel" hidden>
+    <label for="otherLabelText">Custom label</label>
+    <input type="text" id="otherLabelText" placeholder="Other" autocomplete="off" spellcheck="false">
+    <span class="hint">Replaces “Other” on the sign</span>
+  </div>
+
   <div class="fg" id="fSection">
     <label for="secText">Letter / topic &amp; range</label>
     <input type="text" id="secText" placeholder="AM-AZ" autocomplete="off" spellcheck="false">
@@ -331,7 +337,7 @@ const MAX_W = 980; // ≈10.2in — widest sign that fits a landscape Letter pag
 const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
-let state = { sign:'section', cat:'fiction', secText:'', subText:'', shelf:'', msgText:'', showSub:true, tabOnly:false, advTitle:'', advSub:'', advBody:'' };
+let state = { sign:'section', cat:'fiction', secText:'', subText:'', shelf:'', msgText:'', showSub:true, tabOnly:false, advTitle:'', advSub:'', advBody:'', otherLabel:'' };
 let queue = [];
 
 const ADV_PRESETS = {
@@ -372,6 +378,16 @@ function parseSection(raw){
   return { big:t, small: t.length > 2 ? 'A-Z' : 'AA-AZ' };
 }
 
+/* "Other" category can rename its on-sign label; every other category keeps its fixed text */
+function catLabel(d){
+  const c = CATS[d.cat];
+  if (d.cat === 'other'){
+    const custom = (d.otherLabel || '').trim();
+    if (custom) return { strip: custom, banner: custom.toUpperCase() };
+  }
+  return { strip: c.strip, banner: c.banner };
+}
+
 const fmtShelf = s => {
   s = (s || '').trim();
   return !s ? '' : (/^\d+$/.test(s) ? s.padStart(2,'0') : s);
@@ -397,7 +413,7 @@ function signHTML(d){
       '<div class="sec-main"><span class="sec-big">' + fmt(p.big) + '</span>' +
       (d.showSub !== false ? '<span class="sec-range">' + fmt(p.small) + '</span>' : '') +
       '</div>' +
-      '<div class="strip"><span class="cat">' + c.strip + '</span>' + brand('') + '</div></div>';
+      '<div class="strip"><span class="cat">' + fmt(catLabel(d).strip) + '</span>' + brand('') + '</div></div>';
   }
   if (d.sign === 'continuation'){
     const p = parseSection(d.secText);
@@ -408,14 +424,14 @@ function signHTML(d){
   if (d.sign === 'wayfinding'){
     const msg = (d.msgText || '').trim() || 'This genre has a new home!';
     return '<div class="sign way" style="--c:' + c.color + '">' +
-      '<div class="way-left"><span class="way-big">' + c.banner + '</span>' +
+      '<div class="way-left"><span class="way-big">' + fmt(catLabel(d).banner) + '</span>' +
       '<div class="way-sub"><span class="way-msg"><span class="way-msg-text">' + fmt(msg) + '</span></span>' + brand('') + '</div></div>' +
       '<div class="way-box"></div></div>';
   }
   const sub = (d.subText || '').trim() || 'A-Z';
   const shelf = fmtShelf(d.shelf);
   return '<div class="sign ban" style="--c:' + c.color + '">' +
-    '<div class="ban-big">' + c.banner + '</div>' +
+    '<div class="ban-big">' + fmt(catLabel(d).banner) + '</div>' +
     '<div class="strip"><span class="sub"><b>' + fmt(sub) + '</b>' +
     (shelf ? '<span class="dot">•</span>Shelf Rack ' + fmt(shelf) : '') +
     '</span>' + brand('') + '</div></div>';
@@ -427,7 +443,7 @@ function spineHTML(d){
   const p = parseSection(d.secText);
   return '<div class="sign spine" style="--c:' + c.color + '">' +
     '<div class="spine-box"><span class="spine-letter">' + fmt(p.big) + '</span></div>' +
-    '<div class="spine-right"><span class="spine-cat">' + c.strip + '</span>' +
+    '<div class="spine-right"><span class="spine-cat">' + fmt(catLabel(d).strip) + '</span>' +
     '<span class="spine-brand"><b>Lang Library</b><i>' + printedDate() + '</i></span></div></div>';
 }
 
@@ -500,6 +516,7 @@ function syncControls(){
   $$('#signSeg button').forEach(b => b.classList.toggle('on', b.dataset.sign === state.sign));
   $$('#catSeg button').forEach(b => b.classList.toggle('on', b.dataset.cat === state.cat));
   $('#fCat').hidden = state.sign === 'advisory';
+  $('#fOtherLabel').hidden = state.cat !== 'other' || state.sign === 'advisory' || state.sign === 'continuation';
   $('#fSection').hidden = state.sign !== 'section' && state.sign !== 'continuation';
   $('#tabOnlyWrap').hidden = state.sign !== 'section';
   $('#showSubWrap').hidden = state.sign !== 'section' || !!state.tabOnly;
@@ -513,6 +530,7 @@ function syncControls(){
   $('#advTitle').value = state.advTitle || '';
   $('#advSub').value = state.advSub || '';
   $('#advBody').value = state.advBody || '';
+  $('#otherLabelText').value = state.otherLabel || '';
   $('#showSub').checked = state.showSub !== false;
   $('#tabOnly').checked = !!state.tabOnly;
 }
@@ -539,7 +557,7 @@ $('#catSeg').addEventListener('click', e => {
   syncControls(); renderPreview(); persist();
 });
 
-[['secText','secText'],['subText','subText'],['shelfText','shelf'],['msgText','msgText'],['advTitle','advTitle'],['advSub','advSub'],['advBody','advBody']].forEach(([id, key]) => {
+[['secText','secText'],['subText','subText'],['shelfText','shelf'],['msgText','msgText'],['advTitle','advTitle'],['advSub','advSub'],['advBody','advBody'],['otherLabelText','otherLabel']].forEach(([id, key]) => {
   const el = $('#' + id);
   el.addEventListener('input', () => { state[key] = el.value; renderPreview(); persist(); });
   el.addEventListener('keydown', e => {
