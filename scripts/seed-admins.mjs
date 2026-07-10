@@ -30,10 +30,13 @@ try {
 }
 
 for (const s of seeds) {
-  if (!s.username || !s.email || !s.name || !s.password || s.password.length < 10) {
-    console.error(`Skipping invalid entry (need username/email/name and a 10+ char password):`, s.username ?? s);
+  if (!s.username || !s.email || !s.name || !s.password || s.password.length < 8) {
+    console.error(`Skipping invalid entry (need username/email/name and an 8+ char password):`, s.username ?? s);
     process.exitCode = 1;
     continue;
+  }
+  if (s.password.length < 10) {
+    console.warn(`⚠ ${s.username}: seeded password is under 10 chars — change it in /admin/account soon.`);
   }
   const body = {
     username: s.username.toLowerCase(),
