@@ -209,6 +209,28 @@
   }
   .adv-strip .brand{ margin-left:auto; }
 
+  /* Color Guide legend sign */
+  .guide{ background:#fff; width:940px; gap:6px; }
+  .guide-title{
+    border:6px solid #000; background:#fff; color:#000;
+    display:flex; align-items:center; justify-content:space-between; gap:22px;
+    padding:12px 13px 12px 22px;
+  }
+  .guide-title .t{
+    font-weight:800; font-size:54px; line-height:1.05; letter-spacing:.3px;
+    overflow-wrap:break-word; min-width:0;
+  }
+  .guide-title .brand{ align-self:flex-end; }
+  .guide-row{
+    background:var(--c); color:#fff; height:92px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:space-between; gap:22px;
+    padding:0 12px 0 22px;
+    font-weight:800; font-size:58px; letter-spacing:1px; white-space:nowrap;
+  }
+  .guide-box{ background:#fff; width:68px; height:68px; flex-shrink:0; }
+  #guideCatChecks{ display:flex; flex-direction:column; gap:6px; }
+  #guideCatChecks i{ width:11px; height:11px; border-radius:3px; display:inline-block; }
+
   /* ── Print ──────────────────────────────────── */
   @page{ size:letter landscape; margin:0.35in; }
   @media print{
@@ -239,6 +261,7 @@
       <button type="button" data-sign="continuation">Continuation</button>
       <button type="button" data-sign="wayfinding">Wayfinding</button>
       <button type="button" data-sign="advisory">General Advisory</button>
+      <button type="button" data-sign="guide">Color Guide</button>
     </div>
   </div>
 
@@ -277,6 +300,17 @@
     <label for="msgText">Message</label>
     <input type="text" id="msgText" placeholder="This genre has a new home!" autocomplete="off" spellcheck="false">
     <span class="hint">Shown under the big word</span>
+  </div>
+
+  <div class="fg" id="fGuideTitle" hidden>
+    <label for="guideTitle">Title</label>
+    <input type="text" id="guideTitle" placeholder="Library Color Legend" autocomplete="off" spellcheck="false">
+    <label class="check"><input type="checkbox" id="guideBoxes" checked> Show arrow boxes</label>
+  </div>
+
+  <div class="fg" id="fGuideCats" hidden>
+    <span class="lbl">Genres on the sign</span>
+    <div id="guideCatChecks"></div>
   </div>
 
   <div class="fg advField" id="fAdvPreset" hidden>
@@ -338,7 +372,8 @@ const MAX_W = 980; // ≈10.2in — widest sign that fits a landscape Letter pag
 const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
-let state = { sign:'section', cat:'fiction', secText:'', subText:'', shelf:'', msgText:'', showSub:true, tabOnly:false, advTitle:'', advSub:'', advBody:'', otherLabel:'' };
+const DEFAULT_GUIDE_CATS = ['fiction','comics','nonfiction','young','drama'];
+let state = { sign:'section', cat:'fiction', secText:'', subText:'', shelf:'', msgText:'', showSub:true, tabOnly:false, advTitle:'', advSub:'', advBody:'', otherLabel:'', guideTitle:'', guideBoxes:true, guideCats:DEFAULT_GUIDE_CATS.slice() };
 let queue = [];
 
 const ADV_PRESETS = {
@@ -407,6 +442,22 @@ function signHTML(d){
       (sub ? '<span class="adv-sub">' + fmt(sub) + '</span>' : '') +
       (body ? ' <span class="adv-body">' + fmt(body) + '</span>' : '') +
       '</div>' + brand('') + '</div></div>';
+  }
+  if (d.sign === 'guide'){
+    const title = (d.guideTitle || '').trim() || 'Library Color Legend';
+    const ids = (Array.isArray(d.guideCats) ? d.guideCats : DEFAULT_GUIDE_CATS).filter(id => CATS[id]);
+    const rows = ids.map(id => {
+      let label = CATS[id].banner;
+      if (id === 'other'){
+        const custom = (d.otherLabel || '').trim();
+        if (custom) label = custom.toUpperCase();
+      }
+      return '<div class="guide-row" style="--c:' + CATS[id].color + '"><span>' + fmt(label) + '</span>' +
+        (d.guideBoxes !== false ? '<span class="guide-box"></span>' : '') + '</div>';
+    }).join('');
+    return '<div class="sign guide">' +
+      '<div class="guide-title"><span class="t">' + fmt(title) + '</span>' + brand('') + '</div>' +
+      rows + '</div>';
   }
   if (d.sign === 'section'){
     const p = parseSection(d.secText);
@@ -516,8 +567,9 @@ function restore(){
 function syncControls(){
   $$('#signSeg button').forEach(b => b.classList.toggle('on', b.dataset.sign === state.sign));
   $$('#catSeg button').forEach(b => b.classList.toggle('on', b.dataset.cat === state.cat));
-  $('#fCat').hidden = state.sign === 'advisory';
-  $('#fOtherLabel').hidden = state.cat !== 'other' || state.sign === 'advisory' || state.sign === 'continuation';
+  $('#fCat').hidden = state.sign === 'advisory' || state.sign === 'guide';
+  $('#fOtherLabel').hidden = state.cat !== 'other' || state.sign === 'advisory' || state.sign === 'continuation' || state.sign === 'guide';
+  $('#fGuideTitle').hidden = $('#fGuideCats').hidden = state.sign !== 'guide';
   $('#fSection').hidden = state.sign !== 'section' && state.sign !== 'continuation';
   $('#tabOnlyWrap').hidden = state.sign !== 'section';
   $('#showSubWrap').hidden = state.sign !== 'section' || !!state.tabOnly;
@@ -532,6 +584,10 @@ function syncControls(){
   $('#advSub').value = state.advSub || '';
   $('#advBody').value = state.advBody || '';
   $('#otherLabelText').value = state.otherLabel || '';
+  $('#guideTitle').value = state.guideTitle || '';
+  $('#guideBoxes').checked = state.guideBoxes !== false;
+  const gcats = Array.isArray(state.guideCats) ? state.guideCats : DEFAULT_GUIDE_CATS;
+  $$('#guideCatChecks input').forEach(el => { el.checked = gcats.includes(el.dataset.gcat); });
   $('#showSub').checked = state.showSub !== false;
   $('#tabOnly').checked = !!state.tabOnly;
 }
@@ -547,6 +603,15 @@ $('#catSeg').innerHTML = Object.entries(CATS).map(([id, c]) =>
   '<button type="button" data-cat="' + id + '"><i style="background:' + c.color + '"></i>' + c.label + '</button>'
 ).join('');
 
+/* build the color-guide genre checkboxes */
+$('#guideCatChecks').innerHTML = Object.entries(CATS).map(([id, c]) =>
+  '<label class="check"><input type="checkbox" data-gcat="' + id + '"> <i style="background:' + c.color + '"></i> ' + c.label + '</label>'
+).join('');
+$('#guideCatChecks').addEventListener('change', () => {
+  state.guideCats = $$('#guideCatChecks input:checked').map(el => el.dataset.gcat);
+  renderPreview(); persist();
+});
+
 $('#signSeg').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   state.sign = b.dataset.sign;
@@ -558,7 +623,7 @@ $('#catSeg').addEventListener('click', e => {
   syncControls(); renderPreview(); persist();
 });
 
-[['secText','secText'],['subText','subText'],['shelfText','shelf'],['msgText','msgText'],['advTitle','advTitle'],['advSub','advSub'],['advBody','advBody'],['otherLabelText','otherLabel']].forEach(([id, key]) => {
+[['secText','secText'],['subText','subText'],['shelfText','shelf'],['msgText','msgText'],['advTitle','advTitle'],['advSub','advSub'],['advBody','advBody'],['otherLabelText','otherLabel'],['guideTitle','guideTitle']].forEach(([id, key]) => {
   const el = $('#' + id);
   el.addEventListener('input', () => { state[key] = el.value; renderPreview(); persist(); });
   el.addEventListener('keydown', e => {
@@ -573,6 +638,10 @@ $('#showSub').addEventListener('change', () => {
 $('#tabOnly').addEventListener('change', () => {
   state.tabOnly = $('#tabOnly').checked;
   syncControls(); renderPreview(); persist();
+});
+$('#guideBoxes').addEventListener('change', () => {
+  state.guideBoxes = $('#guideBoxes').checked;
+  renderPreview(); persist();
 });
 $('#advPresetSeg').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
