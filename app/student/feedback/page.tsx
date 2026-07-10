@@ -1,10 +1,12 @@
+import FeedbackForm from "@/components/FeedbackForm";
+
 export default function StudentFeedback() {
   return (
     <div className="wrap narrow">
       <h1>Feedback</h1>
-      <p className="sub">The feedback box is being set up — check back soon.</p>
+      <p className="sub">Book wishes, ideas, problems — the library team reads everything.</p>
       <div className="card">
-        <p>Soon you&rsquo;ll be able to send book wishes and ideas straight to the library team.</p>
+        <FeedbackForm audience="student" />
       </div>
     </div>
   );

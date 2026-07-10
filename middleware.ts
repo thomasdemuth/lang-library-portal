@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextFetchEvent, NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken, type Session } from "@/lib/session";
 import { audienceForHost, staffHost, studentHost, studentUrl, type HostAudience } from "@/lib/hosts";
 
@@ -59,7 +59,26 @@ function json401(): NextResponse {
   return applyHeaders(NextResponse.json({ error: "Not signed in" }, { status: 401 }));
 }
 
-export async function middleware(req: NextRequest) {
+/** Fire-and-forget page-view insert straight to PostgREST (no SDK in the edge bundle). */
+function logUsage(row: { audience: string; role: string; path: string; visitor_id: string }): Promise<unknown> {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return Promise.resolve();
+  return fetch(`${url}/rest/v1/usage_events`, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify(row),
+  }).catch(() => undefined);
+}
+
+const VID_COOKIE = "lang_vid";
+
+export async function middleware(req: NextRequest, event: NextFetchEvent) {
   const host = req.headers.get("host");
   const { pathname } = req.nextUrl;
 
@@ -105,9 +124,8 @@ export async function middleware(req: NextRequest) {
     (audience === "staff" &&
       (STAFF_OPEN.has(pathname) || STAFF_OPEN_PREFIXES.some((p) => pathname.startsWith(p))));
 
-  let session: Session | null = null;
+  const session: Session | null = await verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
   if (!isOpen) {
-    session = await verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
     const isApi = pathname.startsWith("/api/");
 
     if (audience === "staff" && (pathname.startsWith("/admin") || pathname.startsWith("/api/admin"))) {
@@ -133,7 +151,30 @@ export async function middleware(req: NextRequest) {
   }
   const url = req.nextUrl.clone();
   url.pathname = `/${audience}${pathname === "/" ? "" : pathname}`;
-  return applyHeaders(NextResponse.rewrite(url));
+  const res = applyHeaders(NextResponse.rewrite(url));
+
+  // ── 6. Usage logging — real page loads only, never blocking ──────────
+  const dest = req.headers.get("sec-fetch-dest");
+  const isPageLoad =
+    dest === "document" ||
+    (req.headers.get("rsc") === "1" && !req.headers.get("next-router-prefetch"));
+  if (isPageLoad) {
+    let vid = req.cookies.get(VID_COOKIE)?.value;
+    if (!vid || !/^[0-9a-f][0-9a-f-]{20,50}$/i.test(vid)) {
+      vid = crypto.randomUUID();
+      res.cookies.set(VID_COOKIE, vid, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 400 * 24 * 3600,
+        path: "/",
+      });
+    }
+    event.waitUntil(
+      logUsage({ audience, role: session?.aud ?? "anon", path: pathname, visitor_id: vid })
+    );
+  }
+  return res;
 }
 
 export const config = {
