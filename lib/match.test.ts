@@ -132,6 +132,13 @@ describe("CSV rows", () => {
     expect(merged.length).toBe(2);
   });
 
+  it("keeps punctuation-only titles importable (the library owns “?”)", () => {
+    const b = rowToBook({ title: "?", ean_isbn13: "9781512483758" });
+    expect(b).not.toBeNull();
+    expect(b!.title_norm.length).toBeGreaterThan(0);
+    expect(b!.title_norm).toBe("?");
+  });
+
   it("falls back through isbn10 to title+author keys", () => {
     const b = rowToBook({ title: "Old Book", upc_isbn10: "0875349242" });
     expect(b?.dedupe_key).toBe("i10:0875349242");

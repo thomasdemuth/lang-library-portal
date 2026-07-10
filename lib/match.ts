@@ -84,26 +84,29 @@ export type BookRecord = {
 
 function digitsOnly(v: unknown): string | null {
   const d = String(v ?? "").replace(/[^0-9Xx]/g, "");
-  return d.length >= 9 ? d.toUpperCase() : null;
+  return d.length >= 9 && d.length <= 20 ? d.toUpperCase() : null;
 }
 
-function text(v: unknown): string | null {
-  const s = String(v ?? "").trim();
+function text(v: unknown, maxLen: number): string | null {
+  const s = String(v ?? "").trim().slice(0, maxLen);
   return s ? s : null;
 }
 
 /** Convert one parsed Libib CSV row (header-keyed object) or null to skip. */
 export function rowToBook(row: Record<string, unknown>): BookRecord | null {
-  const title = text(row.title);
+  const title = text(row.title, 500);
   if (!title) return null;
-  const creators = text(row.creators);
+  const creators = text(row.creators, 500);
   const isbn13 = digitsOnly(row.ean_isbn13 ?? row.isbn13);
   const isbn10 = digitsOnly(row.upc_isbn10 ?? row.isbn10);
   const copiesRaw = row.copies ?? row.quantity ?? 1;
   const copies = Math.max(1, Math.min(999, parseInt(String(copiesRaw), 10) || 1));
 
-  const title_norm = normalizeTitle(title);
-  const creators_norm = creators ? normalizeCreators(creators) : null;
+  // Titles that are pure punctuation (the library owns a book titled "?")
+  // normalize to nothing — fall back to the raw lowercased title so the
+  // record stays valid and exact-matchable.
+  const title_norm = normalizeTitle(title) || title.toLowerCase();
+  const creators_norm = creators ? normalizeCreators(creators) || null : null;
   const dedupe_key = isbn13
     ? `i13:${isbn13}`
     : isbn10
@@ -115,11 +118,11 @@ export function rowToBook(row: Record<string, unknown>): BookRecord | null {
     creators,
     isbn13,
     isbn10,
-    publisher: text(row.publisher),
-    publish_date: text(row.publish_date),
-    group_name: text(row.group),
-    tags: text(row.tags),
-    item_type: text(row.item_type),
+    publisher: text(row.publisher, 300),
+    publish_date: text(row.publish_date, 50),
+    group_name: text(row.group, 300),
+    tags: text(row.tags, 1000),
+    item_type: text(row.item_type, 50),
     copies,
     title_norm,
     creators_norm,
@@ -198,8 +201,9 @@ export function chooseMatch(
   request: { title: string; author?: string | null; copies: number },
   candidates: Candidate[]
 ): MatchResult {
-  const reqTitleNorm = normalizeTitle(request.title);
-  const reqTitleShortNorm = normalizeTitle(stripSubtitle(request.title));
+  const reqTitleNorm = normalizeTitle(request.title) || request.title.toLowerCase().trim();
+  const reqTitleShortNorm =
+    normalizeTitle(stripSubtitle(request.title)) || reqTitleNorm;
   const reqAuthorNorm = request.author ? normalizeCreators(request.author) : null;
   const reqAuthorTokens = request.author ? nameTokens(request.author) : new Set<string>();
 
