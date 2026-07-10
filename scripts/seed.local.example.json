@@ -1,0 +1,5 @@
+[
+  { "username": "admin1", "email": "librarian@thelangschool.org", "name": "First Last", "password": "change-me-please-1" },
+  { "username": "admin2", "email": "second@thelangschool.org", "name": "First Last", "password": "change-me-please-2" },
+  { "username": "admin3", "email": "third@thelangschool.org", "name": "First Last", "password": "change-me-please-3" }
+]
