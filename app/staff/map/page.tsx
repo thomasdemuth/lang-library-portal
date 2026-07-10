@@ -1,14 +1,11 @@
+import LibraryMap from "@/components/map/LibraryMap";
+
 export default function StaffMap() {
   return (
-    <div className="wrap">
+    <div className="wrap" style={{ maxWidth: 1280 }}>
       <h1>Library Map</h1>
-      <p className="sub">The interactive map is being set up — check back soon.</p>
-      <div className="card">
-        <p>
-          Once the library team finishes placing shelves, you&rsquo;ll be able to zoom around and
-          click any shelf to see its section and details.
-        </p>
-      </div>
+      <p className="sub">Zoom around and click any shelf to see its section and details.</p>
+      <LibraryMap editable={false} />
     </div>
   );
 }
