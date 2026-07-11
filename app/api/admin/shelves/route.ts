@@ -9,6 +9,7 @@ const Shelf = z.object({
   label: z.string().trim().min(1).max(80),
   category: z.enum(CATEGORY_IDS as [string, ...string[]]),
   letter_range: z.string().trim().max(40).nullable(),
+  shelf_number: z.string().trim().max(40).nullable(),
   details_public: z.string().trim().max(1000).nullable(),
   notes_internal: z.string().trim().max(2000).nullable(),
   x: z.number().finite(),
@@ -39,12 +40,13 @@ export const PUT = guarded(async (req: NextRequest) => {
   }
   if (upserts.length > 0) {
     const now = new Date().toISOString();
-    const { error } = await db()
-      .from("shelves")
-      .upsert(
-        upserts.map((s) => ({ ...s, updated_at: now, updated_by: admin.id })),
-        { onConflict: "id" }
-      );
+    const rows = upserts.map((s) => ({ ...s, updated_at: now, updated_by: admin.id }));
+    let { error } = await db().from("shelves").upsert(rows, { onConflict: "id" });
+    // Resilience: if the shelf_number migration hasn't run yet, drop it and retry.
+    if (error && /shelf_number/.test(error.message ?? "")) {
+      const stripped = rows.map(({ shelf_number: _drop, ...rest }) => rest);
+      ({ error } = await db().from("shelves").upsert(stripped, { onConflict: "id" }));
+    }
     if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
   return NextResponse.json({ ok: true, saved: upserts.length, deleted: deleteIds.length });

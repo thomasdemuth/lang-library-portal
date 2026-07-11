@@ -12,7 +12,9 @@ export default function SiteHeader({
   return (
     <header className="topbar">
       <a className="brand" href="/">
-        <b>Lang Library</b>
+        <b>
+          <span className="lang">Lang</span> <span className="lib">Library</span>
+        </b>
         <span>{tagline}</span>
       </a>
       <nav className="nav">

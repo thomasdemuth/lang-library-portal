@@ -9,7 +9,7 @@ export default function StaffHome() {
             <span className="dot" style={{ background: "#b2222c" }} />
             Book Requests
           </h2>
-          <p>Need copies for your class? Submit a request — we check the shelves instantly.</p>
+          <p>Need copies for your class? Submit a request and see what the library already has on the shelves.</p>
         </a>
         <a className="card" href="/map">
           <h2>

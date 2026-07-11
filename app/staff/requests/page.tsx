@@ -5,7 +5,7 @@ export default function StaffRequests() {
     <div className="wrap">
       <h1>Book Requests</h1>
       <p className="sub">
-        Request books for your class — we instantly check whether the library has enough copies.
+        Request books for your class and see what the library already has on the shelves.
       </p>
       <RequestsPanel />
     </div>

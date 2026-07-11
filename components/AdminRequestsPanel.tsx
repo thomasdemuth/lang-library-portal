@@ -56,6 +56,16 @@ export default function AdminRequestsPanel() {
     load();
   }
 
+  async function deleteRequest(id: number, title: string) {
+    if (!confirm(`Delete request #${id} (“${title}”)? This can't be undone.`)) return;
+    const res = await fetch(`/api/admin/requests/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      setError((await res.json()).error ?? "Couldn't delete the request.");
+      return;
+    }
+    load();
+  }
+
   return (
     <>
       {error && <div className="error">{error}</div>}
@@ -181,9 +191,14 @@ export default function AdminRequestsPanel() {
                     placeholder="Ordered 4 from Ingram, ETA next week…"
                   />
                 </div>
-                <button className="btn" onClick={() => patch(r.id, { admin_note: noteDraft || null })}>
-                  Save note
-                </button>
+                <div style={{ display: "flex", gap: 8, justifyContent: "space-between" }}>
+                  <button className="btn" onClick={() => patch(r.id, { admin_note: noteDraft || null })}>
+                    Save note
+                  </button>
+                  <button className="btn ghost" onClick={() => deleteRequest(r.id, r.title)}>
+                    Delete request
+                  </button>
+                </div>
               </div>
             )}
           </div>

@@ -8,9 +8,16 @@ import { guarded, requireAdmin } from "@/lib/guards";
  * in public/ so there is no unauthenticated path to it; the middleware guards
  * this URL and we re-check here.
  */
+/** A floating "back to Management" link, injected so the standalone file stays pristine. Hidden when printing. */
+const BACK_LINK = `
+<style>@media print{#adminBack{display:none!important}}</style>
+<a id="adminBack" href="/admin" style="position:fixed;top:12px;right:14px;z-index:99999;background:#1c2330;color:#fff;text-decoration:none;font:700 13px/1 Montserrat,-apple-system,Arial,sans-serif;padding:10px 14px;border-radius:9px;box-shadow:0 2px 10px rgba(16,24,40,.22)">← Management</a>
+</body>`;
+
 export const GET = guarded(async (req: NextRequest) => {
   await requireAdmin(req);
-  const file = await readFile(path.join(process.cwd(), "assets", "sign-maker.html"));
+  const raw = await readFile(path.join(process.cwd(), "assets", "sign-maker.html"), "utf8");
+  const file = raw.includes("</body>") ? raw.replace("</body>", BACK_LINK) : raw + BACK_LINK;
   return new NextResponse(file, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",

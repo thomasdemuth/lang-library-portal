@@ -62,7 +62,7 @@ export default function GateForm({ placeholder }: { placeholder: string }) {
           onChange={(e) => setEmail(e.target.value)}
         />
       </div>
-      <button className="btn primary" type="submit" disabled={busy} style={{ width: "100%" }}>
+      <button className="btn brand" type="submit" disabled={busy} style={{ width: "100%" }}>
         {busy ? "Checking…" : "Enter the library"}
       </button>
     </form>

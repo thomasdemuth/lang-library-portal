@@ -76,6 +76,16 @@ export default function RequestsPanel() {
     load();
   }, []);
 
+  async function deleteRequest(id: number, title: string) {
+    if (!confirm(`Delete your request for “${title}”? This can't be undone.`)) return;
+    const res = await fetch(`/api/requests/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      setError((await res.json()).error ?? "Couldn't delete that request.");
+      return;
+    }
+    load();
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -118,15 +128,12 @@ export default function RequestsPanel() {
       <div className="card" style={{ marginBottom: 20 }}>
         <h2 style={{ marginTop: 0 }}>New request</h2>
         <p className="hint" style={{ marginTop: 0 }}>
-          We check the library&rsquo;s inventory the moment you submit.
+          We&rsquo;ll match your request against the library&rsquo;s current shelves.
         </p>
         {error && <div className="error">{error}</div>}
         {result && (
           <div className={result.status === "found" ? "notice" : "error"}>
-            {result.message}{" "}
-            {result.status === "found"
-              ? "The library team has been notified and will get them to you."
-              : "The library team has been notified and will follow up."}
+            {result.message} You&rsquo;ll find it in your requests below.
           </div>
         )}
         <form onSubmit={submit}>
@@ -185,6 +192,7 @@ export default function RequestsPanel() {
                 <th>Needed by</th>
                 <th>Inventory check</th>
                 <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -208,6 +216,15 @@ export default function RequestsPanel() {
                     <span className="pill" style={{ background: r.status === "ready" ? "#e7f6f3" : "#eef0f5" }}>
                       {STATUS_LABELS[r.status] ?? r.status}
                     </span>
+                  </td>
+                  <td>
+                    <button
+                      className="btn ghost"
+                      style={{ padding: "4px 8px", fontSize: 12 }}
+                      onClick={() => deleteRequest(r.id, r.title)}
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}

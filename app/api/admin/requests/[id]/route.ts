@@ -39,3 +39,16 @@ export const PATCH = guarded(
     return NextResponse.json({ ok: true, request: data });
   }
 );
+
+/** An admin may delete any request. */
+export const DELETE = guarded(
+  async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
+    await requireAdmin(req);
+    const { id } = await ctx.params;
+    const requestId = Number(id);
+    if (!Number.isInteger(requestId)) return NextResponse.json({ error: "Bad id" }, { status: 400 });
+    const { error } = await db().from("book_requests").delete().eq("id", requestId);
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+);
