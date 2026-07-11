@@ -32,7 +32,7 @@ type Parsed = {
 
 const BATCH = 500;
 
-export default function InventoryPanel() {
+export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const [active, setActive] = useState<Sync | null>(null);
   const [bookCount, setBookCount] = useState(0);
   const [history, setHistory] = useState<Sync[]>([]);
@@ -175,6 +175,7 @@ export default function InventoryPanel() {
         )}
       </div>
 
+      {canImport && (
       <div
         className="card"
         style={{
@@ -236,6 +237,7 @@ export default function InventoryPanel() {
           </div>
         )}
       </div>
+      )}
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h2 style={{ marginTop: 0 }}>Search the catalog</h2>

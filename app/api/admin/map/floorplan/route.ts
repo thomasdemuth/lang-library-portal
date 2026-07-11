@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { guarded, requireAdmin } from "@/lib/guards";
+import { guarded, requirePermission } from "@/lib/guards";
 
 const MAX_BYTES = 4 * 1024 * 1024; // stay under Vercel's request limit
 const TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
@@ -11,7 +11,7 @@ const TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
  * to ≤4096px before uploading.
  */
 export const PUT = guarded(async (req: NextRequest) => {
-  const admin = await requireAdmin(req);
+  const admin = await requirePermission(req, "map_floorplan");
   const type = req.headers.get("content-type") ?? "";
   if (!TYPES.has(type)) {
     return NextResponse.json({ error: "Upload a PNG, JPEG, or WebP image." }, { status: 415 });

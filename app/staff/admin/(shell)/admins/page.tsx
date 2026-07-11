@@ -1,13 +1,13 @@
-import { currentAdmin } from "@/lib/server";
+import { requireChiefPage } from "@/lib/server";
 import AdminsPanel from "@/components/AdminsPanel";
 
 export default async function AdminsPage() {
-  const admin = await currentAdmin();
+  const admin = await requireChiefPage();
   return (
     <>
       <h1>Admins &amp; Invites</h1>
-      <p className="sub">Manage management accounts and private invite links.</p>
-      <AdminsPanel selfId={admin!.id} />
+      <p className="sub">Add admins, choose each one&rsquo;s powers, and manage invite links.</p>
+      <AdminsPanel selfId={admin.id} />
     </>
   );
 }

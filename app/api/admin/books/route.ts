@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { guarded, requireAdmin } from "@/lib/guards";
+import { guarded, requirePermission } from "@/lib/guards";
 import { normalizeTitle } from "@/lib/match";
 
 const PAGE_SIZE = 50;
 
 /** Search the active inventory generation. */
 export const GET = guarded(async (req: NextRequest) => {
-  await requireAdmin(req);
+  await requirePermission(req, "inventory_view");
   const q = (req.nextUrl.searchParams.get("q") ?? "").slice(0, 200);
   const page = Math.max(0, parseInt(req.nextUrl.searchParams.get("page") ?? "0", 10) || 0);
 

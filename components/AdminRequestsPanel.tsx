@@ -24,7 +24,7 @@ type AdminRequest = {
 
 const FILTERS = ["all", "new", "in_progress", "ordered", "ready", "declined"] as const;
 
-export default function AdminRequestsPanel() {
+export default function AdminRequestsPanel({ canDelete }: { canDelete: boolean }) {
   const [requests, setRequests] = useState<AdminRequest[]>([]);
   const [newCount, setNewCount] = useState(0);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
@@ -195,9 +195,11 @@ export default function AdminRequestsPanel() {
                   <button className="btn" onClick={() => patch(r.id, { admin_note: noteDraft || null })}>
                     Save note
                   </button>
-                  <button className="btn ghost" onClick={() => deleteRequest(r.id, r.title)}>
-                    Delete request
-                  </button>
+                  {canDelete && (
+                    <button className="btn ghost" onClick={() => deleteRequest(r.id, r.title)}>
+                      Delete request
+                    </button>
+                  )}
                 </div>
               </div>
             )}

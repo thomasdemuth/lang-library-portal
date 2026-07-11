@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken, type Session } from "@/lib/session";
 import { db } from "@/lib/db";
+import { canDo, type AdminRole, type PermKey } from "@/lib/permissions";
 
 export type AdminIdentity = {
   id: string;
@@ -9,6 +10,8 @@ export type AdminIdentity = {
   name: string;
   session_v: number;
   notify_requests: boolean;
+  role: AdminRole;
+  permissions: Record<string, boolean>;
 };
 
 export class GuardError extends Error {
@@ -44,17 +47,43 @@ export async function requireAdmin(req: NextRequest): Promise<AdminIdentity> {
   const session = await requireSession(req);
   if (session.aud !== "admin" || !session.sub) throw deny(401, "Admin sign-in required");
 
-  const { data, error } = await db()
-    .from("admins")
-    .select("id, username, email, name, session_v, notify_requests, disabled_at")
-    .eq("id", session.sub)
-    .maybeSingle();
+  const full = "id, username, email, name, session_v, notify_requests, disabled_at, role, permissions";
+  let { data, error } = await db().from("admins").select(full).eq("id", session.sub).maybeSingle();
+  // Resilience: before migration 0004, role/permissions don't exist — behave
+  // exactly as the app did then (every admin has full access = chief).
+  if (error && /role|permissions|column/i.test(error.message ?? "")) {
+    const retry = await db()
+      .from("admins")
+      .select("id, username, email, name, session_v, notify_requests, disabled_at")
+      .eq("id", session.sub)
+      .maybeSingle();
+    data = retry.data ? { ...retry.data, role: "chief", permissions: {} } : null;
+    error = retry.error;
+  }
   if (error) throw deny(500, "Database error");
   if (!data || data.disabled_at || data.session_v !== session.v) {
     throw deny(401, "Session expired — sign in again");
   }
-  const { disabled_at: _drop, ...identity } = data;
-  return identity as AdminIdentity;
+  const { disabled_at: _drop, ...rest } = data;
+  return {
+    ...rest,
+    role: rest.role === "chief" ? "chief" : "admin",
+    permissions: (rest.permissions as Record<string, boolean>) ?? {},
+  } as AdminIdentity;
+}
+
+/** Chief Admin only. */
+export async function requireChief(req: NextRequest): Promise<AdminIdentity> {
+  const admin = await requireAdmin(req);
+  if (admin.role !== "chief") throw deny(403, "Chief Admins only.");
+  return admin;
+}
+
+/** An admin holding a specific granted power (or Chief). */
+export async function requirePermission(req: NextRequest, key: PermKey): Promise<AdminIdentity> {
+  const admin = await requireAdmin(req);
+  if (!canDo(admin, key)) throw deny(403, "You don't have permission for that.");
+  return admin;
 }
 
 /** Wrap a route handler so GuardError responses are returned, not thrown. */

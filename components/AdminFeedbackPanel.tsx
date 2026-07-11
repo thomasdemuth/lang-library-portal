@@ -14,7 +14,7 @@ type Feedback = {
 
 const FILTERS = ["new", "read", "archived", "all"] as const;
 
-export default function AdminFeedbackPanel() {
+export default function AdminFeedbackPanel({ canManage }: { canManage: boolean }) {
   const [items, setItems] = useState<Feedback[]>([]);
   const [newCount, setNewCount] = useState(0);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("new");
@@ -78,12 +78,12 @@ export default function AdminFeedbackPanel() {
                 {f.email} · {new Date(f.created_at).toLocaleString()}
               </p>
               <span style={{ display: "flex", gap: 6 }}>
-                {f.status !== "read" && (
+                {canManage && f.status !== "read" && (
                   <button className="btn" onClick={() => setStatus(f.id, "read")}>
                     Mark read
                   </button>
                 )}
-                {f.status !== "archived" && (
+                {canManage && f.status !== "archived" && (
                   <button className="btn ghost" onClick={() => setStatus(f.id, "archived")}>
                     Archive
                   </button>

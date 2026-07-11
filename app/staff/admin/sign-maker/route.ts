@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { guarded, requireAdmin } from "@/lib/guards";
+import { canDo } from "@/lib/permissions";
+import { staffUrl } from "@/lib/hosts";
 
 /**
  * Streams the sign maker verbatim, admin-only. The file is intentionally NOT
@@ -15,7 +17,8 @@ const BACK_LINK = `
 </body>`;
 
 export const GET = guarded(async (req: NextRequest) => {
-  await requireAdmin(req);
+  const admin = await requireAdmin(req);
+  if (!canDo(admin, "signmaker")) return NextResponse.redirect(`${staffUrl()}/admin`);
   const raw = await readFile(path.join(process.cwd(), "assets", "sign-maker.html"), "utf8");
   const file = raw.includes("</body>") ? raw.replace("</body>", BACK_LINK) : raw + BACK_LINK;
   return new NextResponse(file, {

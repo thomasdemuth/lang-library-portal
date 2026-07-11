@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { guarded, requireAdmin } from "@/lib/guards";
+import { guarded, requirePermission } from "@/lib/guards";
 
 const Body = z.object({ status: z.enum(["new", "read", "archived"]) });
 
 export const PATCH = guarded(
   async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
-    const admin = await requireAdmin(req);
+    const admin = await requirePermission(req, "feedback_manage");
     const { id } = await ctx.params;
     const feedbackId = Number(id);
     if (!Number.isInteger(feedbackId)) return NextResponse.json({ error: "Bad id" }, { status: 400 });

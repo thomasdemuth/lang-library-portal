@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { guarded, requireAdmin } from "@/lib/guards";
+import { guarded, requirePermission } from "@/lib/guards";
 
 const Row = z.object({
   title: z.string().min(1).max(500),
@@ -23,7 +23,7 @@ const Body = z.object({ rows: z.array(Row).min(1).max(600) });
 /** Receive one batch of pre-normalized, pre-merged rows for a pending sync. */
 export const POST = guarded(
   async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
-    await requireAdmin(req);
+    await requirePermission(req, "inventory_import");
     const { id } = await ctx.params;
     const syncId = Number(id);
     if (!Number.isInteger(syncId)) return NextResponse.json({ error: "Bad id" }, { status: 400 });

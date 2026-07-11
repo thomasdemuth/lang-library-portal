@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { guarded, requireAdmin } from "@/lib/guards";
+import { guarded, requirePermission } from "@/lib/guards";
 
 const Body = z.object({
   row_count: z.number().int().min(0).max(1000000).optional(),
@@ -11,7 +11,7 @@ const Body = z.object({
 /** Atomically make this pending generation the live inventory. */
 export const POST = guarded(
   async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
-    await requireAdmin(req);
+    await requirePermission(req, "inventory_import");
     const { id } = await ctx.params;
     const syncId = Number(id);
     if (!Number.isInteger(syncId)) return NextResponse.json({ error: "Bad id" }, { status: 400 });

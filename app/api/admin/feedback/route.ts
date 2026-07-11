@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { guarded, requireAdmin } from "@/lib/guards";
+import { guarded, requirePermission } from "@/lib/guards";
 
 const STATUSES = new Set(["new", "read", "archived"]);
 
 export const GET = guarded(async (req: NextRequest) => {
-  await requireAdmin(req);
+  await requirePermission(req, "feedback_view");
   const status = req.nextUrl.searchParams.get("status");
   let query = db()
     .from("feedback")

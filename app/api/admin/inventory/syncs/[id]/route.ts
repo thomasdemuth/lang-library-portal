@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { guarded, requireAdmin } from "@/lib/guards";
+import { guarded, requirePermission } from "@/lib/guards";
 
 /** Abort a pending import (the active inventory is untouched). */
 export const DELETE = guarded(
   async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
-    await requireAdmin(req);
+    await requirePermission(req, "inventory_import");
     const { id } = await ctx.params;
     const syncId = Number(id);
     if (!Number.isInteger(syncId)) return NextResponse.json({ error: "Bad id" }, { status: 400 });

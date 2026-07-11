@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { guarded, requireAdmin } from "@/lib/guards";
+import { guarded, requirePermission } from "@/lib/guards";
 
 const CreateBody = z.object({ source_filename: z.string().trim().max(200).optional() });
 
 /** Start a new pending inventory generation. */
 export const POST = guarded(async (req: NextRequest) => {
-  const admin = await requireAdmin(req);
+  const admin = await requirePermission(req, "inventory_import");
   const parsed = CreateBody.safeParse(await req.json().catch(() => ({})));
 
   // Only one pending sync at a time: abort any stale ones first.
@@ -32,7 +32,7 @@ export const POST = guarded(async (req: NextRequest) => {
 
 /** Sync history + the active generation's book count. */
 export const GET = guarded(async (req: NextRequest) => {
-  await requireAdmin(req);
+  await requirePermission(req, "inventory_view");
   const { data: syncs, error } = await db()
     .from("inventory_syncs")
     .select("id, status, source_filename, row_count, merged_count, started_at, activated_at")

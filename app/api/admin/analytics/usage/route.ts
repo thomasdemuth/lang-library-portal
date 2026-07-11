@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { guarded, requireAdmin } from "@/lib/guards";
+import { guarded, requirePermission } from "@/lib/guards";
 
 function isoDay(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
 export const GET = guarded(async (req: NextRequest) => {
-  await requireAdmin(req);
+  await requirePermission(req, "analytics");
   const days = Math.min(90, Math.max(7, parseInt(req.nextUrl.searchParams.get("days") ?? "30", 10) || 30));
   const to = new Date();
   const from = new Date(Date.now() - (days - 1) * 24 * 3600 * 1000);

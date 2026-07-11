@@ -1,6 +1,8 @@
 import AnalyticsPanel from "@/components/AnalyticsPanel";
+import { requirePermPage } from "@/lib/server";
 
-export default function AnalyticsPage() {
+export default async function AnalyticsPage() {
+  await requirePermPage("analytics");
   return (
     <>
       <h1>Site Usage</h1>

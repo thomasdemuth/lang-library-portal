@@ -1,11 +1,12 @@
 import { db } from "@/lib/db";
 import { currentAdmin } from "@/lib/server";
+import { canDo } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 async function counts() {
   const client = db();
-  const [requests, feedback, active, cronBeat] = await Promise.all([
+  const [requests, feedback, active] = await Promise.all([
     client.from("book_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
     client.from("feedback").select("id", { count: "exact", head: true }).eq("status", "new"),
     client
@@ -13,82 +14,86 @@ async function counts() {
       .select("id, activated_at, merged_count")
       .eq("status", "active")
       .maybeSingle(),
-    client
-      .from("book_requests")
-      .select("reminder_sent_at")
-      .not("reminder_sent_at", "is", null)
-      .order("reminder_sent_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
   ]);
   return {
     newRequests: requests.count ?? 0,
     newFeedback: feedback.count ?? 0,
     books: active.data?.merged_count ?? 0,
     lastSync: active.data?.activated_at ?? null,
-    lastReminder: cronBeat.data?.reminder_sent_at ?? null,
   };
 }
 
 export default async function AdminDashboard() {
   const admin = await currentAdmin();
-  let stats = { newRequests: 0, newFeedback: 0, books: 0, lastSync: null as string | null, lastReminder: null as string | null };
+  let stats = { newRequests: 0, newFeedback: 0, books: 0, lastSync: null as string | null };
   try {
     stats = await counts();
   } catch {
     /* dashboard should render even if the DB hiccups */
   }
 
+  const isChief = admin?.role === "chief";
+  const can = (k: Parameters<typeof canDo>[1]) => (admin ? canDo(admin, k) : false);
+
+  const kpis = [
+    { show: can("requests"), b: String(stats.newRequests), label: "new book requests" },
+    { show: can("feedback_view"), b: String(stats.newFeedback), label: "unread feedback" },
+    { show: can("inventory_view"), b: stats.books.toLocaleString(), label: "titles in inventory" },
+    {
+      show: can("inventory_view"),
+      b: stats.lastSync ? new Date(stats.lastSync).toLocaleDateString() : "never",
+      label: "last Libib sync",
+    },
+  ].filter((k) => k.show);
+
+  const cards = [
+    { show: can("requests"), href: "/admin/requests", h: `Book Requests${stats.newRequests > 0 ? ` (${stats.newRequests})` : ""}`, p: "Review teacher requests and set their status." },
+    { show: can("feedback_view"), href: "/admin/feedback", h: `Feedback${stats.newFeedback > 0 ? ` (${stats.newFeedback})` : ""}`, p: "What students and teachers are telling you." },
+    { show: can("inventory_view") || can("inventory_import"), href: "/admin/inventory", h: "Inventory", p: "Upload the latest Libib export and search the catalog." },
+    { show: can("map_edit") || can("map_floorplan"), href: "/admin/map", h: "Map Editor", p: "Place shelves, set categories, keep internal notes." },
+    { show: can("signmaker"), href: "/admin/sign-maker", h: "Sign Maker", p: "Print shelf tabs, banners, and wayfinding signs." },
+    { show: can("analytics"), href: "/admin/analytics", h: "Site Usage", p: "Visits and activity across both sites." },
+    { show: isChief, href: "/admin/admins", h: "Admins & Invites", p: "Add admins, set their powers, and manage invites." },
+  ].filter((c) => c.show);
+
   return (
     <>
       <h1>Management dashboard</h1>
-      <p className="sub">Welcome back, {admin?.name?.split(" ")[0] ?? "librarian"}.</p>
+      <p className="sub">
+        Welcome back, {admin?.name?.split(" ")[0] ?? "librarian"}.{" "}
+        <span className="pill" style={{ background: isChief ? "#eef1fb" : "#eef0f5", marginLeft: 4 }}>
+          {isChief ? "Chief Admin" : "Admin"}
+        </span>
+      </p>
 
-      <div className="kpis" style={{ marginBottom: 22 }}>
-        <div className="kpi">
-          <b>{stats.newRequests}</b>
-          <span>new book requests</span>
+      {kpis.length > 0 && (
+        <div className="kpis" style={{ marginBottom: 22 }}>
+          {kpis.map((k, i) => (
+            <div className="kpi" key={i}>
+              <b>{k.b}</b>
+              <span>{k.label}</span>
+            </div>
+          ))}
         </div>
-        <div className="kpi">
-          <b>{stats.newFeedback}</b>
-          <span>unread feedback</span>
-        </div>
-        <div className="kpi">
-          <b>{stats.books.toLocaleString()}</b>
-          <span>titles in inventory</span>
-        </div>
-        <div className="kpi">
-          <b>{stats.lastSync ? new Date(stats.lastSync).toLocaleDateString() : "never"}</b>
-          <span>last Libib sync</span>
-        </div>
-      </div>
+      )}
 
-      <div className="cards">
-        <a className="card" href="/admin/requests">
-          <h2>Book Requests{stats.newRequests > 0 ? ` (${stats.newRequests})` : ""}</h2>
-          <p>Review teacher requests and set their status.</p>
-        </a>
-        <a className="card" href="/admin/feedback">
-          <h2>Feedback{stats.newFeedback > 0 ? ` (${stats.newFeedback})` : ""}</h2>
-          <p>What students and teachers are telling you.</p>
-        </a>
-        <a className="card" href="/admin/inventory">
-          <h2>Inventory</h2>
-          <p>Upload the latest Libib export and search the catalog.</p>
-        </a>
-        <a className="card" href="/admin/map">
-          <h2>Map Editor</h2>
-          <p>Place shelves, set categories, keep internal notes.</p>
-        </a>
-        <a className="card" href="/admin/sign-maker">
-          <h2>Sign Maker</h2>
-          <p>Print shelf tabs, banners, and wayfinding signs.</p>
-        </a>
-        <a className="card" href="/admin/analytics">
-          <h2>Site Usage</h2>
-          <p>Visits and activity across both sites.</p>
-        </a>
-      </div>
+      {cards.length > 0 ? (
+        <div className="cards">
+          {cards.map((c) => (
+            <a className="card" href={c.href} key={c.href}>
+              <h2>{c.h}</h2>
+              <p>{c.p}</p>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <div className="card">
+          <p className="hint" style={{ margin: 0 }}>
+            You don&rsquo;t have any powers assigned yet. A Chief Admin can grant them from
+            <b> Admins &amp; Invites</b>.
+          </p>
+        </div>
+      )}
     </>
   );
 }

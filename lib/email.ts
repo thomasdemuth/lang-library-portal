@@ -30,12 +30,20 @@ export async function sendEmail(to: string[], subject: string, text: string): Pr
   }
 }
 
-/** Emails of active admins who want request notifications. */
+/** Emails of active admins who want request notifications AND can act on them. */
 export async function notifyAdminEmails(): Promise<string[]> {
-  const { data } = await db()
-    .from("admins")
-    .select("email, notify_requests, disabled_at")
-    .eq("notify_requests", true)
-    .is("disabled_at", null);
-  return (data ?? []).map((a) => a.email);
+  const full = "email, notify_requests, disabled_at, role, permissions";
+  let { data, error } = await db().from("admins").select(full).eq("notify_requests", true).is("disabled_at", null);
+  if (error && /role|permissions|column/i.test(error.message ?? "")) {
+    // Pre-migration: no roles yet — everyone with notify on is notified.
+    const retry = await db()
+      .from("admins")
+      .select("email, notify_requests, disabled_at")
+      .eq("notify_requests", true)
+      .is("disabled_at", null);
+    return (retry.data ?? []).map((a) => a.email);
+  }
+  return (data ?? [])
+    .filter((a) => a.role === "chief" || (a.permissions as Record<string, boolean>)?.requests === true)
+    .map((a) => a.email);
 }

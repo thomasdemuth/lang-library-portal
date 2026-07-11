@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { guarded, requireAdmin } from "@/lib/guards";
+import { guarded, requirePermission } from "@/lib/guards";
 import { CATEGORY_IDS } from "@/lib/categories";
 
 const Shelf = z.object({
@@ -27,7 +27,7 @@ const Body = z.object({
 
 /** Bulk save from the map editor: upsert everything, delete the removed. */
 export const PUT = guarded(async (req: NextRequest) => {
-  const admin = await requireAdmin(req);
+  const admin = await requirePermission(req, "map_edit");
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid shelves payload" }, { status: 400 });

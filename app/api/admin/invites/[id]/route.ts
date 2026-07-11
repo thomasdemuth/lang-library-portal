@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { guarded, requireAdmin } from "@/lib/guards";
+import { guarded, requireChief } from "@/lib/guards";
 
 export const DELETE = guarded(
   async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
-    await requireAdmin(req);
+    await requireChief(req);
     const { id } = await ctx.params;
     if (!z.string().uuid().safeParse(id).success) {
       return NextResponse.json({ error: "Bad id" }, { status: 400 });

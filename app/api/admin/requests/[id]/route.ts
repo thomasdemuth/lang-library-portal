@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { guarded, requireAdmin } from "@/lib/guards";
+import { guarded, requireChief, requirePermission } from "@/lib/guards";
 
 const Body = z.object({
   status: z.enum(["new", "in_progress", "ordered", "ready", "declined"]).optional(),
@@ -10,7 +10,7 @@ const Body = z.object({
 
 export const PATCH = guarded(
   async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
-    const admin = await requireAdmin(req);
+    const admin = await requirePermission(req, "requests");
     const { id } = await ctx.params;
     const requestId = Number(id);
     if (!Number.isInteger(requestId)) return NextResponse.json({ error: "Bad id" }, { status: 400 });
@@ -40,10 +40,10 @@ export const PATCH = guarded(
   }
 );
 
-/** An admin may delete any request. */
+/** Deleting a request is reserved for Chief Admins. */
 export const DELETE = guarded(
   async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
-    await requireAdmin(req);
+    await requireChief(req);
     const { id } = await ctx.params;
     const requestId = Number(id);
     if (!Number.isInteger(requestId)) return NextResponse.json({ error: "Bad id" }, { status: 400 });
