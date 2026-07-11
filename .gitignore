@@ -8,3 +8,5 @@ node_modules/
 scripts/seed.local.json
 *.tsbuildinfo
 next-env.d.ts
+.vercel
+.env*
