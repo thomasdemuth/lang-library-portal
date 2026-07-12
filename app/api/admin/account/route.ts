@@ -1,0 +1,83 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { db } from "@/lib/db";
+import { guarded, requireAdmin } from "@/lib/guards";
+import { verifyPassword } from "@/lib/passwords";
+import { SESSION_COOKIE } from "@/lib/session";
+
+const Body = z.object({ password: z.string().min(1, "Enter your password to confirm.") });
+
+const PROTECTED_EMAIL = "library@thelangschool.org";
+
+function isForeignKeyViolation(message: string | undefined): boolean {
+  return /foreign key|violates.*constraint/i.test(message ?? "");
+}
+
+/**
+ * Self-service account deletion. The shared `library@` mailbox account can't
+ * be deleted this way (it's the fallback login every other admin depends on).
+ *
+ * Tries a real row delete first; if the admin has history elsewhere (handled
+ * a request, ran an import, edited the map...) foreign keys block that, so we
+ * fall back to the same disable-and-revoke-sessions path Chiefs use — the
+ * account can no longer sign in or appear as active, but past records stay intact.
+ */
+export const DELETE = guarded(async (req: NextRequest) => {
+  const admin = await requireAdmin(req);
+  if (admin.email.toLowerCase() === PROTECTED_EMAIL) {
+    return NextResponse.json({ error: "This account can't be deleted." }, { status: 403 });
+  }
+
+  const parsed = Body.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
+  }
+
+  const { data: row, error: readErr } = await db()
+    .from("admins")
+    .select("password_hash")
+    .eq("id", admin.id)
+    .single();
+  if (readErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
+  if (!(await verifyPassword(parsed.data.password, row.password_hash))) {
+    return NextResponse.json({ error: "Password is wrong." }, { status: 403 });
+  }
+
+  if (admin.role === "chief") {
+    const { count } = await db()
+      .from("admins")
+      .select("id", { count: "exact", head: true })
+      .eq("role", "chief")
+      .is("disabled_at", null)
+      .neq("id", admin.id);
+    if ((count ?? 0) === 0) {
+      return NextResponse.json(
+        { error: "You're the last active Chief Admin — promote someone else first." },
+        { status: 400 }
+      );
+    }
+  }
+
+  const { error: delErr } = await db().from("admins").delete().eq("id", admin.id);
+  if (delErr && !isForeignKeyViolation(delErr.message)) {
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
+  if (delErr) {
+    // History elsewhere references this admin — disable instead of erasing.
+    const { error: disableErr } = await db()
+      .from("admins")
+      .update({ disabled_at: new Date().toISOString(), session_v: 999999999 })
+      .eq("id", admin.id);
+    if (disableErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
+
+  const res = NextResponse.json({ ok: true });
+  res.cookies.set(SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
+  return res;
+});

@@ -2,6 +2,7 @@ import { requireAdminPage } from "@/lib/server";
 import { db } from "@/lib/db";
 import PasswordForm from "@/components/PasswordForm";
 import NotificationPrefs from "@/components/NotificationPrefs";
+import DeleteAccountForm from "@/components/DeleteAccountForm";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,7 @@ export default async function AccountPage() {
         notifyRequests={admin.notify_requests}
         notifyWeekly={notifyWeekly}
       />
+      {admin.email.toLowerCase() !== "library@thelangschool.org" && <DeleteAccountForm />}
     </>
   );
 }

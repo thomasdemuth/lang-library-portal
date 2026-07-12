@@ -98,6 +98,8 @@ textarea.input { font-weight: 500; resize: vertical; min-height: 110px; line-hei
 .btn.brand:hover { background: var(--brand-blue-deep); border-color: var(--brand-blue-deep); }
 .btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
 .btn.ghost:hover { color: var(--danger); }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.danger:hover { background: #8f1b23; border-color: #8f1b23; }
 .btn:disabled { opacity: .55; cursor: default; }
 
 .error {
