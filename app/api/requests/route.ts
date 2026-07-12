@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { guarded, requireStaff } from "@/lib/guards";
 import { chooseMatch, matchMessage, normalizeTitle, type Candidate } from "@/lib/match";
-import { notifyAdminEmails, sendEmail } from "@/lib/email";
+import { notifyChiefEmails, sendEmail } from "@/lib/email";
 import { staffUrl } from "@/lib/hosts";
 
 const Body = z.object({
@@ -80,7 +80,7 @@ export const POST = guarded(async (req: NextRequest) => {
 
   // Notify admins after the response is sent — never slows the teacher down
   after(async () => {
-    const admins = await notifyAdminEmails();
+    const admins = await notifyChiefEmails();
     if (admins.length === 0) return;
     const lines = [
       `New book request #${created.id} — ${STATUS_TAG[result.status]}`,

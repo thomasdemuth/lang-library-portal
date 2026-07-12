@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { STATUS_LABELS } from "@/lib/labels";
+
+export { STATUS_LABELS };
 
 type MyRequest = {
   id: number;
@@ -13,14 +16,6 @@ type MyRequest = {
   matched_copies: number | null;
   status: string;
   created_at: string;
-};
-
-export const STATUS_LABELS: Record<string, string> = {
-  new: "New",
-  in_progress: "In progress",
-  ordered: "Ordered",
-  ready: "Ready",
-  declined: "Declined",
 };
 
 export function MatchTag({

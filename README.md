@@ -17,9 +17,14 @@ cookies, and the admin area doesn't exist on the student host.
 - **Sync the catalog from Libib** — Libib → Export CSV → Management → *Inventory* → drop the
   file → **Import & replace**. The old inventory stays live until the new one finishes, then
   they swap atomically. Do this with your weekly re-shelving.
-- **Book requests** — new requests email every admin (and instantly show whether the library
-  has enough copies). Set the status on *Book Requests* (New → In progress / Ordered / Ready /
-  Declined). Anything still **New** after 72 hours triggers one reminder email.
+- **Book requests** — new requests email every Chief Admin and show whether the library
+  has enough copies. Set the status on *Book Requests* (New → In progress / Ordered / Ready /
+  Declined). Marking **Ready** or **Declined** emails the requesting teacher (with your note,
+  if you left one). Anything still **New** after 72 hours triggers one reminder email.
+- **Weekly summary** — every Friday morning, Chief Admins (and anyone who opts in) get an
+  email digest: the week's requests, feedback, inventory imports, map changes, and traffic.
+- **Email preferences** — Management → *My Account* → Email notifications: mute new-request
+  alerts (chiefs) or toggle the weekly summary (everyone).
 - **Edit the map** — Management → *Map Editor*. **Build** mode: drag to draw a shelf.
   **Edit** mode: drag to move, corner square to resize, click for the properties panel
   (label, category color, letter range, public details, internal notes). **Save map** when done.
@@ -56,8 +61,11 @@ npm run seed       # seed admins from scripts/seed.local.json (gitignored)
    `CRON_SECRET` in Vercel env — Vercel sends it automatically as the bearer token.
    The cron also keeps the free Supabase project from pausing.
 4. **Seed admins**: locally, with production values in `.env.local`, run `npm run seed`.
-5. **Email**: Resend free tier. Until school DNS verifies a sending domain, set
-   `EMAIL_OVERRIDE_TO` so all mail lands in one inbox. See `docs/IT-HANDOFF.md`.
+5. **Email**: sent AS `library@thelangschool.org` through Gmail's own SMTP — no DNS
+   needed, free. One-time setup while signed into that mailbox: turn on 2-Step
+   Verification, then create an App password at myaccount.google.com/apppasswords and
+   put it in `GMAIL_APP_PASSWORD`. Set `EMAIL_OVERRIDE_TO` to reroute all mail to one
+   inbox while testing; clear it to go live.
 6. Later, swap to real subdomains (see `docs/IT-HANDOFF.md`) by changing the two host
    env vars — no code changes.
 
@@ -69,8 +77,9 @@ npm run seed       # seed admins from scripts/seed.local.json (gitignored)
 | `STUDENT_HOST` / `STAFF_HOST` | the two site hostnames (no protocol) |
 | `SUPABASE_URL` | `https://<ref>.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | the **`sb_secret_…`** key (never the publishable one) |
-| `RESEND_API_KEY` / `EMAIL_FROM` | outgoing mail |
-| `EMAIL_OVERRIDE_TO` | optional: reroute all mail to one inbox (pre-DNS) |
+| `GMAIL_USER` | the library mailbox all mail is sent as |
+| `GMAIL_APP_PASSWORD` | Gmail App password for that mailbox (16 chars) |
+| `EMAIL_OVERRIDE_TO` | optional: reroute all mail to one inbox (testing) |
 | `CRON_SECRET` | bearer token for `/api/cron/daily` |
 
 No `NEXT_PUBLIC_*` vars exist — the browser never talks to Supabase directly.
