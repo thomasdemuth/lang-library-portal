@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guarded, requirePermission } from "@/lib/guards";
 import { normalizeTitle } from "@/lib/match";
+import { attachTags } from "@/lib/tags";
 
 const PAGE_SIZE = 50;
 
@@ -20,7 +21,7 @@ export const GET = guarded(async (req: NextRequest) => {
 
   let query = db()
     .from("books")
-    .select("id, title, creators, isbn13, copies, group_name", { count: "exact" })
+    .select("id, title, creators, isbn13, copies, group_name, dedupe_key", { count: "exact" })
     .eq("sync_id", active.id);
 
   const norm = normalizeTitle(q);
@@ -34,5 +35,10 @@ export const GET = guarded(async (req: NextRequest) => {
     .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-  return NextResponse.json({ books: data, total: count ?? 0, page, pageSize: PAGE_SIZE });
+  return NextResponse.json({
+    books: await attachTags(data ?? []),
+    total: count ?? 0,
+    page,
+    pageSize: PAGE_SIZE,
+  });
 });

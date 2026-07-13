@@ -93,6 +93,9 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
     audience = "staff";
   }
 
+  // The web-app manifest is public on both hosts (home-screen install)
+  if (pathname === "/manifest.webmanifest") return applyHeaders(NextResponse.next());
+
   // ── 2. Never expose internal route prefixes ───────────────────────────
   if (pathname.startsWith("/student") || pathname.startsWith("/staff")) return hard404();
   // The admin surface does not exist on the student host — don't even reveal it

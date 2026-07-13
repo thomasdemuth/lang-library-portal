@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Papa from "papaparse";
 import { mergeBooks, rowToBook, type BookRecord } from "@/lib/match";
+import { type CategoryId } from "@/lib/categories";
+import ScanPanel from "@/components/ScanPanel";
+import TagPicker, { TagPill } from "@/components/TagPicker";
 
 type Sync = {
   id: number;
@@ -20,6 +23,8 @@ type Book = {
   isbn13: string | null;
   copies: number;
   group_name: string | null;
+  dedupe_key: string;
+  tag: CategoryId | null;
 };
 
 type Parsed = {
@@ -46,6 +51,8 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Book[] | null>(null);
   const [total, setTotal] = useState(0);
+  const [tagOpen, setTagOpen] = useState<number | null>(null);
+  const [tagError, setTagError] = useState<string | null>(null);
 
   async function load() {
     const res = await fetch("/api/admin/inventory/syncs");
@@ -155,6 +162,21 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     }
   }
 
+  async function setTag(book: Book, tag: CategoryId | null) {
+    setTagError(null);
+    const res = await fetch("/api/admin/books/tag", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ book_key: book.dedupe_key, category: tag }),
+    });
+    if (!res.ok) {
+      setTagError((await res.json().catch(() => ({}))).error ?? "Couldn't save the tag.");
+      return;
+    }
+    setResults((cur) => cur?.map((b) => (b.dedupe_key === book.dedupe_key ? { ...b, tag } : b)) ?? cur);
+    setTagOpen(null);
+  }
+
   return (
     <>
       {error && <div className="error">{error}</div>}
@@ -240,8 +262,17 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
       )}
 
       <div className="card" style={{ marginBottom: 20 }}>
-        <h2 style={{ marginTop: 0 }}>Search the catalog</h2>
-        <form onSubmit={search} style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <h2 style={{ margin: 0, flex: 1 }}>Search the catalog</h2>
+          <ScanPanel
+            canImport={canImport}
+            onCatalogChange={() => {
+              load();
+              if (results) search();
+            }}
+          />
+        </div>
+        <form onSubmit={search} style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
           <input
             className="input"
             style={{ maxWidth: 340 }}
@@ -253,32 +284,56 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
             Search
           </button>
         </form>
+        {tagError && <div className="error" style={{ marginTop: 10 }}>{tagError}</div>}
         {results && (
           <>
             <p className="hint" style={{ marginTop: 10 }}>
               {total.toLocaleString()} result{total === 1 ? "" : "s"}
               {total > results.length ? ` (showing first ${results.length})` : ""}
             </p>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Creators</th>
-                  <th>ISBN-13</th>
-                  <th>Copies</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((b) => (
-                  <tr key={b.id}>
-                    <td>{b.title}</td>
-                    <td>{b.creators ?? "—"}</td>
-                    <td>{b.isbn13 ?? "—"}</td>
-                    <td>{b.copies}</td>
+            <div className="tablewrap">
+              <table className="table books">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Tag</th>
+                    <th>Creators</th>
+                    <th>ISBN-13</th>
+                    <th>Copies</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {results.map((b) => (
+                    <tr key={b.id}>
+                      <td data-th="Title">{b.title}</td>
+                      <td data-th="Tag">
+                        {canImport ? (
+                          tagOpen === b.id ? (
+                            <TagPicker value={b.tag} onChange={(t) => setTag(b, t)} />
+                          ) : (
+                            <button
+                              type="button"
+                              className="tagbtn"
+                              onClick={() => setTagOpen(b.id)}
+                              aria-label={`Change tag for ${b.title}`}
+                            >
+                              {b.tag ? <TagPill tag={b.tag} /> : <span className="tag-none">+ tag</span>}
+                            </button>
+                          )
+                        ) : b.tag ? (
+                          <TagPill tag={b.tag} />
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td data-th="Creators">{b.creators ?? "—"}</td>
+                      <td data-th="ISBN-13">{b.isbn13 ?? "—"}</td>
+                      <td data-th="Copies">{b.copies}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>

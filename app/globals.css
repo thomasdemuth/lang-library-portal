@@ -172,3 +172,118 @@ textarea.input { font-weight: 500; resize: vertical; min-height: 110px; line-hei
   display: inline-block; font-size: 11px; font-weight: 700; border-radius: 999px;
   padding: 3px 10px; letter-spacing: .3px; white-space: nowrap;
 }
+
+/* ── Book tags ──────────────────────────────────── */
+.tagpill {
+  display: inline-block; color: #fff; font-weight: 700; border-radius: 999px;
+  letter-spacing: .3px; white-space: nowrap; vertical-align: middle;
+}
+.tagpicker { display: flex; gap: 6px; flex-wrap: wrap; }
+.tagchip {
+  display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px;
+  font-weight: 700; cursor: pointer; border-radius: 999px; padding: 6px 12px;
+  border: 1.5px solid var(--line); background: #fff; color: var(--ink);
+}
+.tagchip:disabled { opacity: .55; cursor: default; }
+.tagbtn { border: 0; background: none; padding: 0; cursor: pointer; font: inherit; }
+.tag-none {
+  font-size: 11.5px; font-weight: 700; color: var(--muted);
+  border: 1.5px dashed var(--line); border-radius: 999px; padding: 3px 10px; white-space: nowrap;
+}
+.tagbtn:hover .tag-none { color: var(--brand-blue); border-color: var(--brand-blue); }
+.tablewrap { overflow-x: auto; }
+
+/* ── Barcode scanner ────────────────────────────── */
+.scan-overlay {
+  position: fixed; inset: 0; z-index: 60; background: #0b0e14;
+  display: flex; flex-direction: column;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.scan-stage { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.scan-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scan-stage.flash::after {
+  content: ""; position: absolute; inset: 0; background: #2ecf8f55; pointer-events: none;
+}
+.scan-guide {
+  position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%);
+  width: min(78%, 440px); height: 140px; border: 3px solid #ffffffcc; border-radius: 16px;
+  box-shadow: 0 0 0 2000px rgba(11, 14, 20, .35); pointer-events: none;
+}
+.scan-top {
+  position: relative; display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; gap: 10px;
+}
+.scan-modes { display: flex; gap: 6px; background: #ffffff22; border-radius: 999px; padding: 4px; }
+.scan-mode {
+  font: inherit; font-size: 13px; font-weight: 700; color: #fff; background: transparent;
+  border: 0; border-radius: 999px; padding: 8px 16px; cursor: pointer;
+}
+.scan-mode.on { background: #fff; color: var(--ink); }
+.scan-close {
+  font-size: 17px; font-weight: 700; color: #fff; background: #ffffff22; border: 0;
+  border-radius: 999px; width: 40px; height: 40px; cursor: pointer;
+}
+.scan-bulkbar {
+  position: relative; margin: 0 14px; padding: 10px 12px; border-radius: 12px;
+  background: #ffffffe8; display: flex; flex-direction: column; gap: 8px;
+}
+.scan-bulkhint { font-size: 12px; font-weight: 700; color: var(--muted); }
+.scan-camerror {
+  position: absolute; top: 40%; left: 50%; transform: translateX(-50%);
+  width: min(90%, 420px); text-align: center; color: #fff; font-size: 14px; font-weight: 600;
+}
+.scan-toast {
+  position: absolute; bottom: 92px; left: 50%; transform: translateX(-50%);
+  max-width: min(92%, 480px); color: #fff; font-size: 14px; font-weight: 700;
+  padding: 10px 16px; border-radius: 12px; text-align: center;
+}
+.scan-toast.ok { background: #147a55e6; }
+.scan-toast.bad { background: #a11c26e6; }
+.scan-manual {
+  position: absolute; bottom: 0; left: 0; right: 0; display: flex; gap: 8px;
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+}
+.scan-manual .input { flex: 1; font-size: 16px; }
+.scan-sheet {
+  background: #fff; border-radius: 18px 18px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 12px; box-shadow: 0 -8px 30px rgba(16, 24, 40, .35);
+}
+.scan-bookrow { display: flex; gap: 14px; align-items: flex-start; }
+.scan-cover { width: 58px; border-radius: 6px; box-shadow: 0 2px 8px rgba(16,24,40,.25); flex: none; }
+.scan-title { font-size: 16px; font-weight: 800; line-height: 1.3; }
+.scan-meta { font-size: 13px; color: var(--muted); margin-top: 3px; font-weight: 600; }
+.scan-meta.ok { color: #147a55; }
+.scan-meta.warn { color: #a67c00; }
+.scan-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.scan-actions .btn { flex: 1; min-width: 120px; }
+
+/* ── Mobile & home-screen (standalone) polish ───── */
+@media (max-width: 640px) {
+  .wrap { padding: 16px; }
+  .admin-main { padding: 16px; }
+  .input, select.input, textarea.input { font-size: 16px; } /* stop iOS focus zoom */
+  .btn { padding: 11px 16px; }
+  .side { position: sticky; top: 0; z-index: 20; background: #fff; overflow-x: auto;
+    flex-wrap: nowrap; white-space: nowrap; gap: 2px; padding: 8px 10px;
+    scrollbar-width: none; }
+  .side::-webkit-scrollbar { display: none; }
+  .side-label { padding: 10px 6px 10px; }
+  /* Book search results become cards */
+  .table.books thead { display: none; }
+  .table.books tr {
+    display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
+    padding: 10px 2px; border-bottom: 1px solid var(--line);
+  }
+  .table.books td { display: block; padding: 0; border: 0; }
+  .table.books td[data-th="Title"] { grid-column: 1; font-weight: 700; }
+  .table.books td[data-th="Tag"] { grid-column: 2; grid-row: 1; justify-self: end; }
+  .table.books td[data-th="Creators"] { grid-column: 1 / -1; color: var(--muted); font-size: 12.5px; }
+  .table.books td[data-th="ISBN-13"] { grid-column: 1; color: var(--muted); font-size: 12px; }
+  .table.books td[data-th="Copies"] { grid-column: 2; justify-self: end; color: var(--muted); font-size: 12px; }
+  .table.books td[data-th="Copies"]::after { content: " in stock"; }
+}
+@media (display-mode: standalone) {
+  /* Pinned to the home screen: honor the notch, drop the in-page footer feel */
+  body { padding-top: env(safe-area-inset-top); }
+  header a[href="/"] { pointer-events: auto; }
+}

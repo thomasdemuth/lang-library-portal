@@ -17,6 +17,18 @@ cookies, and the admin area doesn't exist on the student host.
 - **Sync the catalog from Libib** — Libib → Export CSV → Management → *Inventory* → drop the
   file → **Import & replace**. The old inventory stays live until the new one finishes, then
   they swap atomically. Do this with your weekly re-shelving.
+- **Scan book barcodes** — Management → *Inventory* → **Scan barcodes** (best on a phone).
+  Point the camera at the ISBN barcode: the book comes up instantly with cover, copies, and
+  tag. From there: set the category tag, add or remove a copy, or add a book the library
+  doesn't own yet (details filled in by ISBN lookup). **Bulk tag** mode tags every scanned
+  book with the chosen category — ideal for working down a whole shelf. Adds/removes last
+  until the next Libib import (Libib stays the source of truth), so mirror them in Libib;
+  **tags are keyed by ISBN and survive every import**.
+- **Category tags** — each book can carry one of the map's color categories (Fiction,
+  Non-Fiction, Comics, Young Reader, Drama, Other). Set them from a scan or from catalog
+  search results; they show as colored pills on desktop and mobile.
+- **Put it on your phone** — open the staff site in Safari → Share → **Add to Home Screen**.
+  It opens full-screen like an app with the library icon; the scanner is one tap away.
 - **Book requests** — new requests email every Chief Admin and show whether the library
   has enough copies. Set the status on *Book Requests* (New → In progress / Ordered / Ready /
   Declined). Marking **Ready** or **Declined** emails the requesting teacher (with your note,
