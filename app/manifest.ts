@@ -7,10 +7,12 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "Lang Library",
     short_name: "Library",
     description: "The Lang School library portal",
     start_url: "/",
+    scope: "/",
     display: "standalone",
     background_color: "#f2f4f8",
     theme_color: "#2e50c8",

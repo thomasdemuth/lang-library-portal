@@ -66,29 +66,58 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
   }, [view, W, H]);
 
   // ── rAF-coalesced updates while dragging ──────────────────────────────
-  // View changes during a gesture bypass React entirely: the viewBox
-  // attribute is written straight onto the <svg> (one write per frame),
-  // and React state is committed once when the gesture ends. Shelf
-  // move/resize still needs React (the shelf's own nodes must re-render),
-  // but at most once per frame.
+  // View changes during a gesture bypass React entirely. Pan/pinch don't
+  // even touch the viewBox per frame: they set a CSS transform on the
+  // <svg>, which the compositor applies on the GPU — the floorplan raster
+  // is reused for the whole gesture instead of being redrawn every frame
+  // (redrawing it is what made mobile panning lag). The final view is
+  // baked into the viewBox once, when the gesture ends. Shelf move/resize
+  // still needs React (the shelf's own nodes must re-render), but at most
+  // once per frame.
   const raf = useRef<number | null>(null);
   const pending = useRef<{ view?: View; shelf?: { id: string; patch: Partial<Shelf> } }>({});
   const dims = useRef({ W, H });
   dims.current = { W, H };
+  // Screen geometry frozen at gesture start: content px-per-unit and the
+  // letterbox offset inside the <svg> element (its aspect never changes).
+  const renderBase = useRef<{ v0: View; scale0: number; offX: number; offY: number } | null>(null);
+
+  const writeViewBox = useCallback((v: View) => {
+    const { W: w0, H: h0 } = dims.current;
+    svgRef.current?.setAttribute(
+      "viewBox",
+      `${v.cx - w0 / v.z / 2} ${v.cy - h0 / v.z / 2} ${w0 / v.z} ${h0 / v.z}`
+    );
+  }, []);
+
   const flush = useCallback((): void => {
     raf.current = null;
     const p = pending.current;
     pending.current = {};
     if (p.view) {
-      const { cx, cy, z } = p.view;
-      const { W: w0, H: h0 } = dims.current;
-      svgRef.current?.setAttribute("viewBox", `${cx - w0 / z / 2} ${cy - h0 / z / 2} ${w0 / z} ${h0 / z}`);
+      const svg = svgRef.current;
+      const base = renderBase.current;
+      if (svg && base) {
+        // Similarity transform mapping the gesture-start rendering to the
+        // current view: scale k about the element origin plus a translate
+        // that accounts for the (constant) letterbox offset.
+        const { W: w0, H: h0 } = dims.current;
+        const { v0, scale0, offX, offY } = base;
+        const v = p.view;
+        const k = v.z / v0.z;
+        const tx = offX * (1 - k) + k * scale0 * (v0.cx - w0 / (2 * v0.z) - (v.cx - w0 / (2 * v.z)));
+        const ty = offY * (1 - k) + k * scale0 * (v0.cy - h0 / (2 * v0.z) - (v.cy - h0 / (2 * v.z)));
+        svg.style.transformOrigin = "0 0";
+        svg.style.transform = `translate(${tx}px, ${ty}px) scale(${k})`;
+      } else if (svg) {
+        writeViewBox(p.view); // wheel zoom outside a pointer gesture
+      }
     }
     if (p.shelf) {
       const { id, patch } = p.shelf;
       setShelves((cur) => cur.map((s) => (s.id === id ? { ...s, ...patch } : s)));
     }
-  }, []);
+  }, [writeViewBox]);
   const schedule = useCallback(() => {
     if (raf.current == null) raf.current = requestAnimationFrame(flush);
   }, [flush]);
@@ -113,13 +142,53 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
     }
   }
 
+  /** Freeze the screen geometry a pan/pinch renders against (see flush). */
+  function captureRenderBase() {
+    const svg = svgRef.current;
+    if (!svg) return;
+    // Bake any leftover gesture transform first so the rect is untransformed
+    if (svg.style.transform) {
+      svg.style.transform = "";
+      writeViewBox(viewRef.current);
+    }
+    const rect = svg.getBoundingClientRect();
+    const { W: w0, H: h0 } = dims.current;
+    const v0 = viewRef.current;
+    const scale0 = Math.min(rect.width / (w0 / v0.z), rect.height / (h0 / v0.z));
+    renderBase.current = {
+      v0,
+      scale0,
+      offX: (rect.width - (w0 / v0.z) * scale0) / 2,
+      offY: (rect.height - (h0 / v0.z) * scale0) / 2,
+    };
+  }
+
+  /** Bake the gesture's CSS transform into the viewBox and sync React. */
+  function endViewGesture() {
+    if (raf.current != null) {
+      cancelAnimationFrame(raf.current);
+      raf.current = null;
+    }
+    pending.current.view = undefined;
+    renderBase.current = null;
+    const svg = svgRef.current;
+    if (svg) {
+      writeViewBox(viewRef.current);
+      svg.style.transform = "";
+    }
+    setView(viewRef.current);
+  }
+
   // Wheel zooming has no "end" event: commit to React shortly after the
   // last tick so the committed tree matches what's on screen.
   const wheelIdle = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (wheelIdle.current) clearTimeout(wheelIdle.current); }, []);
   function commitWheelSoon() {
     if (wheelIdle.current) clearTimeout(wheelIdle.current);
-    wheelIdle.current = setTimeout(() => setView(viewRef.current), 200);
+    wheelIdle.current = setTimeout(() => {
+      // If a pointer gesture is mid-flight, its pointerup commit wins
+      if (!renderBase.current) setView(viewRef.current);
+    }, 200);
   }
 
   async function load() {
@@ -175,6 +244,7 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
   /** Begin panning from the current pointer, whatever it went down on. */
   function startPan(e: React.PointerEvent) {
     flushPendingView();
+    captureRenderBase();
     const g = gesture.current;
     g.kind = "pan";
     g.startClient = { x: e.clientX, y: e.clientY };
@@ -214,6 +284,7 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
     setHover(null);
     gesture.current.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (gesture.current.pointers.size === 2) {
+      if (!renderBase.current) captureRenderBase();
       const [a, b] = [...gesture.current.pointers.values()];
       gesture.current.pinchStart = { dist: Math.hypot(a.x - b.x, a.y - b.y), z: viewRef.current.z };
       gesture.current.kind = null;
@@ -342,8 +413,8 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
     const wasViewGesture = g.kind === "pan" || g.pinchStart != null;
     g.pointers.delete(e.pointerId);
     if (g.pointers.size < 2) g.pinchStart = undefined;
-    // Sync React with the DOM-written viewBox now that the gesture is over.
-    if (wasViewGesture) setView(viewRef.current);
+    // Bake the gesture's transform into the viewBox and sync React.
+    if (wasViewGesture) endViewGesture();
     // Selection waits until here (see gesture comment): dragging a shelf
     // selects it on release; a tap selects/deselects; a pan changes nothing.
     if (g.kind === "move" && g.moveId) setSelected(g.moveId);
@@ -429,7 +500,7 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
   return (
     <div className="maplayout" style={{ "--map-cols": sel ? "1fr 300px" : "1fr" } as React.CSSProperties}>
       <div>
-        <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="map-toolbar" style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
           {editable && (
             <span className="desk-only" style={{ display: "flex", gap: 4 }}>
               {(["view", "build", "edit"] as Mode[]).map((m) => (

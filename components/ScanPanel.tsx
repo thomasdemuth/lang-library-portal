@@ -235,7 +235,11 @@ export default function ScanPanel({
   const isbnFor = result?.book?.isbn13 ?? result?.book?.isbn10 ?? result?.external?.isbn13 ?? result?.code;
 
   return (
-    <div className={`scan-overlay${isPage ? " page" : ""}`} role={isPage ? undefined : "dialog"} aria-label="Barcode scanner">
+    <div
+      className={`scan-overlay${isPage ? " page" : ""}${mode === "bulk" ? " bulk" : ""}`}
+      role={isPage ? undefined : "dialog"}
+      aria-label="Barcode scanner"
+    >
       <div className={`scan-stage${flash ? " flash" : ""}`}>
         <video ref={videoRef} className="scan-video" muted playsInline />
         <div className="scan-guide" aria-hidden />

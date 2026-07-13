@@ -12,9 +12,8 @@ export default async function AdminMapPage() {
 
   return (
     <>
-      {/* On the phone this tab is the map VIEWER — editing tools stay on desktop */}
+      {/* On the phone this tab is just the map — no title, no editing tools */}
       <h1 className="desk-only">Map Editor</h1>
-      <h1 className="mobile-only">Library Map</h1>
       <p className="sub desk-only">
         {canEdit ? (
           <>
@@ -26,7 +25,6 @@ export default async function AdminMapPage() {
         )}
         Students and teachers see everything except internal notes.
       </p>
-      <p className="sub mobile-only">Pinch to zoom, drag to pan, tap a shelf for details.</p>
       {canFloorplan && (
         <div className="desk-only">
           <FloorplanUpload />

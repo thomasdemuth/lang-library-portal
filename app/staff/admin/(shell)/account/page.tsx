@@ -4,6 +4,7 @@ import PasswordForm from "@/components/PasswordForm";
 import NotificationPrefs from "@/components/NotificationPrefs";
 import DeleteAccountForm from "@/components/DeleteAccountForm";
 import SignOutButton from "@/components/SignOutButton";
+import AdminsPanel from "@/components/AdminsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -31,15 +32,10 @@ export default async function AccountPage() {
         </span>
       </p>
       {/* On the phone the tab bar replaces the sidebar/topbar — Settings
-          carries the roster link and sign-out instead. */}
+          carries quick links and sign-out instead. */}
       <div className="card mobile-only" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>Library</h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {admin.role === "chief" && (
-            <a className="btn" href="/admin/admins">
-              Admins &amp; Invites
-            </a>
-          )}
           <a className="btn" href="/admin/requests">
             Book Requests
           </a>
@@ -56,6 +52,14 @@ export default async function AccountPage() {
         notifyWeekly={notifyWeekly}
       />
       {admin.email.toLowerCase() !== "library@thelangschool.org" && <DeleteAccountForm />}
+      {/* Mobile: admins & invites live right here, one continuous Settings page */}
+      {admin.role === "chief" && (
+        <div className="mobile-only" style={{ marginTop: 24 }}>
+          <h1 style={{ fontSize: 20 }}>Admins &amp; Invites</h1>
+          <p className="sub">Invite new admins and manage the team.</p>
+          <AdminsPanel selfId={admin.id} />
+        </div>
+      )}
     </>
   );
 }

@@ -190,6 +190,7 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h2 style={{ marginTop: 0 }}>Admins</h2>
+        <div className="tablewrap">
         <table className="table">
           <thead>
             <tr>
@@ -269,6 +270,7 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="card">
@@ -276,6 +278,7 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
         {invites.length === 0 ? (
           <p className="hint">No invites yet.</p>
         ) : (
+          <div className="tablewrap">
           <table className="table">
             <thead>
               <tr>
@@ -315,6 +318,7 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </>
