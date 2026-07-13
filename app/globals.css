@@ -180,6 +180,17 @@ textarea.input { font-weight: 500; resize: vertical; min-height: 110px; line-hei
   padding: 3px 10px; letter-spacing: .3px; white-space: nowrap;
 }
 
+/* ── Catalog search box (icon button inside the row) */
+.searchrow { display: flex; gap: 8px; max-width: 420px; }
+.searchrow .input { flex: 1; }
+.searchbtn {
+  flex: none; width: 44px; height: 44px; border-radius: 10px; cursor: pointer;
+  border: 1.5px solid var(--line); background: var(--brand-blue); color: #fff;
+  display: flex; align-items: center; justify-content: center; border-color: var(--brand-blue);
+}
+.searchbtn svg { width: 18px; height: 18px; }
+.searchbtn:active { transform: scale(.94); }
+
 /* ── Book tags ──────────────────────────────────── */
 .tagpill {
   display: inline-block; color: #fff; font-weight: 700; border-radius: 999px;
@@ -346,8 +357,17 @@ a.scan-close { display: flex; align-items: center; justify-content: center; text
   .mobile-only { display: none !important; }
 }
 @media (display-mode: standalone) {
-  /* Pinned to the home screen: honor the notch */
+  /* Content runs under the translucent iOS status bar; paint that strip
+     with the brand gradient so the white clock always reads. Admin pages
+     skip the strip — their app bar covers the same area seamlessly. */
   body { padding-top: env(safe-area-inset-top); }
+  body::before {
+    content: ""; position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    height: env(safe-area-inset-top);
+    background: linear-gradient(120deg, var(--brand-blue) 0%, #2a62b8 60%, var(--brand-green) 140%);
+  }
+  body:has(.admin-grid) { padding-top: 0; }
+  body:has(.admin-grid)::before { content: none; }
 }
 
 /* ── Appearance: text size (Settings → Preferences) */
@@ -401,8 +421,7 @@ html[data-theme="dark"] .settings-row { background: var(--panel); border-color: 
     padding: calc(12px + env(safe-area-inset-top)) 18px 12px;
     box-shadow: 0 2px 10px rgba(20, 32, 70, .25);
   }
-  .mheader small { font-weight: 600; font-size: 11px; opacity: .85; display: block; }
-  .mheader { margin: -16px -16px 14px; }
+  .mheader { margin: -16px -16px 14px; min-height: 54px; }
   /* the app bar shows the page name — drop the in-page title on phones */
   .admin-main > h1, .admin-main > .sub { display: none; }
   /* the header owns the notch area now */
@@ -459,11 +478,15 @@ html[data-theme="dark"] .madmin { background: var(--panel); }
 
 /* ── Mobile map: full-bleed, legend floats on top ── */
 @media (max-width: 640px) {
-  .maplayout .card.mapcard { border: 0; border-radius: 0; padding: 0; background: transparent; box-shadow: none; margin: -16px -16px 0; }
+  .maplayout .card.mapcard { border: 0; border-radius: 0; padding: 0; box-shadow: none; margin: -16px -16px 0; }
   .mapsvg { height: calc(100dvh - 175px); }
   .map-legend-overlay {
     position: absolute; top: calc(8px); left: 8px; right: 8px; z-index: 6;
     display: flex; gap: 6px; flex-wrap: wrap; pointer-events: none;
+  }
+  .map-legend-overlay .legend-toggle {
+    pointer-events: auto; cursor: pointer; border: 0; font: inherit;
+    font-size: 10.5px; font-weight: 700; color: var(--muted);
   }
   .map-legend-overlay span {
     display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700;

@@ -285,16 +285,18 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h2 style={{ marginTop: 0 }}>Search the catalog</h2>
-        <form onSubmit={search} style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+        <form onSubmit={search} className="searchrow" style={{ marginTop: 12 }}>
           <input
             className="input"
-            style={{ maxWidth: 340 }}
             placeholder="Title or author…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
-          <button className="btn" type="submit">
-            Search
+          <button className="searchbtn" type="submit" aria-label="Search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.5-4.5" />
+            </svg>
           </button>
         </form>
         {tagError && <div className="error" style={{ marginTop: 10 }}>{tagError}</div>}

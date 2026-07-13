@@ -11,7 +11,9 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    // Content extends under the iOS status bar; the app-bar gradient
+    // paints that area itself (one continuous surface, no seam).
+    statusBarStyle: "black-translucent",
     title: "Lang Library",
   },
 };

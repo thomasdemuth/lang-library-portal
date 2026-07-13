@@ -20,12 +20,5 @@ export default function MobileHeader() {
     const p = window.location.pathname;
     setTitle(TITLES.find(([href]) => p.startsWith(href))?.[1] ?? "Dashboard");
   }, []);
-  return (
-    <div className="mheader">
-      <div>
-        <small>Lang Library</small>
-        {title}
-      </div>
-    </div>
-  );
+  return <div className="mheader">{title}</div>;
 }

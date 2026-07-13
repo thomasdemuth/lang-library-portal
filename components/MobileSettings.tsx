@@ -14,7 +14,8 @@ type View =
   | "launch"
   | "admins"
   | "invite"
-  | "password";
+  | "password"
+  | "delete";
 
 type AdminRow = {
   id: string;
@@ -263,6 +264,14 @@ export default function MobileSettings({
       </div>
     );
 
+  if (view === "delete")
+    return (
+      <div className="subview">
+        {back}
+        <DeleteAccountForm />
+      </div>
+    );
+
   return (
     <>
       <div className="settings-group" style={{ marginTop: 4 }}>
@@ -308,14 +317,11 @@ export default function MobileSettings({
         <div className="settings-rows">
           <Row icon={I.key} bg="#b7791f" label="Change password" onClick={() => setView("password")} />
           <Row icon={I.out} bg="#68727f" label="Sign out" onClick={signOut} />
+          {canDelete && (
+            <Row icon={I.trash} bg="var(--danger)" label="Delete account" danger onClick={() => setView("delete")} />
+          )}
         </div>
       </div>
-
-      {canDelete && (
-        <div className="settings-group">
-          <DeleteAccountForm />
-        </div>
-      )}
     </>
   );
 }

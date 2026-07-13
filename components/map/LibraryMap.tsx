@@ -45,6 +45,20 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
   const [loaded, setLoaded] = useState(false);
   const [mapUpdatedAt, setMapUpdatedAt] = useState<string | null>(null);
   const [hover, setHover] = useState<{ x: number; y: number; shelf: Shelf } | null>(null);
+  const [legendHidden, setLegendHidden] = useState(false);
+  useEffect(() => {
+    try {
+      setLegendHidden(localStorage.getItem("ll-maplegend") === "hidden");
+    } catch {}
+  }, []);
+  function toggleLegend() {
+    setLegendHidden((cur) => {
+      try {
+        localStorage.setItem("ll-maplegend", cur ? "shown" : "hidden");
+      } catch {}
+      return !cur;
+    });
+  }
 
   // Floorplan dimensions drive the coordinate space (fallback: blank canvas)
   const W = settings?.floorplan_width ?? 4000;
@@ -543,13 +557,19 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
           className="card mapcard"
           style={{ position: "relative", padding: 6, touchAction: "none", overflow: "hidden" }}
         >
-          <div className="map-legend-overlay" aria-hidden>
-            {CATEGORY_IDS.map((id) => (
-              <span key={id}>
-                <span className="dot" style={{ background: CATEGORIES[id].color, width: 9, height: 9 }} />
-                {CATEGORIES[id].label}
+          <div className="map-legend-overlay">
+            {!legendHidden &&
+              CATEGORY_IDS.map((id) => (
+                <span key={id} aria-hidden>
+                  <span className="dot" style={{ background: CATEGORIES[id].color, width: 9, height: 9 }} />
+                  {CATEGORIES[id].label}
+                </span>
+              ))}
+            <button type="button" className="legend-toggle" onClick={toggleLegend}>
+              <span aria-hidden style={{ pointerEvents: "none" }}>
+                {legendHidden ? "☰ Key" : "✕ Hide"}
               </span>
-            ))}
+            </button>
           </div>
           {loaded && !hasPlan && !editable ? (
             <p className="hint" style={{ padding: 20 }}>
