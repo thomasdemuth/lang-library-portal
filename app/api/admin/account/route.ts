@@ -63,11 +63,20 @@ export const DELETE = guarded(async (req: NextRequest) => {
     return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
   if (delErr) {
-    // History elsewhere references this admin — disable instead of erasing.
-    const { error: disableErr } = await db()
+    // History elsewhere references this admin — disable instead of erasing,
+    // and mark deleted_at so the Admins & Invites roster hides it for good
+    // (unlike a Chief-initiated disable, which stays visible to re-enable).
+    const now = new Date().toISOString();
+    let disableErr = (await db()
       .from("admins")
-      .update({ disabled_at: new Date().toISOString(), session_v: 999999999 })
-      .eq("id", admin.id);
+      .update({ disabled_at: now, deleted_at: now, session_v: 999999999 })
+      .eq("id", admin.id)).error;
+    if (disableErr && /deleted_at|column/i.test(disableErr.message ?? "")) {
+      disableErr = (await db()
+        .from("admins")
+        .update({ disabled_at: now, session_v: 999999999 })
+        .eq("id", admin.id)).error;
+    }
     if (disableErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
