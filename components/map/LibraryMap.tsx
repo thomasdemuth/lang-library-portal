@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CATEGORIES, CATEGORY_IDS, type CategoryId } from "@/lib/categories";
 
 export type Shelf = {
@@ -65,14 +65,25 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
     return `${view.cx - w / 2} ${view.cy - h / 2} ${w} ${h}`;
   }, [view, W, H]);
 
-  // ── rAF-coalesced updates: at most one re-render per frame while dragging ──
+  // ── rAF-coalesced updates while dragging ──────────────────────────────
+  // View changes during a gesture bypass React entirely: the viewBox
+  // attribute is written straight onto the <svg> (one write per frame),
+  // and React state is committed once when the gesture ends. Shelf
+  // move/resize still needs React (the shelf's own nodes must re-render),
+  // but at most once per frame.
   const raf = useRef<number | null>(null);
   const pending = useRef<{ view?: View; shelf?: { id: string; patch: Partial<Shelf> } }>({});
-  const flush = useCallback(() => {
+  const dims = useRef({ W, H });
+  dims.current = { W, H };
+  const flush = useCallback((): void => {
     raf.current = null;
     const p = pending.current;
     pending.current = {};
-    if (p.view) setView(p.view);
+    if (p.view) {
+      const { cx, cy, z } = p.view;
+      const { W: w0, H: h0 } = dims.current;
+      svgRef.current?.setAttribute("viewBox", `${cx - w0 / z / 2} ${cy - h0 / z / 2} ${w0 / z} ${h0 / z}`);
+    }
     if (p.shelf) {
       const { id, patch } = p.shelf;
       setShelves((cur) => cur.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -83,16 +94,32 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
   }, [flush]);
   useEffect(() => () => { if (raf.current != null) cancelAnimationFrame(raf.current); }, []);
 
-  /** Set the view now (immediate) — for buttons. */
+  /** Set the view now, through React — for buttons and gesture-end commits. */
   function applyView(v: View) {
     viewRef.current = v;
     setView(v);
   }
-  /** Queue a view change to the next frame — for gestures. */
+  /** Queue a direct-to-DOM view write on the next frame — for gestures. */
   function queueView(v: View) {
     viewRef.current = v;
     pending.current.view = v;
     schedule();
+  }
+  /** Make the DOM viewBox current before reading the CTM at gesture start. */
+  function flushPendingView() {
+    if (raf.current != null && pending.current.view) {
+      cancelAnimationFrame(raf.current);
+      flush();
+    }
+  }
+
+  // Wheel zooming has no "end" event: commit to React shortly after the
+  // last tick so the committed tree matches what's on screen.
+  const wheelIdle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (wheelIdle.current) clearTimeout(wheelIdle.current); }, []);
+  function commitWheelSoon() {
+    if (wheelIdle.current) clearTimeout(wheelIdle.current);
+    wheelIdle.current = setTimeout(() => setView(viewRef.current), 200);
   }
 
   async function load() {
@@ -122,14 +149,38 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
   }, []);
 
   // ── Pan / zoom / pinch ─────────────────────────────────────────────────
+  // Pan and pinch measure in CLIENT pixels, converted to map units through
+  // a matrix captured once at gesture start. Measuring through the live CTM
+  // (as before) created a feedback loop — the pan mutates the viewBox the
+  // measurements depend on, one frame behind the pointer — which is what
+  // made panning stutter and rubber-band.
+  // Selection is applied on pointerUP, never on pointerdown: selecting opens
+  // or closes the 300px side panel, which resizes the SVG and shifts its
+  // screen-to-map scale — doing that mid-gesture corrupted every coordinate
+  // captured at gesture start (shelves jumped, pans lurched).
   const gesture = useRef<{
     kind: "pan" | "move" | "resize" | "draw" | null;
     startPt: { x: number; y: number };
+    startClient: { x: number; y: number };
+    startInv?: DOMMatrix;
     startView?: View;
     shelfStart?: { x: number; y: number; w: number; h: number };
-    pointers: Map<number, { x: number; y: number }>;
+    pointers: Map<number, { x: number; y: number }>; // client px
     pinchStart?: { dist: number; z: number };
-  }>({ kind: null, startPt: { x: 0, y: 0 }, pointers: new Map() });
+    moveId?: string; // shelf being moved/resized
+    tapSelect?: string | null; // selection to apply on pointerup if it was a tap
+    moved: boolean;
+  }>({ kind: null, startPt: { x: 0, y: 0 }, startClient: { x: 0, y: 0 }, pointers: new Map(), moved: false });
+
+  /** Begin panning from the current pointer, whatever it went down on. */
+  function startPan(e: React.PointerEvent) {
+    flushPendingView();
+    const g = gesture.current;
+    g.kind = "pan";
+    g.startClient = { x: e.clientX, y: e.clientY };
+    g.startInv = svgRef.current?.getScreenCTM()?.inverse() ?? undefined;
+    g.startView = viewRef.current;
+  }
 
   const [draft, setDraft] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
@@ -145,7 +196,9 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
   function onWheel(e: React.WheelEvent) {
     e.preventDefault();
     setHover(null);
+    flushPendingView();
     zoomAt(svgPoint(e), e.deltaY < 0 ? 1.15 : 1 / 1.15);
+    commitWheelSoon();
   }
 
   function markDirty() {
@@ -159,73 +212,85 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
       /* synthetic or already-released pointers can't be captured — fine */
     }
     setHover(null);
-    const pt = svgPoint(e);
-    gesture.current.pointers.set(e.pointerId, pt);
+    gesture.current.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (gesture.current.pointers.size === 2) {
       const [a, b] = [...gesture.current.pointers.values()];
       gesture.current.pinchStart = { dist: Math.hypot(a.x - b.x, a.y - b.y), z: viewRef.current.z };
       gesture.current.kind = null;
       return;
     }
+    gesture.current.moved = false;
     if (editable && mode === "build") {
+      const pt = svgPoint(e);
       gesture.current.kind = "draw";
       gesture.current.startPt = { x: snap(pt.x), y: snap(pt.y) };
       setDraft({ x: snap(pt.x), y: snap(pt.y), w: 0, h: 0 });
     } else {
-      gesture.current.kind = "pan";
-      gesture.current.startPt = pt;
-      gesture.current.startView = viewRef.current;
-      if (mode !== "edit") setSelected(null);
+      startPan(e);
+      if (mode !== "edit") gesture.current.tapSelect = null; // tap on background deselects
     }
   }
 
-  function onPointerDownShelf(e: React.PointerEvent, s: Shelf) {
-    e.stopPropagation();
-    try {
-      (e.target as Element).setPointerCapture?.(e.pointerId);
-    } catch {
-      /* fine */
-    }
-    setHover(null);
-    setSelected(s.id);
-    const pt = svgPoint(e);
-    gesture.current.pointers.set(e.pointerId, pt);
-    if (editable && mode === "edit") {
-      gesture.current.kind = "move";
-      gesture.current.startPt = pt;
+  const onPointerDownShelf = useCallback(
+    (e: React.PointerEvent, s: Shelf) => {
+      e.stopPropagation();
+      try {
+        (e.target as Element).setPointerCapture?.(e.pointerId);
+      } catch {
+        /* fine */
+      }
+      setHover(null);
+      gesture.current.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      gesture.current.moved = false;
+      gesture.current.tapSelect = s.id;
+      if (editable && mode === "edit") {
+        gesture.current.kind = "move";
+        gesture.current.moveId = s.id;
+        gesture.current.startPt = svgPoint(e);
+        gesture.current.startClient = { x: e.clientX, y: e.clientY };
+        gesture.current.shelfStart = { x: s.x, y: s.y, w: s.w, h: s.h };
+      } else {
+        startPan(e);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editable, mode, svgPoint]
+  );
+
+  const onPointerDownHandle = useCallback(
+    (e: React.PointerEvent, s: Shelf) => {
+      e.stopPropagation();
+      try {
+        (e.target as Element).setPointerCapture?.(e.pointerId);
+      } catch {
+        /* fine */
+      }
+      gesture.current.kind = "resize";
+      gesture.current.moveId = s.id;
+      gesture.current.startPt = svgPoint(e);
+      gesture.current.startClient = { x: e.clientX, y: e.clientY };
       gesture.current.shelfStart = { x: s.x, y: s.y, w: s.w, h: s.h };
-    } else {
-      gesture.current.kind = "pan";
-      gesture.current.startPt = pt;
-      gesture.current.startView = viewRef.current;
-    }
-  }
-
-  function onPointerDownHandle(e: React.PointerEvent, s: Shelf) {
-    e.stopPropagation();
-    try {
-      (e.target as Element).setPointerCapture?.(e.pointerId);
-    } catch {
-      /* fine */
-    }
-    const pt = svgPoint(e);
-    gesture.current.kind = "resize";
-    gesture.current.startPt = pt;
-    gesture.current.shelfStart = { x: s.x, y: s.y, w: s.w, h: s.h };
-    gesture.current.pointers.set(e.pointerId, pt);
-  }
+      gesture.current.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      gesture.current.moved = false;
+      gesture.current.tapSelect = undefined;
+    },
+    [svgPoint]
+  );
 
   function onPointerMove(e: React.PointerEvent) {
     const g = gesture.current;
     if (!g.pointers.has(e.pointerId) && g.kind === null) return;
-    const pt = svgPoint(e);
-    if (g.pointers.has(e.pointerId)) g.pointers.set(e.pointerId, pt);
+    if (g.pointers.has(e.pointerId)) g.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (!g.moved && Math.hypot(e.clientX - g.startClient.x, e.clientY - g.startClient.y) > 5) {
+      g.moved = true;
+    }
 
     if (g.pointers.size === 2 && g.pinchStart) {
+      g.moved = true;
       const [a, b] = [...g.pointers.values()];
-      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const dist = Math.hypot(a.x - b.x, a.y - b.y); // client px — stable under view changes
       if (g.pinchStart.dist > 0) {
-        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        const mid = svgPoint({ clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 });
         const v = viewRef.current;
         const z = Math.min(40, Math.max(0.8, g.pinchStart.z * (dist / g.pinchStart.dist)));
         const k = v.z / z;
@@ -234,25 +299,34 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
       return;
     }
 
-    if (g.kind === "pan" && g.startView) {
+    if (g.kind === "pan" && g.startView && g.startInv) {
+      // Client-pixel delta mapped to map units through the gesture-start
+      // matrix (vector transform: scale/rotation terms only, no translation).
+      const dxPx = e.clientX - g.startClient.x;
+      const dyPx = e.clientY - g.startClient.y;
+      const m = g.startInv;
       queueView({
         z: g.startView.z,
-        cx: g.startView.cx - (pt.x - g.startPt.x),
-        cy: g.startView.cy - (pt.y - g.startPt.y),
+        cx: g.startView.cx - (m.a * dxPx + m.c * dyPx),
+        cy: g.startView.cy - (m.b * dxPx + m.d * dyPx),
       });
-    } else if (g.kind === "draw" && draft) {
+      return;
+    }
+
+    const pt = svgPoint(e); // draw/move/resize don't change the view mid-gesture
+    if (g.kind === "draw" && draft) {
       const x = Math.min(g.startPt.x, snap(pt.x));
       const y = Math.min(g.startPt.y, snap(pt.y));
       setDraft({ x, y, w: Math.abs(snap(pt.x) - g.startPt.x), h: Math.abs(snap(pt.y) - g.startPt.y) });
-    } else if (g.kind === "move" && selected && g.shelfStart) {
+    } else if (g.kind === "move" && g.moveId && g.shelfStart) {
       const dx = snap(pt.x - g.startPt.x);
       const dy = snap(pt.y - g.startPt.y);
-      pending.current.shelf = { id: selected, patch: { x: g.shelfStart.x + dx, y: g.shelfStart.y + dy } };
+      pending.current.shelf = { id: g.moveId, patch: { x: g.shelfStart.x + dx, y: g.shelfStart.y + dy } };
       schedule();
       markDirty();
-    } else if (g.kind === "resize" && selected && g.shelfStart) {
+    } else if (g.kind === "resize" && g.moveId && g.shelfStart) {
       pending.current.shelf = {
-        id: selected,
+        id: g.moveId,
         patch: {
           w: Math.max(GRID, snap(g.shelfStart.w + (pt.x - g.startPt.x))),
           h: Math.max(GRID, snap(g.shelfStart.h + (pt.y - g.startPt.y))),
@@ -265,8 +339,17 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
 
   function onPointerUp(e: React.PointerEvent) {
     const g = gesture.current;
+    const wasViewGesture = g.kind === "pan" || g.pinchStart != null;
     g.pointers.delete(e.pointerId);
     if (g.pointers.size < 2) g.pinchStart = undefined;
+    // Sync React with the DOM-written viewBox now that the gesture is over.
+    if (wasViewGesture) setView(viewRef.current);
+    // Selection waits until here (see gesture comment): dragging a shelf
+    // selects it on release; a tap selects/deselects; a pan changes nothing.
+    if (g.kind === "move" && g.moveId) setSelected(g.moveId);
+    else if (!g.moved && g.tapSelect !== undefined) setSelected(g.tapSelect);
+    g.tapSelect = undefined;
+    g.moveId = undefined;
     if (g.kind === "draw" && draft) {
       if (draft.w >= GRID && draft.h >= GRID) {
         const id = crypto.randomUUID();
@@ -335,12 +418,13 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
     ? new Date(mapUpdatedAt).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" })
     : null;
 
-  function shelfTip(e: React.MouseEvent, s: Shelf) {
+  const shelfTip = useCallback((e: React.MouseEvent, s: Shelf) => {
     if (gesture.current.kind) return; // not while dragging
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
     setHover({ x: e.clientX - rect.left, y: e.clientY - rect.top, shelf: s });
-  }
+  }, []);
+  const clearTip = useCallback(() => setHover(null), []);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: sel ? "1fr 300px" : "1fr", gap: 16 }}>
@@ -415,81 +499,18 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
               )}
               {!hasPlan && <rect x={0} y={0} width={W} height={H} fill="#fff" stroke="#e2e6ee" />}
 
-              {shelves.map((s) => {
-                const c = CATEGORIES[s.category]?.color ?? "#000";
-                const isSel = s.id === selected;
-                const fontSize = Math.max(14, Math.min(s.w, s.h) * 0.3);
-                const numSize = Math.max(11, Math.min(s.w, s.h) * 0.16);
-                return (
-                  <g key={s.id} transform={`rotate(${s.rotation} ${s.x + s.w / 2} ${s.y + s.h / 2})`}>
-                    <rect
-                      x={s.x}
-                      y={s.y}
-                      width={s.w}
-                      height={s.h}
-                      rx={6}
-                      fill={c}
-                      opacity={0.92}
-                      stroke={isSel ? "#1c2330" : "#ffffff"}
-                      strokeWidth={isSel ? 8 : 3}
-                      style={{ cursor: "pointer" }}
-                      onPointerDown={(e) => onPointerDownShelf(e, s)}
-                      onMouseEnter={(e) => shelfTip(e, s)}
-                      onMouseMove={(e) => shelfTip(e, s)}
-                      onMouseLeave={() => setHover(null)}
-                    />
-                    {s.shelf_number && (
-                      <text
-                        x={s.x + numSize * 0.7}
-                        y={s.y + numSize * 1.2}
-                        textAnchor="start"
-                        fill="#fff"
-                        fontWeight={700}
-                        fontSize={numSize}
-                        opacity={0.92}
-                        style={{ pointerEvents: "none", userSelect: "none" }}
-                      >
-                        #{s.shelf_number}
-                      </text>
-                    )}
-                    <text
-                      x={s.x + s.w / 2}
-                      y={s.y + s.h / 2 + (s.letter_range ? -fontSize * 0.25 : fontSize * 0.35)}
-                      textAnchor="middle"
-                      fill="#fff"
-                      fontWeight={800}
-                      fontSize={fontSize}
-                      style={{ pointerEvents: "none", userSelect: "none" }}
-                    >
-                      {s.label}
-                    </text>
-                    {s.letter_range && (
-                      <text
-                        x={s.x + s.w / 2}
-                        y={s.y + s.h / 2 + fontSize * 0.85}
-                        textAnchor="middle"
-                        fill="#fff"
-                        fontWeight={600}
-                        fontSize={fontSize * 0.7}
-                        style={{ pointerEvents: "none", userSelect: "none" }}
-                      >
-                        {s.letter_range}
-                      </text>
-                    )}
-                    {editable && mode === "edit" && isSel && s.rotation === 0 && (
-                      <rect
-                        x={s.x + s.w - GRID}
-                        y={s.y + s.h - GRID}
-                        width={GRID}
-                        height={GRID}
-                        fill="#1c2330"
-                        style={{ cursor: "nwse-resize" }}
-                        onPointerDown={(e) => onPointerDownHandle(e, s)}
-                      />
-                    )}
-                  </g>
-                );
-              })}
+              {shelves.map((s) => (
+                <ShelfNode
+                  key={s.id}
+                  s={s}
+                  isSel={s.id === selected}
+                  showHandle={editable && mode === "edit" && s.id === selected && s.rotation === 0}
+                  onDown={onPointerDownShelf}
+                  onDownHandle={onPointerDownHandle}
+                  onTip={shelfTip}
+                  onTipLeave={clearTip}
+                />
+              ))}
 
               {draft && draft.w > 0 && (
                 <rect
@@ -638,3 +659,98 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
     </div>
   );
 }
+
+/**
+ * One shelf's SVG nodes, memoized so panning commits and edit-mode drags
+ * only re-render the shelves whose props actually changed.
+ */
+const ShelfNode = memo(function ShelfNode({
+  s,
+  isSel,
+  showHandle,
+  onDown,
+  onDownHandle,
+  onTip,
+  onTipLeave,
+}: {
+  s: Shelf;
+  isSel: boolean;
+  showHandle: boolean;
+  onDown: (e: React.PointerEvent, s: Shelf) => void;
+  onDownHandle: (e: React.PointerEvent, s: Shelf) => void;
+  onTip: (e: React.MouseEvent, s: Shelf) => void;
+  onTipLeave: () => void;
+}) {
+  const c = CATEGORIES[s.category]?.color ?? "#000";
+  const fontSize = Math.max(14, Math.min(s.w, s.h) * 0.3);
+  const numSize = Math.max(11, Math.min(s.w, s.h) * 0.16);
+  return (
+    <g transform={`rotate(${s.rotation} ${s.x + s.w / 2} ${s.y + s.h / 2})`}>
+      <rect
+        x={s.x}
+        y={s.y}
+        width={s.w}
+        height={s.h}
+        rx={6}
+        fill={c}
+        opacity={0.92}
+        stroke={isSel ? "#1c2330" : "#ffffff"}
+        strokeWidth={isSel ? 8 : 3}
+        style={{ cursor: "pointer" }}
+        onPointerDown={(e) => onDown(e, s)}
+        onMouseEnter={(e) => onTip(e, s)}
+        onMouseMove={(e) => onTip(e, s)}
+        onMouseLeave={onTipLeave}
+      />
+      {s.shelf_number && (
+        <text
+          x={s.x + numSize * 0.7}
+          y={s.y + numSize * 1.2}
+          textAnchor="start"
+          fill="#fff"
+          fontWeight={700}
+          fontSize={numSize}
+          opacity={0.92}
+          style={{ pointerEvents: "none", userSelect: "none" }}
+        >
+          #{s.shelf_number}
+        </text>
+      )}
+      <text
+        x={s.x + s.w / 2}
+        y={s.y + s.h / 2 + (s.letter_range ? -fontSize * 0.25 : fontSize * 0.35)}
+        textAnchor="middle"
+        fill="#fff"
+        fontWeight={800}
+        fontSize={fontSize}
+        style={{ pointerEvents: "none", userSelect: "none" }}
+      >
+        {s.label}
+      </text>
+      {s.letter_range && (
+        <text
+          x={s.x + s.w / 2}
+          y={s.y + s.h / 2 + fontSize * 0.85}
+          textAnchor="middle"
+          fill="#fff"
+          fontWeight={600}
+          fontSize={fontSize * 0.7}
+          style={{ pointerEvents: "none", userSelect: "none" }}
+        >
+          {s.letter_range}
+        </text>
+      )}
+      {showHandle && (
+        <rect
+          x={s.x + s.w - GRID}
+          y={s.y + s.h - GRID}
+          width={GRID}
+          height={GRID}
+          fill="#1c2330"
+          style={{ cursor: "nwse-resize" }}
+          onPointerDown={(e) => onDownHandle(e, s)}
+        />
+      )}
+    </g>
+  );
+});
