@@ -12,8 +12,10 @@ export default async function AdminMapPage() {
 
   return (
     <>
-      <h1>Map Editor</h1>
-      <p className="sub">
+      {/* On the phone this tab is the map VIEWER — editing tools stay on desktop */}
+      <h1 className="desk-only">Map Editor</h1>
+      <h1 className="mobile-only">Library Map</h1>
+      <p className="sub desk-only">
         {canEdit ? (
           <>
             <b>Build</b> mode: drag to draw shelves. <b>Edit</b> mode: drag to move, corner handle to
@@ -24,7 +26,12 @@ export default async function AdminMapPage() {
         )}
         Students and teachers see everything except internal notes.
       </p>
-      {canFloorplan && <FloorplanUpload />}
+      <p className="sub mobile-only">Pinch to zoom, drag to pan, tap a shelf for details.</p>
+      {canFloorplan && (
+        <div className="desk-only">
+          <FloorplanUpload />
+        </div>
+      )}
       <LibraryMap editable={canEdit} />
     </>
   );

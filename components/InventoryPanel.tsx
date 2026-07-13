@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Papa from "papaparse";
 import { mergeBooks, rowToBook, type BookRecord } from "@/lib/match";
 import { type CategoryId } from "@/lib/categories";
-import ScanPanel from "@/components/ScanPanel";
 import TagPicker, { TagPill } from "@/components/TagPicker";
 
 type Sync = {
@@ -51,6 +50,8 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Book[] | null>(null);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [tagOpen, setTagOpen] = useState<number | null>(null);
   const [tagError, setTagError] = useState<string | null>(null);
 
@@ -159,6 +160,27 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     if (res.ok) {
       setResults(data.books);
       setTotal(data.total);
+      setPage(0);
+    }
+  }
+
+  // Browse without typing: the whole catalog, A→Z, straight away.
+  useEffect(() => {
+    search();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function loadMore() {
+    setLoadingMore(true);
+    try {
+      const res = await fetch(`/api/admin/books?q=${encodeURIComponent(q)}&page=${page + 1}`);
+      const data = await res.json();
+      if (res.ok) {
+        setResults((cur) => [...(cur ?? []), ...data.books]);
+        setPage(data.page);
+      }
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -182,7 +204,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
       {error && <div className="error">{error}</div>}
       {notice && <div className="notice">{notice}</div>}
 
-      <div className="card" style={{ marginBottom: 20 }}>
+      <div className="card desk-only" style={{ marginBottom: 20 }}>
         <h2 style={{ marginTop: 0 }}>Current inventory</h2>
         {active ? (
           <p style={{ margin: 0 }}>
@@ -199,7 +221,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
 
       {canImport && (
       <div
-        className="card"
+        className="card desk-only"
         style={{
           marginBottom: 20,
           borderStyle: dragOver ? "dashed" : "solid",
@@ -262,16 +284,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
       )}
 
       <div className="card" style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <h2 style={{ margin: 0, flex: 1 }}>Search the catalog</h2>
-          <ScanPanel
-            canImport={canImport}
-            onCatalogChange={() => {
-              load();
-              if (results) search();
-            }}
-          />
-        </div>
+        <h2 style={{ marginTop: 0 }}>Search the catalog</h2>
         <form onSubmit={search} style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
           <input
             className="input"
@@ -288,8 +301,8 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
         {results && (
           <>
             <p className="hint" style={{ marginTop: 10 }}>
-              {total.toLocaleString()} result{total === 1 ? "" : "s"}
-              {total > results.length ? ` (showing first ${results.length})` : ""}
+              {total.toLocaleString()} {q.trim() ? `result${total === 1 ? "" : "s"}` : "titles"}
+              {total > results.length ? ` (showing ${results.length.toLocaleString()})` : ""}
             </p>
             <div className="tablewrap">
               <table className="table books">
@@ -334,11 +347,16 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                 </tbody>
               </table>
             </div>
+            {results.length < total && (
+              <button className="btn" style={{ marginTop: 12, width: "100%" }} onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? "Loading…" : `Show more (${(total - results.length).toLocaleString()} left)`}
+              </button>
+            )}
           </>
         )}
       </div>
 
-      <div className="card">
+      <div className="card desk-only">
         <h2 style={{ marginTop: 0 }}>Import history</h2>
         {history.length === 0 ? (
           <p className="hint">No imports yet.</p>

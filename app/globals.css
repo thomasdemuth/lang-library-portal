@@ -205,8 +205,8 @@ textarea.input { font-weight: 500; resize: vertical; min-height: 110px; line-hei
   content: ""; position: absolute; inset: 0; background: #2ecf8f55; pointer-events: none;
 }
 .scan-guide {
-  position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%);
-  width: min(78%, 440px); height: 140px; border: 3px solid #ffffffcc; border-radius: 16px;
+  position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%);
+  width: min(68%, 340px); height: 220px; border: 3px solid #ffffffcc; border-radius: 18px;
   box-shadow: 0 0 0 2000px rgba(11, 14, 20, .35); pointer-events: none;
 }
 .scan-top {
@@ -223,6 +223,9 @@ textarea.input { font-weight: 500; resize: vertical; min-height: 110px; line-hei
   font-size: 17px; font-weight: 700; color: #fff; background: #ffffff22; border: 0;
   border-radius: 999px; width: 40px; height: 40px; cursor: pointer;
 }
+a.scan-close { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+/* The Scan tab keeps the tab bar reachable below the camera */
+.scan-overlay.page { bottom: calc(60px + env(safe-area-inset-bottom)); padding-bottom: 0; }
 .scan-bulkbar {
   position: relative; margin: 0 14px; padding: 10px 12px; border-radius: 12px;
   background: #ffffffe8; display: flex; flex-direction: column; gap: 8px;
@@ -257,17 +260,42 @@ textarea.input { font-weight: 500; resize: vertical; min-height: 110px; line-hei
 .scan-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .scan-actions .btn { flex: 1; min-width: 120px; }
 
+/* ── Library map layout ─────────────────────────── */
+.maplayout { display: grid; grid-template-columns: var(--map-cols, 1fr); gap: 16px; }
+.mapsvg { width: 100%; height: 70vh; display: block; }
+@media (max-width: 640px) {
+  .maplayout { grid-template-columns: 1fr; }
+  .mapsvg { height: 58vh; } /* leave room for the details panel + tab bar */
+}
+
+/* ── Bottom tab bar (the phone app shell) ───────── */
+.tabbar { display: none; }
+
 /* ── Mobile & home-screen (standalone) polish ───── */
 @media (max-width: 640px) {
   .wrap { padding: 16px; }
-  .admin-main { padding: 16px; }
+  .admin-main { padding: 16px 16px calc(84px + env(safe-area-inset-bottom)); }
   .input, select.input, textarea.input { font-size: 16px; } /* stop iOS focus zoom */
   .btn { padding: 11px 16px; }
-  .side { position: sticky; top: 0; z-index: 20; background: #fff; overflow-x: auto;
-    flex-wrap: nowrap; white-space: nowrap; gap: 2px; padding: 8px 10px;
-    scrollbar-width: none; }
-  .side::-webkit-scrollbar { display: none; }
-  .side-label { padding: 10px 6px 10px; }
+  .desk-only { display: none !important; }
+
+  /* The admin area becomes an app: tab bar instead of sidebar + site header */
+  .side { display: none; }
+  body:has(.admin-grid) .topbar { display: none; }
+  .tabbar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 70;
+    display: flex; align-items: stretch;
+    background: #fffffff5; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    border-top: 1px solid var(--line);
+    padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+  }
+  .tabbar a {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: .2px; color: var(--muted);
+    text-decoration: none; -webkit-tap-highlight-color: transparent;
+  }
+  .tabbar a.active { color: var(--brand-blue); }
+  .tabbar svg { width: 24px; height: 24px; }
   /* Book search results become cards */
   .table.books thead { display: none; }
   .table.books tr {
@@ -282,8 +310,10 @@ textarea.input { font-weight: 500; resize: vertical; min-height: 110px; line-hei
   .table.books td[data-th="Copies"] { grid-column: 2; justify-self: end; color: var(--muted); font-size: 12px; }
   .table.books td[data-th="Copies"]::after { content: " in stock"; }
 }
+@media (min-width: 641px) {
+  .mobile-only { display: none !important; }
+}
 @media (display-mode: standalone) {
-  /* Pinned to the home screen: honor the notch, drop the in-page footer feel */
+  /* Pinned to the home screen: honor the notch */
   body { padding-top: env(safe-area-inset-top); }
-  header a[href="/"] { pointer-events: auto; }
 }

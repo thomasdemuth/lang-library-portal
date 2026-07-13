@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import PasswordForm from "@/components/PasswordForm";
 import NotificationPrefs from "@/components/NotificationPrefs";
 import DeleteAccountForm from "@/components/DeleteAccountForm";
+import SignOutButton from "@/components/SignOutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,22 @@ export default async function AccountPage() {
           {admin.role === "chief" ? "Chief Admin" : "Admin"}
         </span>
       </p>
+      {/* On the phone the tab bar replaces the sidebar/topbar — Settings
+          carries the roster link and sign-out instead. */}
+      <div className="card mobile-only" style={{ marginBottom: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Library</h2>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {admin.role === "chief" && (
+            <a className="btn" href="/admin/admins">
+              Admins &amp; Invites
+            </a>
+          )}
+          <a className="btn" href="/admin/requests">
+            Book Requests
+          </a>
+          <SignOutButton />
+        </div>
+      </div>
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Change password</h2>
         <PasswordForm />

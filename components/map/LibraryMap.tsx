@@ -427,11 +427,11 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
   const clearTip = useCallback(() => setHover(null), []);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: sel ? "1fr 300px" : "1fr", gap: 16 }}>
+    <div className="maplayout" style={{ "--map-cols": sel ? "1fr 300px" : "1fr" } as React.CSSProperties}>
       <div>
         <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
           {editable && (
-            <span style={{ display: "flex", gap: 4 }}>
+            <span className="desk-only" style={{ display: "flex", gap: 4 }}>
               {(["view", "build", "edit"] as Mode[]).map((m) => (
                 <button
                   key={m}
@@ -480,7 +480,8 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
             <svg
               ref={svgRef}
               viewBox={vb}
-              style={{ width: "100%", height: "70vh", display: "block", cursor: mode === "build" ? "crosshair" : "grab" }}
+              className="mapsvg"
+              style={{ cursor: mode === "build" ? "crosshair" : "grab" }}
               onWheel={onWheel}
               onPointerDown={onPointerDownBg}
               onPointerMove={onPointerMove}

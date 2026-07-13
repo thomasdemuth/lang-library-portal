@@ -45,7 +45,9 @@ function zxingReader(): MultiFormatReader {
   const reader = new MultiFormatReader();
   const hints = new Map();
   hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.UPC_A]);
-  hints.set(DecodeHintType.TRY_HARDER, true);
+  // No TRY_HARDER: it triggers exhaustive (rotated etc.) searches that
+  // roughly double per-frame cost. Trying more frames per second beats
+  // trying harder per frame for handheld barcode alignment.
   reader.setHints(hints);
   return reader;
 }
@@ -85,15 +87,18 @@ export async function startScanner(
           const codes = await native.detect(video);
           for (const c of codes) if (c.rawValue) onCode(c.rawValue);
         } else if (zxing) {
-          // Decode a horizontal band around the center — where the guide
-          // frame tells the user to hold the barcode. Much faster than
-          // full frames and rejects clutter at the edges.
-          const bandH = Math.round(video.videoHeight * 0.45);
-          canvas.width = video.videoWidth;
-          canvas.height = bandH;
+          // Decode only the region under the guide frame (center band,
+          // middle ~84% width), downscaled to ≤720px — a fraction of the
+          // pixels of a full frame, so we can afford many more attempts
+          // per second, which is what makes handheld scanning feel fast.
+          const srcH = Math.round(video.videoHeight * 0.4);
+          const srcW = Math.round(video.videoWidth * 0.84);
+          const scale = Math.min(1, 720 / srcW);
+          canvas.width = Math.round(srcW * scale);
+          canvas.height = Math.round(srcH * scale);
           ctx.drawImage(
             video,
-            0, Math.round((video.videoHeight - bandH) / 2), video.videoWidth, bandH,
+            Math.round((video.videoWidth - srcW) / 2), Math.round((video.videoHeight - srcH) / 2), srcW, srcH,
             0, 0, canvas.width, canvas.height
           );
           const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -102,7 +107,7 @@ export async function startScanner(
             gray[i] = (data[j] * 306 + data[j + 1] * 601 + data[j + 2] * 117) >> 10;
           }
           const bitmap = new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(gray, width, height)));
-          const result = zxing.decode(bitmap);
+          const result = zxing.decodeWithState(bitmap);
           if (result?.getText()) onCode(result.getText());
         }
       } catch (e) {
@@ -111,7 +116,7 @@ export async function startScanner(
         }
       }
     }
-    if (!stopped) setTimeout(tick, native ? 120 : 180);
+    if (!stopped) setTimeout(tick, native ? 100 : 90);
   }
   tick();
 

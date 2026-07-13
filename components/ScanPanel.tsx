@@ -32,11 +32,15 @@ const COOLDOWN_MS = 3000;
 export default function ScanPanel({
   canImport,
   onCatalogChange,
+  variant = "button",
 }: {
   canImport: boolean;
   onCatalogChange?: () => void;
+  /** "button": launcher + overlay (inventory page). "page": always-on scanner filling the Scan tab. */
+  variant?: "button" | "page";
 }) {
-  const [open, setOpen] = useState(false);
+  const isPage = variant === "page";
+  const [open, setOpen] = useState(isPage);
   const [mode, setMode] = useState<"lookup" | "bulk">("lookup");
   const [bulkTag, setBulkTag] = useState<CategoryId>("fiction");
   const [camError, setCamError] = useState<string | null>(null);
@@ -222,7 +226,7 @@ export default function ScanPanel({
 
   if (!open) {
     return (
-      <button className="btn brand" onClick={() => setOpen(true)}>
+      <button className="btn brand scan-launch" onClick={() => setOpen(true)}>
         📷 Scan barcodes
       </button>
     );
@@ -231,7 +235,7 @@ export default function ScanPanel({
   const isbnFor = result?.book?.isbn13 ?? result?.book?.isbn10 ?? result?.external?.isbn13 ?? result?.code;
 
   return (
-    <div className="scan-overlay" role="dialog" aria-label="Barcode scanner">
+    <div className={`scan-overlay${isPage ? " page" : ""}`} role={isPage ? undefined : "dialog"} aria-label="Barcode scanner">
       <div className={`scan-stage${flash ? " flash" : ""}`}>
         <video ref={videoRef} className="scan-video" muted playsInline />
         <div className="scan-guide" aria-hidden />
@@ -248,9 +252,16 @@ export default function ScanPanel({
               </button>
             )}
           </div>
-          <button className="scan-close" onClick={close} aria-label="Close scanner">
-            ✕
-          </button>
+          {!isPage ? (
+            <button className="scan-close" onClick={close} aria-label="Close scanner">
+              ✕
+            </button>
+          ) : (
+            // Unlinked on desktop, but a typed URL shouldn't be a trap
+            <a className="scan-close desk-only" href="/admin" aria-label="Leave scanner">
+              ✕
+            </a>
+          )}
         </div>
 
         {mode === "bulk" && (
