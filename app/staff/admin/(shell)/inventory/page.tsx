@@ -16,6 +16,9 @@ export default async function InventoryPage() {
         The book catalog, synced from Libib by CSV export. Book requests are matched against
         whatever is live here.
       </p>
+      <a className="btn brand mobile-only" style={{ width: "100%", textAlign: "center", marginBottom: 14 }} href="/admin/requests">
+        📖 Manage Book Requests
+      </a>
       <InventoryPanel canImport={canImport} />
     </>
   );

@@ -3,8 +3,7 @@ import { db } from "@/lib/db";
 import PasswordForm from "@/components/PasswordForm";
 import NotificationPrefs from "@/components/NotificationPrefs";
 import DeleteAccountForm from "@/components/DeleteAccountForm";
-import SignOutButton from "@/components/SignOutButton";
-import AdminsPanel from "@/components/AdminsPanel";
+import MobileSettings from "@/components/MobileSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +21,7 @@ async function weeklyPref(adminId: string): Promise<boolean | null> {
 export default async function AccountPage() {
   const admin = await requireAdminPage();
   const notifyWeekly = await weeklyPref(admin.id);
+  const canDelete = admin.email.toLowerCase() !== "library@thelangschool.org";
   return (
     <>
       <h1>My account</h1>
@@ -31,35 +31,32 @@ export default async function AccountPage() {
           {admin.role === "chief" ? "Chief Admin" : "Admin"}
         </span>
       </p>
-      {/* On the phone the tab bar replaces the sidebar/topbar — Settings
-          carries quick links and sign-out instead. */}
-      <div className="card mobile-only" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Library</h2>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <a className="btn" href="/admin/requests">
-            Book Requests
-          </a>
-          <SignOutButton />
+
+      {/* Desktop keeps the classic account page (admins live on their own page) */}
+      <div className="desk-only">
+        <div className="card">
+          <h2 style={{ marginTop: 0 }}>Change password</h2>
+          <PasswordForm />
         </div>
+        <NotificationPrefs
+          isChief={admin.role === "chief"}
+          notifyRequests={admin.notify_requests}
+          notifyWeekly={notifyWeekly}
+        />
+        {canDelete && <DeleteAccountForm />}
       </div>
-      <div className="card">
-        <h2 style={{ marginTop: 0 }}>Change password</h2>
-        <PasswordForm />
+
+      {/* The phone gets the app-style Settings: grouped tiles with drill-ins */}
+      <div className="mobile-only">
+        <MobileSettings
+          name={admin.name}
+          isChief={admin.role === "chief"}
+          selfId={admin.id}
+          notifyRequests={admin.notify_requests}
+          notifyWeekly={notifyWeekly}
+          canDelete={canDelete}
+        />
       </div>
-      <NotificationPrefs
-        isChief={admin.role === "chief"}
-        notifyRequests={admin.notify_requests}
-        notifyWeekly={notifyWeekly}
-      />
-      {admin.email.toLowerCase() !== "library@thelangschool.org" && <DeleteAccountForm />}
-      {/* Mobile: admins & invites live right here, one continuous Settings page */}
-      {admin.role === "chief" && (
-        <div className="mobile-only" style={{ marginTop: 24 }}>
-          <h1 style={{ fontSize: 20 }}>Admins &amp; Invites</h1>
-          <p className="sub">Invite new admins and manage the team.</p>
-          <AdminsPanel selfId={admin.id} />
-        </div>
-      )}
     </>
   );
 }

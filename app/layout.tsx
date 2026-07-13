@@ -25,10 +25,26 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // The pre-paint script may stamp data-theme/data-textsize on <html>
+    // before hydration — that attribute delta is expected, not a bug.
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* Next's appleWebApp emits the modern tag; older iOS wants this one */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
+        {/* Apply saved appearance before first paint (no flash) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: [
+              "try{",
+              'var t=localStorage.getItem("ll-theme")||"light";',
+              'var dark=t==="dark"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);',
+              'if(dark)document.documentElement.dataset.theme="dark";',
+              'var s=localStorage.getItem("ll-textsize");',
+              'if(s&&s!=="medium")document.documentElement.dataset.textsize=s;',
+              "}catch(e){}",
+            ].join(""),
+          }}
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

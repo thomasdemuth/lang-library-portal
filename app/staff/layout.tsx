@@ -1,4 +1,5 @@
 import SiteHeader from "@/components/SiteHeader";
+import LaunchRedirect from "@/components/LaunchRedirect";
 import { currentSession } from "@/lib/server";
 
 export default async function StaffLayout({ children }: { children: React.ReactNode }) {
@@ -15,6 +16,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
     : [];
   return (
     <>
+      {isAdmin && <LaunchRedirect />}
       <SiteHeader tagline="staff portal" email={session?.email} links={links} />
       {children}
     </>

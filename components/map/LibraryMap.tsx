@@ -500,7 +500,7 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
   return (
     <div className="maplayout" style={{ "--map-cols": sel ? "1fr 300px" : "1fr" } as React.CSSProperties}>
       <div>
-        <div className="map-toolbar" style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="map-toolbar">
           {editable && (
             <span className="desk-only" style={{ display: "flex", gap: 4 }}>
               {(["view", "build", "edit"] as Mode[]).map((m) => (
@@ -540,9 +540,17 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
 
         <div
           ref={containerRef}
-          className="card"
-          style={{ position: "relative", padding: 6, touchAction: "none", background: "#fbfbfd", overflow: "hidden" }}
+          className="card mapcard"
+          style={{ position: "relative", padding: 6, touchAction: "none", overflow: "hidden" }}
         >
+          <div className="map-legend-overlay" aria-hidden>
+            {CATEGORY_IDS.map((id) => (
+              <span key={id}>
+                <span className="dot" style={{ background: CATEGORIES[id].color, width: 9, height: 9 }} />
+                {CATEGORIES[id].label}
+              </span>
+            ))}
+          </div>
           {loaded && !hasPlan && !editable ? (
             <p className="hint" style={{ padding: 20 }}>
               The map is being set up — check back soon.
@@ -638,7 +646,7 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
           )}
         </div>
 
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
+        <div className="desk-only" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
           {CATEGORY_IDS.map((id) => (
             <span key={id} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
               <span className="dot" style={{ background: CATEGORIES[id].color }} />

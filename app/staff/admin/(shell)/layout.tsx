@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { currentAdmin } from "@/lib/server";
 import { canDo } from "@/lib/permissions";
 import MobileTabBar from "@/components/MobileTabBar";
+import MobileHeader from "@/components/MobileHeader";
 
 export default async function AdminShell({ children }: { children: React.ReactNode }) {
   const admin = await currentAdmin();
@@ -47,7 +48,10 @@ export default async function AdminShell({ children }: { children: React.ReactNo
         {isChief && <a href="/admin/admins">Admins &amp; Invites</a>}
         <a href="/admin/account">My Account</a>
       </aside>
-      <main className="admin-main">{children}</main>
+      <main className="admin-main">
+        <MobileHeader />
+        {children}
+      </main>
       <MobileTabBar
         canScan={canDo(admin, "inventory_view") || canDo(admin, "inventory_import")}
         canInventory={canDo(admin, "inventory_view") || canDo(admin, "inventory_import")}
