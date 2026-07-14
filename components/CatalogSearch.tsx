@@ -39,7 +39,21 @@ export default function CatalogSearch() {
   }
 
   useEffect(() => {
-    search();
+    // arriving from a "new on the shelves" card prefills the query
+    const preset = new URLSearchParams(window.location.search).get("q");
+    if (preset) {
+      setQ(preset);
+      fetch(`/api/catalog?q=${encodeURIComponent(preset)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          setResults(d.books);
+          setTotal(d.total);
+          setPage(0);
+        })
+        .catch(() => {});
+    } else {
+      search();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

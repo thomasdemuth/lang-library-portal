@@ -4,7 +4,8 @@ export default function AdminLogin() {
   return (
     <div className="wrap narrow">
       <div className="gate-hero">
-        <span className="mark">Lang Library</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="gate-logo" src="/icon-192.png" alt="Lang Library" width={76} height={76} />
         <h1>Management sign-in</h1>
         <p className="sub">For library management accounts only.</p>
       </div>

@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { currentAdmin } from "@/lib/server";
 import { canDo } from "@/lib/permissions";
+import { Ic } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -47,20 +48,28 @@ export default async function AdminDashboard() {
   ].filter((k) => k.show);
 
   const cards = [
-    { show: can("requests"), href: "/admin/requests", h: `Book Requests${stats.newRequests > 0 ? ` (${stats.newRequests})` : ""}`, p: "Review teacher requests and set their status." },
-    { show: can("feedback_view"), href: "/admin/feedback", h: `Feedback${stats.newFeedback > 0 ? ` (${stats.newFeedback})` : ""}`, p: "What students and teachers are telling you." },
-    { show: can("inventory_view") || can("inventory_import"), href: "/admin/inventory", h: "Inventory", p: "Upload the latest Libib export and search the catalog." },
-    { show: can("map_edit") || can("map_floorplan"), href: "/admin/map", h: "Map Editor", p: "Place shelves, set categories, keep internal notes." },
-    { show: can("signmaker"), href: "/admin/sign-maker", h: "Sign Maker", p: "Print shelf tabs, banners, and wayfinding signs." },
-    { show: can("analytics"), href: "/admin/analytics", h: "Site Usage", p: "Visits and activity across both sites." },
-    { show: isChief, href: "/admin/admins", h: "Admins & Invites", p: "Add admins, set their powers, and manage invites." },
+    { show: can("requests"), href: "/admin/requests", icon: "requests", badge: stats.newRequests, h: "Book Requests", p: "Review teacher requests and set their status." },
+    { show: can("feedback_view"), href: "/admin/feedback", icon: "feedback", badge: stats.newFeedback, h: "Feedback", p: "What students and teachers are telling you." },
+    { show: can("inventory_view") || can("inventory_import"), href: "/admin/inventory", icon: "book", badge: 0, h: "Inventory", p: "Scan, tag, and search the catalog; sync from Libib." },
+    { show: can("map_edit") || can("map_floorplan"), href: "/admin/map", icon: "map", badge: 0, h: "Map Editor", p: "Place shelves, set categories, keep internal notes." },
+    { show: can("signmaker"), href: "/admin/sign-maker", icon: "sign", badge: 0, h: "Sign Maker", p: "Print shelf tabs, banners, and wayfinding signs." },
+    { show: can("analytics"), href: "/admin/analytics", icon: "chart", badge: 0, h: "Site Usage", p: "Visits and activity across both sites." },
+    { show: isChief, href: "/admin/admins", icon: "users", badge: 0, h: "Admins & Invites", p: "Add admins, set their powers, and manage invites." },
   ].filter((c) => c.show);
+
+  const hour = Number(
+    new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: "America/New_York" }).format(new Date())
+  );
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
     <>
-      <h1>Management dashboard</h1>
+      <h1>
+        {greeting}, {admin?.name?.split(" ")[0] ?? "librarian"}{" "}
+        <span className="wave" aria-hidden>👋</span>
+      </h1>
       <p className="sub">
-        Welcome back, {admin?.name?.split(" ")[0] ?? "librarian"}.{" "}
+        Here&rsquo;s the library at a glance.{" "}
         <span className="pill" style={{ background: isChief ? "#eef1fb" : "#eef0f5", marginLeft: 4 }}>
           {isChief ? "Chief Admin" : "Admin"}
         </span>
@@ -80,8 +89,15 @@ export default async function AdminDashboard() {
       {cards.length > 0 ? (
         <div className="cards">
           {cards.map((c) => (
-            <a className="card" href={c.href} key={c.href}>
-              <h2>{c.h}</h2>
+            <a className="card navcard" href={c.href} key={c.href}>
+              <h2>
+                <span className="navcard-icon">
+                  <Ic name={c.icon} size={17} />
+                </span>
+                {c.h}
+                {c.badge > 0 && <span className="navcard-badge">{c.badge}</span>}
+                <span className="navcard-arrow" aria-hidden>→</span>
+              </h2>
               <p>{c.p}</p>
             </a>
           ))}

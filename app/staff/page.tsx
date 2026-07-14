@@ -1,6 +1,7 @@
 import { currentSession } from "@/lib/server";
 import { db } from "@/lib/db";
 import { STATUS_LABELS } from "@/lib/labels";
+import { Ic } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -68,24 +69,33 @@ export default async function StaffHome() {
       )}
 
       <div className="cards">
-        <a className="card" href="/requests">
+        <a className="card navcard" href="/requests">
           <h2>
-            <span className="dot" style={{ background: "#b2222c" }} />
+            <span className="navcard-icon" style={{ background: "#b2222c" }}>
+              <Ic name="requests" size={17} />
+            </span>
             Book Requests
+            <span className="navcard-arrow" aria-hidden>→</span>
           </h2>
           <p>Need copies for your class? Submit a request and see what the library already has on the shelves.</p>
         </a>
-        <a className="card" href="/map">
+        <a className="card navcard" href="/map">
           <h2>
-            <span className="dot" style={{ background: "#2e3b8e" }} />
+            <span className="navcard-icon" style={{ background: "#2e3b8e" }}>
+              <Ic name="map" size={17} />
+            </span>
             Library Map
+            <span className="navcard-arrow" aria-hidden>→</span>
           </h2>
           <p>See where every genre and section lives, shelf by shelf.</p>
         </a>
-        <a className="card" href="/feedback">
+        <a className="card navcard" href="/feedback">
           <h2>
-            <span className="dot" style={{ background: "#29ac9c" }} />
+            <span className="navcard-icon" style={{ background: "#29ac9c" }}>
+              <Ic name="feedback" size={17} />
+            </span>
             Feedback
+            <span className="navcard-arrow" aria-hidden>→</span>
           </h2>
           <p>Ideas, issues, wishes — straight to the library team.</p>
         </a>
