@@ -25,13 +25,16 @@ export async function POST(req: NextRequest) {
 
   if (!emailAllowedFor(audience, email)) {
     if (audience === "student" && emailAllowedFor("staff", email)) {
-      return NextResponse.json(
-        {
-          error: "This is the student site — teachers and staff have their own.",
-          hint: { label: "Go to the staff site", url: `${staffUrl()}/gate` },
-        },
-        { status: 403 }
-      );
+      // Teachers and admins may browse the student site (e.g. to see what
+      // students see, or to open a student's profile page from User
+      // Insights). The session is host-scoped and grants student powers only.
+      const token = await signSession({ aud: "student", email });
+      const res = NextResponse.json({
+        ok: true,
+        note: `Welcome! You're browsing the student site as staff — the staff site is at ${staffUrl()}.`,
+      });
+      res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions("student"));
+      return res;
     }
     if (audience === "staff" && emailAllowedFor("student", email)) {
       // Students who land on the staff site glide straight through: the

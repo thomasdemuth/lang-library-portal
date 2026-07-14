@@ -8,6 +8,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
       <SiteHeader
         tagline="student portal"
         email={session?.email}
+        audience="student"
         links={
           session
             ? [

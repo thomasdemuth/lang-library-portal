@@ -64,3 +64,10 @@ export function displayName(email: string): string {
   const cap = (s?: string) => (s ? s[0].toUpperCase() + s.slice(1) : "");
   return last ? `${cap(first)} ${cap(last)[0]}.` : cap(first);
 }
+
+/** "thomas.demuth@…" → "Thomas Demuth" (school emails are first.last). */
+export function displayNameFull(email: string): string {
+  const local = email.split("@")[0] ?? email;
+  const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : "");
+  return local.split(/[._-]/).filter(Boolean).map(cap).join(" ") || email;
+}

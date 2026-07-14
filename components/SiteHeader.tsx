@@ -1,11 +1,15 @@
+import UserMenu from "@/components/UserMenu";
+
 export default function SiteHeader({
   tagline,
   links,
   email,
+  audience = "staff",
 }: {
   tagline: string;
   links: { href: string; label: string }[];
   email?: string | null;
+  audience?: "student" | "staff";
 }) {
   return (
     <header className="topbar">
@@ -24,14 +28,7 @@ export default function SiteHeader({
           </a>
         ))}
       </nav>
-      <div className="whoami">
-        {email && (
-          <span className="avatar-chip" title={email}>
-            <span className="avatar">{email[0]?.toUpperCase()}</span>
-            <span className="avatar-email">{email}</span>
-          </span>
-        )}
-      </div>
+      <div className="whoami">{email && <UserMenu email={email} audience={audience} />}</div>
     </header>
   );
 }

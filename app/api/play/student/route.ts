@@ -15,18 +15,28 @@ export const GET = guarded(async (req: NextRequest) => {
   const id = req.nextUrl.searchParams.get("id") ?? "";
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { data: profile, error } = await db()
+  let { data: profile, error } = await db()
     .from("student_profiles")
-    .select("email, avatar")
+    .select("email, avatar, hidden")
     .eq("public_id", id)
     .maybeSingle();
+  if (error && /hidden/i.test(error.message ?? "")) {
+    ({ data: profile, error } = await db()
+      .from("student_profiles")
+      .select("email, avatar")
+      .eq("public_id", id)
+      .maybeSingle());
+  }
   if (error) {
     if (/public_id|student_profiles|relation|does not exist|schema cache/i.test(error.message ?? "")) {
       return NextResponse.json({ migrationPending: true });
     }
     return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
-  if (!profile) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  // Hidden profiles are private — indistinguishable from missing
+  if (!profile || (profile as { hidden?: boolean }).hidden) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   const [{ count: booksRead }, { data: favorites }] = await Promise.all([
     db().from("reading_log").select("id", { count: "exact", head: true }).eq("email", profile.email),

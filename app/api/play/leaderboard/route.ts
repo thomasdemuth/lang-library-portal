@@ -17,16 +17,18 @@ export const GET = guarded(async (req: NextRequest) => {
 
   const counts = new Map<string, number>();
   for (const row of logs ?? []) counts.set(row.email, (counts.get(row.email) ?? 0) + 1);
-  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+  // take extra, then drop hidden profiles and keep the top 10
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30);
   if (top.length === 0) return NextResponse.json({ leaders: [] });
 
-  // public_id arrives with migration 0012 — fall back gracefully before it
+  // public_id / hidden arrive with migrations 0012/0013 — fall back gracefully
+  type Prof = { email: string; avatar: Avatar; public_id?: string; hidden?: boolean };
   let profiles = (
     await db()
       .from("student_profiles")
-      .select("email, avatar, public_id")
+      .select("email, avatar, public_id, hidden")
       .in("email", top.map(([email]) => email))
-  ).data as { email: string; avatar: Avatar; public_id?: string }[] | null;
+  ).data as Prof[] | null;
   if (!profiles) {
     profiles = (
       await db()
@@ -38,12 +40,15 @@ export const GET = guarded(async (req: NextRequest) => {
   const byEmail = new Map((profiles ?? []).map((p) => [p.email, p]));
 
   return NextResponse.json({
-    leaders: top.map(([email, books], i) => ({
-      rank: i + 1,
-      name: displayName(email),
-      books,
-      avatar: byEmail.get(email)?.avatar ?? DEFAULT_AVATAR,
-      id: byEmail.get(email)?.public_id ?? null,
-    })),
+    leaders: top
+      .filter(([email]) => !byEmail.get(email)?.hidden)
+      .slice(0, 10)
+      .map(([email, books], i) => ({
+        rank: i + 1,
+        name: displayName(email),
+        books,
+        avatar: byEmail.get(email)?.avatar ?? DEFAULT_AVATAR,
+        id: byEmail.get(email)?.public_id ?? null,
+      })),
   });
 });

@@ -61,20 +61,33 @@ function json401(): NextResponse {
 }
 
 /** Fire-and-forget page-view insert straight to PostgREST (no SDK in the edge bundle). */
-function logUsage(row: { audience: string; role: string; path: string; visitor_id: string }): Promise<unknown> {
+function logUsage(row: {
+  audience: string;
+  role: string;
+  path: string;
+  visitor_id: string;
+  email: string | null;
+}): Promise<unknown> {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return Promise.resolve();
-  return fetch(`${url}/rest/v1/usage_events`, {
-    method: "POST",
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      Prefer: "return=minimal",
-    },
-    body: JSON.stringify(row),
-  }).catch(() => undefined);
+  const post = (body: Record<string, unknown>) =>
+    fetch(`${url}/rest/v1/usage_events`, {
+      method: "POST",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(body),
+    });
+  const { email, ...base } = row;
+  if (email === null) return post(base).catch(() => undefined);
+  // Pre-migration-0013 the email column doesn't exist — retry without it
+  return post(row)
+    .then((r) => (r.ok ? r : post(base)))
+    .catch(() => undefined);
 }
 
 const VID_COOKIE = "lang_vid";
@@ -188,7 +201,13 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
       });
     }
     event.waitUntil(
-      logUsage({ audience, role: session?.aud ?? "anon", path: pathname, visitor_id: vid })
+      logUsage({
+        audience,
+        role: session?.aud ?? "anon",
+        path: pathname,
+        visitor_id: vid,
+        email: session?.email ?? null,
+      })
     );
   }
   return res;

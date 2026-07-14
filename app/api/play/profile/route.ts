@@ -8,16 +8,23 @@ function migrationPending(message: string | undefined): boolean {
   return /student_profiles|reading_log|relation|does not exist/i.test(message ?? "");
 }
 
-type ProfileRow = { email: string; avatar: Avatar; owned: string[]; points: number; public_id?: string };
+type ProfileRow = {
+  email: string;
+  avatar: Avatar;
+  owned: string[];
+  points: number;
+  public_id?: string;
+  hidden?: boolean;
+};
 
 async function loadProfile(email: string): Promise<ProfileRow | "missing-table" | null> {
-  // public_id arrives with migration 0012 — retry without it before then
+  // public_id / hidden arrive with migrations 0012/0013 — retry without them
   let { data, error } = await db()
     .from("student_profiles")
-    .select("email, avatar, owned, points, public_id")
+    .select("email, avatar, owned, points, public_id, hidden")
     .eq("email", email)
     .maybeSingle();
-  if (error && /public_id/i.test(error.message ?? "")) {
+  if (error && /public_id|hidden/i.test(error.message ?? "")) {
     ({ data, error } = await db()
       .from("student_profiles")
       .select("email, avatar, owned, points")
@@ -63,6 +70,7 @@ const Body = z.discriminatedUnion("action", [
     slot: z.enum(["base", "hat", "accessory", "bg"]),
     id: z.string().max(40).nullable(),
   }),
+  z.object({ action: z.literal("privacy"), hidden: z.boolean() }),
 ]);
 
 /** Buy an item with stars, or equip/unequip an owned one. */
@@ -93,6 +101,20 @@ export const POST = guarded(async (req: NextRequest) => {
       .eq("points", profile.points); // no double-spend on rapid taps
     if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
     return NextResponse.json({ ok: true, owned, points });
+  }
+
+  if (parsed.data.action === "privacy") {
+    const { error } = await db()
+      .from("student_profiles")
+      .update({ hidden: parsed.data.hidden })
+      .eq("email", session.email);
+    if (error) {
+      if (/hidden|schema cache/i.test(error.message ?? "")) {
+        return NextResponse.json({ error: "Profile privacy unlocks after the next library update!" }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, hidden: parsed.data.hidden });
   }
 
   // equip

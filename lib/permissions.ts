@@ -16,6 +16,7 @@ export const PERMISSIONS = [
   { key: "inventory_import", label: "Manage inventory imports", group: "Inventory", desc: "Replace the catalog via Libib CSV." },
   { key: "signmaker", label: "Sign maker", group: "Tools", desc: "Use the sign generator." },
   { key: "analytics", label: "Site usage", group: "Tools", desc: "View the analytics dashboard." },
+  { key: "users", label: "User insights", group: "Tools", desc: "See student & teacher accounts, activity, and notes." },
 ] as const;
 
 export type PermKey = (typeof PERMISSIONS)[number]["key"];
