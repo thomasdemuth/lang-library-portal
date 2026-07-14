@@ -47,6 +47,20 @@ type Parsed = {
 
 const BATCH = 500;
 
+/** Optional catalog columns — Title is fixed. Order + visibility are a
+ *  per-device preference set from the gear menu. */
+const CATALOG_COLS = [
+  { id: "tag", label: "Tag" },
+  { id: "creators", label: "Creators" },
+  { id: "isbn13", label: "ISBN-13" },
+  { id: "copies", label: "Copies" },
+] as const;
+type ColId = (typeof CATALOG_COLS)[number]["id"];
+type ColPref = { id: ColId; on: boolean };
+const DEFAULT_COLS: ColPref[] = CATALOG_COLS.map((c) => ({ id: c.id, on: true }));
+const COL_LABEL = Object.fromEntries(CATALOG_COLS.map((c) => [c.id, c.label])) as Record<ColId, string>;
+const COLS_KEY = "ll-catalog-cols";
+
 export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const [active, setActive] = useState<Sync | null>(null);
   const [bookCount, setBookCount] = useState(0);
@@ -71,6 +85,38 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const [reviewing, setReviewing] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [details, setDetails] = useState<Record<number, BookDetail>>({});
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const [cols, setCols] = useState<ColPref[]>(DEFAULT_COLS);
+  useEffect(() => {
+    try {
+      const raw: unknown = JSON.parse(localStorage.getItem(COLS_KEY) ?? "null");
+      if (!Array.isArray(raw)) return;
+      const saved = raw
+        .filter((r): r is { id: ColId; on?: boolean } => CATALOG_COLS.some((c) => c.id === r?.id))
+        .filter((r, i, arr) => arr.findIndex((s) => s.id === r.id) === i)
+        .map((r) => ({ id: r.id, on: r.on !== false }));
+      // Columns added after the pref was saved get appended, visible.
+      const ids = new Set(saved.map((c) => c.id));
+      setCols([...saved, ...DEFAULT_COLS.filter((c) => !ids.has(c.id))]);
+    } catch {}
+  }, []);
+  function updateCols(next: ColPref[]) {
+    setCols(next);
+    try {
+      localStorage.setItem(COLS_KEY, JSON.stringify(next));
+    } catch {}
+  }
+  function toggleCol(id: ColId) {
+    updateCols(cols.map((c) => (c.id === id ? { ...c, on: !c.on } : c)));
+  }
+  function moveCol(i: number, d: -1 | 1) {
+    const next = [...cols];
+    const [c] = next.splice(i, 1);
+    next.splice(i + d, 0, c);
+    updateCols(next);
+  }
+  const visibleCols = cols.filter((c) => c.on);
 
   async function load() {
     const res = await fetch("/api/admin/inventory/syncs");
@@ -282,6 +328,54 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
       });
   }
 
+  /** One optional catalog cell, keyed so column order can change freely. */
+  function cellFor(b: Book, id: ColId) {
+    if (id === "tag") {
+      return (
+        <td key="tag" data-th="Tag">
+          <span
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {canImport ? (
+              tagOpen === b.id ? (
+                <TagPicker value={b.tag} onChange={(t) => setTag(b, t)} />
+              ) : (
+                <button
+                  type="button"
+                  className="tagbtn"
+                  onClick={() => setTagOpen(b.id)}
+                  aria-label={`Change tag for ${b.title}`}
+                >
+                  {b.tag ? <TagPill tag={b.tag} /> : <span className="tag-none">+ tag</span>}
+                </button>
+              )
+            ) : b.tag ? (
+              <TagPill tag={b.tag} />
+            ) : (
+              "—"
+            )}
+            {b.tag && tagOpen !== b.id && (
+              <button
+                type="button"
+                className="findbtn"
+                disabled={finding === b.id}
+                onClick={() => findShelf(b)}
+                aria-label={`Show ${b.title} on the map`}
+                title="Show on the map"
+              >
+                {finding === b.id ? "…" : "📍"}
+              </button>
+            )}
+          </span>
+        </td>
+      );
+    }
+    if (id === "creators") return <td key="creators" data-th="Creators">{b.creators ?? "—"}</td>;
+    if (id === "isbn13") return <td key="isbn13" data-th="ISBN-13">{b.isbn13 ?? "—"}</td>;
+    return <td key="copies" data-th="Copies">{b.copies}</td>;
+  }
+
   return (
     <>
       {error && <div className="error">{error}</div>}
@@ -298,85 +392,6 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
         </button>
       )}
 
-      <div className="card desk-only" style={{ marginBottom: 20 }}>
-        <h2 style={{ marginTop: 0 }}>Current inventory</h2>
-        {active ? (
-          <p style={{ margin: 0 }}>
-            <b>{bookCount.toLocaleString()}</b> titles live · from{" "}
-            <b>{active.source_filename ?? "CSV"}</b> · imported{" "}
-            {active.activated_at ? new Date(active.activated_at).toLocaleString() : "—"}
-          </p>
-        ) : (
-          <p style={{ margin: 0 }} className="hint">
-            No inventory yet — upload the Libib CSV export below.
-          </p>
-        )}
-      </div>
-
-      {canImport && (
-      <div
-        className="card desk-only"
-        style={{
-          marginBottom: 20,
-          borderStyle: dragOver ? "dashed" : "solid",
-          borderColor: dragOver ? "#6c7ff2" : undefined,
-        }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          const f = e.dataTransfer.files?.[0];
-          if (f) handleFile(f);
-        }}
-      >
-        <h2 style={{ marginTop: 0 }}>Upload a new Libib export</h2>
-        <p className="hint" style={{ marginTop: 0 }}>
-          Libib → your library → Export → CSV. Drop the file here (or choose it). The current
-          inventory stays live until the new one is fully imported, then they swap atomically.
-        </p>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".csv,text/csv"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) handleFile(f);
-          }}
-        />
-
-        {parsed && (
-          <div style={{ marginTop: 14 }}>
-            <div className="notice">
-              <b>{parsed.filename}</b>: {parsed.books.length.toLocaleString()} unique titles ·{" "}
-              {parsed.totalCopies.toLocaleString()} total copies · from{" "}
-              {parsed.rawRows.toLocaleString()} rows
-              {parsed.skipped > 0 ? ` (${parsed.skipped} rows without titles skipped)` : ""}
-            </div>
-            <button className="btn primary" onClick={runImport} disabled={progress !== null}>
-              {progress !== null ? `Importing… ${progress}%` : "Import & replace inventory"}
-            </button>
-          </div>
-        )}
-        {progress !== null && (
-          <div style={{ marginTop: 12, background: "#eef0f5", borderRadius: 6, height: 10 }}>
-            <div
-              style={{
-                width: `${progress}%`,
-                height: "100%",
-                borderRadius: 6,
-                background: "var(--ok)",
-                transition: "width .2s",
-              }}
-            />
-          </div>
-        )}
-      </div>
-      )}
-
       <div className="card" style={{ marginBottom: 20 }}>
         {reviewing && (
           <TagReviewPanel
@@ -386,20 +401,142 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
             }}
           />
         )}
-        <form onSubmit={search} className="searchrow">
-          <input
-            className="input"
-            placeholder="Title or author…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <button className="searchbtn" type="submit" aria-label="Search">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M21 21l-4.5-4.5" />
-            </svg>
-          </button>
-        </form>
+        <div style={{ display: "flex", gap: 8, justifyContent: "space-between", alignItems: "flex-start" }}>
+          <form onSubmit={search} className="searchrow" style={{ flex: 1 }}>
+            <input
+              className="input"
+              placeholder="Title or author…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <button className="searchbtn" type="submit" aria-label="Search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M21 21l-4.5-4.5" />
+              </svg>
+            </button>
+          </form>
+          {canImport && (
+            <button
+              type="button"
+              className={`gearbtn desk-only${settingsOpen ? " on" : ""}`}
+              aria-label="Catalog settings"
+              aria-expanded={settingsOpen}
+              title="Catalog settings"
+              onClick={() => setSettingsOpen((o) => !o)}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+          )}
+        </div>
+        {canImport && settingsOpen && (
+          <div className="catset desk-only">
+            <div>
+              <label className="lbl">Inventory</label>
+              <p className="hint" style={{ margin: "2px 0 10px" }}>
+                {active ? (
+                  <>
+                    <b>{bookCount.toLocaleString()}</b> titles live · from{" "}
+                    <b>{active.source_filename ?? "CSV"}</b> · imported{" "}
+                    {active.activated_at ? new Date(active.activated_at).toLocaleString() : "—"}
+                  </>
+                ) : (
+                  "No inventory yet — upload the Libib CSV export."
+                )}
+              </p>
+              <div
+                className={`catset-drop${dragOver ? " over" : ""}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  const f = e.dataTransfer.files?.[0];
+                  if (f) handleFile(f);
+                }}
+              >
+                <p className="hint" style={{ margin: "0 0 8px" }}>
+                  Libib → your library → Export → CSV. Drop the file here (or choose it). The
+                  current inventory stays live until the new one is fully imported, then they
+                  swap atomically.
+                </p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFile(f);
+                  }}
+                />
+                {parsed && (
+                  <div style={{ marginTop: 12 }}>
+                    <div className="notice">
+                      <b>{parsed.filename}</b>: {parsed.books.length.toLocaleString()} unique titles ·{" "}
+                      {parsed.totalCopies.toLocaleString()} total copies · from{" "}
+                      {parsed.rawRows.toLocaleString()} rows
+                      {parsed.skipped > 0 ? ` (${parsed.skipped} rows without titles skipped)` : ""}
+                    </div>
+                    <button className="btn primary" onClick={runImport} disabled={progress !== null}>
+                      {progress !== null ? `Importing… ${progress}%` : "Import & replace inventory"}
+                    </button>
+                  </div>
+                )}
+                {progress !== null && (
+                  <div style={{ marginTop: 12, background: "#eef0f5", borderRadius: 6, height: 10 }}>
+                    <div
+                      style={{
+                        width: `${progress}%`,
+                        height: "100%",
+                        borderRadius: 6,
+                        background: "var(--ok)",
+                        transition: "width .2s",
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="lbl">Catalog columns</label>
+              <p className="hint" style={{ margin: "2px 0 8px" }}>
+                Title always shows. Reorder with the arrows.
+              </p>
+              {cols.map((c, i) => (
+                <div key={c.id} className="colrow">
+                  <label className="check">
+                    <input type="checkbox" checked={c.on} onChange={() => toggleCol(c.id)} />
+                    {COL_LABEL[c.id]}
+                  </label>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={i === 0}
+                    onClick={() => moveCol(i, -1)}
+                    aria-label={`Move ${COL_LABEL[c.id]} up`}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={i === cols.length - 1}
+                    onClick={() => moveCol(i, 1)}
+                    aria-label={`Move ${COL_LABEL[c.id]} down`}
+                  >
+                    ↓
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="tagpicker tagfilter" style={{ marginTop: 10 }} role="radiogroup" aria-label="Filter by tag">
           {CATEGORY_IDS.map((id) => {
             const active = filter === id;
@@ -456,10 +593,9 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                 <thead>
                   <tr>
                     <th>Title</th>
-                    <th>Tag</th>
-                    <th>Creators</th>
-                    <th>ISBN-13</th>
-                    <th>Copies</th>
+                    {visibleCols.map((c) => (
+                      <th key={c.id}>{COL_LABEL[c.id]}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -475,50 +611,11 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                           onClick={() => toggleExpand(b)}
                         >
                           <td data-th="Title">{b.title}</td>
-                          <td data-th="Tag">
-                            <span
-                              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {canImport ? (
-                                tagOpen === b.id ? (
-                                  <TagPicker value={b.tag} onChange={(t) => setTag(b, t)} />
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="tagbtn"
-                                    onClick={() => setTagOpen(b.id)}
-                                    aria-label={`Change tag for ${b.title}`}
-                                  >
-                                    {b.tag ? <TagPill tag={b.tag} /> : <span className="tag-none">+ tag</span>}
-                                  </button>
-                                )
-                              ) : b.tag ? (
-                                <TagPill tag={b.tag} />
-                              ) : (
-                                "—"
-                              )}
-                              {b.tag && tagOpen !== b.id && (
-                                <button
-                                  type="button"
-                                  className="findbtn"
-                                  disabled={finding === b.id}
-                                  onClick={() => findShelf(b)}
-                                  aria-label={`Show ${b.title} on the map`}
-                                  title="Show on the map"
-                                >
-                                  {finding === b.id ? "…" : "📍"}
-                                </button>
-                              )}
-                            </span>
-                          </td>
-                          <td data-th="Creators">{b.creators ?? "—"}</td>
-                          <td data-th="ISBN-13">{b.isbn13 ?? "—"}</td>
-                          <td data-th="Copies">{b.copies}</td>
+                          {visibleCols.map((c) => cellFor(b, c.id))}
                         </tr>
                         {open && (
                           <tr className="bookrow-detail">
-                            <td colSpan={5}>
+                            <td colSpan={1 + visibleCols.length}>
                               <div className="bookdetail">
                                 {coverIsbn && (
                                   <img
