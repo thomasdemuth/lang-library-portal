@@ -27,6 +27,7 @@ type External = {
 };
 type Lookup = { code: string; found: boolean; book?: Book; external?: External | null };
 type ShelfHit = { id: string; label: string; shelf_number: string | null; letter_range: string | null };
+type Suggestion = { tag: CategoryId; confidence: number; reasons: string[] };
 
 const COOLDOWN_MS = 3000;
 
@@ -42,7 +43,7 @@ export default function ScanPanel({
 }) {
   const isPage = variant === "page";
   const [open, setOpen] = useState(isPage);
-  const [mode, setMode] = useState<"lookup" | "bulk">("lookup");
+  const [mode, setMode] = useState<"lookup" | "bulk" | "putaway">("lookup");
   const [bulkTag, setBulkTag] = useState<CategoryId>("fiction");
   const [camError, setCamError] = useState<string | null>(null);
   const [result, setResult] = useState<Lookup | null>(null);
@@ -51,6 +52,9 @@ export default function ScanPanel({
   const [manual, setManual] = useState("");
   const [flash, setFlash] = useState(false);
   const [shelf, setShelf] = useState<ShelfHit | null>(null);
+  // Put-away mode: the last scanned book and where it goes, kept on screen
+  // until the next scan replaces it — cart, scan, shelve, repeat.
+  const [putaway, setPutaway] = useState<{ title: string; shelf: ShelfHit | null; error?: string } | null>(null);
 
   // The put-away line: whenever a tagged catalog book is on the sheet,
   // resolve which shelf it belongs on and show it right there.
@@ -68,6 +72,23 @@ export default function ScanPanel({
       stale = true;
     };
   }, [result]);
+
+  // Untagged book on the sheet → offer a suggested tag with confidence.
+  const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
+  useEffect(() => {
+    setSuggestion(null);
+    const book = result?.found ? result.book : null;
+    if (!book || book.tag || !canImport) return;
+    let stale = false;
+    (async () => {
+      const res = await fetch(`/api/admin/books/suggest?key=${encodeURIComponent(book.dedupe_key)}`);
+      const data = await res.json().catch(() => null);
+      if (!stale && data?.suggestion) setSuggestion(data.suggestion);
+    })();
+    return () => {
+      stale = true;
+    };
+  }, [result, canImport]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const scanner = useRef<ScannerHandle | null>(null);
@@ -127,6 +148,29 @@ export default function ScanPanel({
           return;
         }
         setResult(data);
+      } else if (modeRef.current === "putaway") {
+        // Put away: keep scanning; each book replaces the shelf callout.
+        const data = await lookup(code);
+        const book = data?.found ? data.book : null;
+        if (!book) {
+          beep(false);
+          setPutaway({ title: data?.external?.title ?? code, shelf: null, error: "Not in the catalog" });
+          return;
+        }
+        if (!book.tag) {
+          beep(false);
+          setPutaway({ title: book.title, shelf: null, error: "No tag yet — tag it first" });
+          return;
+        }
+        const res = await fetch(`/api/admin/books/where?key=${encodeURIComponent(book.dedupe_key)}`);
+        const whereData = await res.json().catch(() => null);
+        if (whereData?.found && whereData.shelves?.length) {
+          beep(true);
+          setPutaway({ title: book.title, shelf: whereData.shelves[0] });
+        } else {
+          beep(false);
+          setPutaway({ title: book.title, shelf: null, error: "No shelf matches its tag yet" });
+        }
       } else {
         // Bulk tagging: every scanned catalog book gets the chosen tag.
         const data = await lookup(code);
@@ -176,6 +220,15 @@ export default function ScanPanel({
   function dismissResult() {
     setResult(null);
     pausedRef.current = false;
+  }
+
+  function switchMode(m: "lookup" | "bulk" | "putaway") {
+    setMode(m);
+    setResult(null);
+    setPutaway(null);
+    setToast(null);
+    pausedRef.current = false;
+    lastSeen.current.clear();
   }
 
   async function submitManual(e: React.FormEvent) {
@@ -255,7 +308,7 @@ export default function ScanPanel({
 
   return (
     <div
-      className={`scan-overlay${isPage ? " page" : ""}${mode === "bulk" ? " bulk" : ""}`}
+      className={`scan-overlay${isPage ? " page" : ""}${mode !== "lookup" ? " bulk" : ""}`}
       role={isPage ? undefined : "dialog"}
       aria-label="Barcode scanner"
     >
@@ -266,11 +319,14 @@ export default function ScanPanel({
 
         <div className="scan-top">
           <div className="scan-modes">
-            <button className={`scan-mode${mode === "lookup" ? " on" : ""}`} onClick={() => setMode("lookup")}>
+            <button className={`scan-mode${mode === "lookup" ? " on" : ""}`} onClick={() => switchMode("lookup")}>
               Look up
             </button>
+            <button className={`scan-mode${mode === "putaway" ? " on" : ""}`} onClick={() => switchMode("putaway")}>
+              Put away
+            </button>
             {canImport && (
-              <button className={`scan-mode${mode === "bulk" ? " on" : ""}`} onClick={() => setMode("bulk")}>
+              <button className={`scan-mode${mode === "bulk" ? " on" : ""}`} onClick={() => switchMode("bulk")}>
                 Bulk tag
               </button>
             )}
@@ -291,6 +347,35 @@ export default function ScanPanel({
           <div className="scan-bulkbar">
             <span className="scan-bulkhint">Every scan tags the book:</span>
             <TagPicker value={bulkTag} onChange={(t) => t && setBulkTag(t)} />
+          </div>
+        )}
+
+        {mode === "putaway" && (
+          <div className="scan-putaway">
+            {putaway ? (
+              putaway.shelf ? (
+                <>
+                  <div className="pa-book">{putaway.title}</div>
+                  <div className="pa-shelf">
+                    {putaway.shelf.shelf_number ? `Shelf ${putaway.shelf.shelf_number}` : putaway.shelf.label}
+                  </div>
+                  <div className="pa-sub">
+                    {putaway.shelf.shelf_number ? putaway.shelf.label : ""}
+                    {putaway.shelf.letter_range ? ` · ${putaway.shelf.letter_range}` : ""}
+                  </div>
+                  <a className="pa-map" href={`/admin/map?shelf=${putaway.shelf.id}`}>
+                    Show on map →
+                  </a>
+                </>
+              ) : (
+                <>
+                  <div className="pa-book">{putaway.title}</div>
+                  <div className="pa-err">{putaway.error}</div>
+                </>
+              )
+            ) : (
+              <div className="pa-hint">Scan a book to see which shelf it goes on</div>
+            )}
           </div>
         )}
 
@@ -345,6 +430,17 @@ export default function ScanPanel({
               </div>
               {canImport && (
                 <>
+                  {!result.book.tag && suggestion && (
+                    <button
+                      type="button"
+                      className="suggest-chip"
+                      disabled={busy}
+                      onClick={() => setResultTag(suggestion.tag)}
+                      title={suggestion.reasons.join(", ")}
+                    >
+                      ✨ Suggested: <TagPill tag={suggestion.tag} small /> {suggestion.confidence}% — tap to apply
+                    </button>
+                  )}
                   <TagPicker value={result.book.tag} onChange={setResultTag} disabled={busy} />
                   <div className="scan-actions">
                     <button className="btn" disabled={busy} onClick={() => adjustCopies(1)}>

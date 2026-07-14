@@ -6,6 +6,7 @@ import NotificationPrefs from "@/components/NotificationPrefs";
 import DeleteAccountForm from "@/components/DeleteAccountForm";
 import MobileSettings from "@/components/MobileSettings";
 import SignOutButton from "@/components/SignOutButton";
+import LaunchPrefCard from "@/components/LaunchPrefCard";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,7 @@ export default async function AccountPage() {
           notifyRequests={admin.notify_requests}
           notifyWeekly={notifyWeekly}
         />
+        <LaunchPrefCard />
         {canDelete && <DeleteAccountForm />}
       </div>
 

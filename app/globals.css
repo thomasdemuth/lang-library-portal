@@ -494,7 +494,10 @@ html[data-theme="dark"] .madmin { background: var(--panel); }
   .map-legend-overlay .legend-toggle {
     pointer-events: auto; cursor: pointer; border: 0; font: inherit;
     font-size: 10.5px; font-weight: 700; color: var(--muted);
+    background: none; padding: 0; margin: 0; appearance: none;
+    -webkit-tap-highlight-color: transparent;
   }
+  .map-legend-overlay .legend-toggle:active span { transform: scale(.94); }
   .map-legend-overlay span {
     display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700;
     background: #ffffffd9; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
@@ -524,3 +527,45 @@ html[data-theme="dark"] .madmin { background: var(--panel); }
   border-radius: 999px; padding: 5px 12px;
 }
 html[data-theme="dark"] .scan-shelf { background: #232d45; color: #9db1ee; }
+
+/* ── Put-away mode ──────────────────────────────── */
+.scan-putaway {
+  position: relative; z-index: 2; margin: 10px 14px 0; padding: 16px 18px;
+  border-radius: 16px; background: #ffffffee; text-align: center;
+  animation: rise-in .25s ease;
+}
+html[data-theme="dark"] .scan-putaway { background: #171e2fee; color: var(--ink); }
+.scan-putaway .pa-book { font-size: 13px; font-weight: 700; color: var(--muted); }
+.scan-putaway .pa-shelf { font-size: 34px; font-weight: 800; letter-spacing: .3px; margin-top: 2px; color: var(--brand-blue); }
+html[data-theme="dark"] .scan-putaway .pa-shelf { color: #9db1ee; }
+.scan-putaway .pa-sub { font-size: 14px; font-weight: 700; margin-top: 2px; }
+.scan-putaway .pa-err { font-size: 17px; font-weight: 800; color: var(--danger); margin-top: 4px; }
+.scan-putaway .pa-map {
+  display: inline-block; margin-top: 8px; font-size: 12.5px; font-weight: 800;
+  color: var(--brand-blue); text-decoration: none; background: #eef1fb;
+  border-radius: 999px; padding: 5px 12px;
+}
+html[data-theme="dark"] .scan-putaway .pa-map { background: #232d45; color: #9db1ee; }
+.scan-putaway .pa-hint { font-size: 13px; font-weight: 700; color: var(--muted); }
+
+/* ── Tag suggestions ────────────────────────────── */
+.suggest-chip {
+  display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px;
+  font-weight: 700; cursor: pointer; border-radius: 999px; padding: 8px 14px;
+  border: 1.5px dashed var(--brand-blue); background: #eef1fb; color: var(--brand-blue-deep);
+  align-self: flex-start;
+}
+.suggest-chip.big { font-size: 14px; padding: 10px 16px; }
+.suggest-chip:disabled { opacity: .55; }
+html[data-theme="dark"] .suggest-chip { background: #232d45; color: #9db1ee; border-color: #4a5a8a; }
+
+/* ── Tag review overlay ─────────────────────────── */
+.review-overlay {
+  position: fixed; inset: 0; z-index: 80; background: var(--bg); overflow-y: auto;
+  padding: calc(14px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+}
+html[data-theme="dark"] .review-overlay { background: #0f1420; }
+.review-top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-size: 15px; }
+.review-top .scan-close { background: #00000014; color: var(--ink); }
+html[data-theme="dark"] .review-top .scan-close { background: #ffffff22; color: #fff; }
+.review-card { display: flex; flex-direction: column; gap: 14px; max-width: 520px; margin: 0 auto; }

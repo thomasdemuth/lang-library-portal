@@ -13,6 +13,7 @@ export const GET = guarded(async (req: NextRequest) => {
   const page = Math.max(0, parseInt(req.nextUrl.searchParams.get("page") ?? "0", 10) || 0);
   const tagParam = req.nextUrl.searchParams.get("tag");
   const tag = isCategoryId(tagParam) ? tagParam : null;
+  const untagged = req.nextUrl.searchParams.get("untagged") === "1";
 
   const { data: active } = await db()
     .from("inventory_syncs")
@@ -21,12 +22,16 @@ export const GET = guarded(async (req: NextRequest) => {
     .maybeSingle();
   if (!active) return NextResponse.json({ books: [], total: 0, page, pageSize: PAGE_SIZE });
 
-  // Tag filtering goes through the books_tagged view (books ⋈ book_tags);
-  // untagged browsing keeps hitting the base table so it works pre-0008.
+  // Tag filtering (and the untagged review queue) go through the
+  // books_tagged view (books ⋈ book_tags); plain browsing keeps hitting
+  // the base table so it works pre-0008.
   const cols = "id, title, creators, isbn13, copies, group_name, dedupe_key";
-  let query = tag
-    ? db().from("books_tagged").select(`${cols}, tag`, { count: "exact" }).eq("tag", tag)
-    : db().from("books").select(cols, { count: "exact" });
+  let query =
+    tag || untagged
+      ? db().from("books_tagged").select(`${cols}, tag`, { count: "exact" })
+      : db().from("books").select(cols, { count: "exact" });
+  if (tag) query = query.eq("tag", tag);
+  else if (untagged) query = query.is("tag", null);
   query = query.eq("sync_id", active.id);
 
   const norm = normalizeTitle(q);
@@ -39,7 +44,7 @@ export const GET = guarded(async (req: NextRequest) => {
     .order("title", { ascending: true })
     .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
   if (error) {
-    if (tag && /books_tagged|relation|does not exist/i.test(error.message ?? "")) {
+    if ((tag || untagged) && /books_tagged|relation|does not exist/i.test(error.message ?? "")) {
       return NextResponse.json(
         { error: "Tag filters need the pending database migration — run 0008 in Supabase." },
         { status: 409 }
@@ -49,7 +54,7 @@ export const GET = guarded(async (req: NextRequest) => {
   }
 
   return NextResponse.json({
-    books: tag ? data : await attachTags(data ?? []),
+    books: tag || untagged ? data : await attachTags(data ?? []),
     total: count ?? 0,
     page,
     pageSize: PAGE_SIZE,

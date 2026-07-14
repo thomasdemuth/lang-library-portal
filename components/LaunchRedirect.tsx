@@ -4,14 +4,14 @@ import { useEffect } from "react";
 
 /**
  * Honors Settings → Launch screen: when the home-screen app opens on the
- * landing page, jump once per app session to the admin's chosen tab.
- * No-op in a normal browser tab or for anyone who never set the pref.
+ * landing page, jump once per app session to the admin's chosen tab —
+ * Inventory by default, so the app never opens on the desktop-style home.
+ * No-op in a normal browser tab.
  */
 export default function LaunchRedirect() {
   useEffect(() => {
     try {
-      const target = localStorage.getItem("ll-launch");
-      if (!target) return;
+      const target = localStorage.getItem("ll-launch") ?? "inventory";
       const standalone =
         window.matchMedia("(display-mode: standalone)").matches ||
         (navigator as unknown as { standalone?: boolean }).standalone === true;
