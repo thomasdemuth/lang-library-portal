@@ -209,6 +209,29 @@ textarea.input { font-weight: 500; resize: vertical; min-height: 110px; line-hei
   border: 1.5px dashed var(--line); border-radius: 999px; padding: 3px 10px; white-space: nowrap;
 }
 .tagbtn:hover .tag-none { color: var(--brand-blue); border-color: var(--brand-blue); }
+
+/* ── Catalog settings (gear in the search card) ──── */
+.gearbtn {
+  flex: none; width: 44px; height: 44px; border-radius: 10px; cursor: pointer;
+  border: 1.5px solid var(--line); background: #fff; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.gearbtn svg { width: 19px; height: 19px; }
+.gearbtn:hover { color: var(--brand-blue); border-color: var(--brand-blue); }
+.gearbtn.on { color: #fff; background: var(--brand-blue); border-color: var(--brand-blue); }
+html[data-theme="dark"] .gearbtn { background: var(--panel-2); color: var(--muted); border-color: var(--line); }
+html[data-theme="dark"] .gearbtn.on { background: var(--brand-blue); color: #fff; }
+.catset {
+  margin-top: 12px; display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 12px 32px;
+  border: 1px solid var(--line); background: #f8f9fc; border-radius: 12px; padding: 16px 18px;
+}
+html[data-theme="dark"] .catset { background: var(--panel-2); }
+.catset-drop { border: 1.5px dashed var(--line); border-radius: 10px; padding: 12px 14px; }
+.catset-drop.over { border-color: #6c7ff2; }
+.colrow { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+.colrow .check { flex: 1; }
+.colrow .btn { padding: 2px 9px; font-size: 12px; border-radius: 7px; }
 /* "Untagged" filter chip: hollow dashed swatch; solid ink when active */
 .dot.dot-none { background: transparent; border: 1.5px dashed var(--muted); box-sizing: border-box; }
 .tagchip.untagged.active { background: var(--ink); border-color: var(--ink); color: #fff; }
