@@ -4,6 +4,13 @@ export default function StudentHome() {
       <h1>Welcome to the Lang Library</h1>
       <p className="sub">Find your way around the shelves, or tell us what you think.</p>
       <div className="cards">
+        <a className="card" href="/search">
+          <h2>
+            <span className="dot" style={{ background: "#b2222c" }} />
+            Find a Book
+          </h2>
+          <p>Search every book in the library and see exactly which shelf it lives on.</p>
+        </a>
         <a className="card" href="/map">
           <h2>
             <span className="dot" style={{ background: "#2e3b8e" }} />

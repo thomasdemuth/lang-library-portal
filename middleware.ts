@@ -15,7 +15,7 @@ import { audienceForHost, staffHost, studentHost, studentUrl, type HostAudience 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 // Paths open on both hosts (external form)
-const COMMON_OPEN = new Set(["/gate", "/api/gate", "/api/logout"]);
+const COMMON_OPEN = new Set(["/gate", "/api/gate", "/api/logout", "/api/version"]);
 // Additional open paths on the staff host
 const STAFF_OPEN = new Set(["/admin/login", "/api/admin/login", "/api/invite/claim", "/api/cron/daily"]);
 const STAFF_OPEN_PREFIXES = ["/admin/invite/"];

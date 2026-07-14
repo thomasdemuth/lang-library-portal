@@ -66,6 +66,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [tagOpen, setTagOpen] = useState<number | null>(null);
   const [tagError, setTagError] = useState<string | null>(null);
+  const [tagUndo, setTagUndo] = useState<{ text: string; run: () => Promise<void> } | null>(null);
   const [finding, setFinding] = useState<number | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -236,8 +237,9 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     }
   }
 
-  async function setTag(book: Book, tag: CategoryId | null) {
+  async function setTag(book: Book, tag: CategoryId | null, isUndo = false) {
     setTagError(null);
+    const previous = book.tag;
     const res = await fetch("/api/admin/books/tag", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -249,6 +251,15 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     }
     setResults((cur) => cur?.map((b) => (b.dedupe_key === book.dedupe_key ? { ...b, tag } : b)) ?? cur);
     setTagOpen(null);
+    if (isUndo) {
+      setTagUndo(null);
+    } else {
+      setTagUndo({
+        text: tag ? `Tagged “${book.title}” → ${CATEGORIES[tag].label}` : `Cleared the tag on “${book.title}”`,
+        run: () => setTag({ ...book, tag }, previous, true),
+      });
+      setTimeout(() => setTagUndo(null), 8000);
+    }
   }
 
   /** Tap a row → expand it with cover, description, internal notes. */
@@ -426,6 +437,14 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
           )}
         </div>
         {tagError && <div className="error" style={{ marginTop: 10 }}>{tagError}</div>}
+        {tagUndo && (
+          <div className="notice" style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
+            <span style={{ flex: 1 }}>{tagUndo.text}</span>
+            <button className="btn" style={{ padding: "5px 12px", fontSize: 12 }} onClick={() => tagUndo.run()}>
+              ↩ Undo
+            </button>
+          </div>
+        )}
         {results && (
           <>
             <p className="hint" style={{ marginTop: 10 }}>

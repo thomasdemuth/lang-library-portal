@@ -597,3 +597,35 @@ html[data-theme="dark"] .review-overlay { background: #0f1420; }
 .review-top .scan-close { background: #00000014; color: var(--ink); }
 html[data-theme="dark"] .review-top .scan-close { background: #ffffff22; color: #fff; }
 .review-card { display: flex; flex-direction: column; gap: 14px; max-width: 520px; margin: 0 auto; }
+
+/* ── Update-available prompt ────────────────────── */
+/* Desktop: quiet card, bottom-right */
+.update-prompt { position: fixed; right: 20px; bottom: 20px; z-index: 120; }
+.update-prompt .up-card {
+  background: #fff; border: 1px solid var(--line); border-radius: 16px;
+  padding: 18px 20px; max-width: 340px; box-shadow: 0 12px 40px rgba(16, 24, 40, .22);
+  animation: toast-pop .25s cubic-bezier(.2, .9, .3, 1.2);
+}
+html[data-theme="dark"] .update-prompt .up-card { background: var(--panel); color: var(--ink); }
+.update-prompt .up-emoji { font-size: 22px; }
+.update-prompt b { display: block; font-size: 15px; margin-top: 4px; }
+.update-prompt p { margin: 6px 0 12px; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.update-prompt .up-actions { display: flex; gap: 8px; }
+/* Phone: the whole screen greys and blurs behind the card */
+@media (max-width: 640px) {
+  .update-prompt {
+    inset: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(24, 30, 44, .45); -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
+    padding: 24px;
+  }
+  .update-prompt .up-card { width: 100%; max-width: 380px; text-align: center; animation: sheet-up .3s cubic-bezier(.2,.9,.3,1); }
+  .update-prompt .up-actions { flex-direction: column; }
+  .update-prompt .up-actions .btn { width: 100%; }
+}
+
+/* undo button inside scan toasts */
+.toast-undo {
+  font: inherit; font-size: 12.5px; font-weight: 800; margin-left: 10px;
+  background: #ffffff2e; border: 1px solid #ffffff88; color: #fff;
+  border-radius: 999px; padding: 3px 12px; cursor: pointer;
+}

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { guarded, requirePermission } from "@/lib/guards";
+import { guarded, requireSession } from "@/lib/guards";
 import { whereIsBook } from "@/lib/catalog";
 
-/** Which shelf does this book live on? (Admin flavor.) */
+/** Which shelf is this book on? (Student/teacher flavor — read-only.) */
 export const GET = guarded(async (req: NextRequest) => {
-  await requirePermission(req, "inventory_view");
+  await requireSession(req);
   const key = (req.nextUrl.searchParams.get("key") ?? "").slice(0, 600);
   if (!key) return NextResponse.json({ error: "Missing book key" }, { status: 400 });
   const result = await whereIsBook(key);

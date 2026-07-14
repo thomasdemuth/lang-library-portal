@@ -12,6 +12,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
           session
             ? [
                 { href: "/", label: "Home" },
+                { href: "/search", label: "Find a Book" },
                 { href: "/map", label: "Library Map" },
                 { href: "/feedback", label: "Feedback" },
               ]

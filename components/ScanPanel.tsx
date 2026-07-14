@@ -48,7 +48,7 @@ export default function ScanPanel({
   const [camError, setCamError] = useState<string | null>(null);
   const [result, setResult] = useState<Lookup | null>(null);
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
+  const [toast, setToast] = useState<{ ok: boolean; text: string; undo?: () => Promise<void> } | null>(null);
   const [manual, setManual] = useState("");
   const [flash, setFlash] = useState(false);
   const [shelf, setShelf] = useState<ShelfHit | null>(null);
@@ -99,10 +99,11 @@ export default function ScanPanel({
   modeRef.current = mode;
   bulkTagRef.current = bulkTag;
 
-  const say = useCallback((ok: boolean, text: string) => {
-    setToast({ ok, text });
+  const say = useCallback((ok: boolean, text: string, undo?: () => Promise<void>) => {
+    setToast({ ok, text, undo });
     beep(ok);
-    setTimeout(() => setToast((t) => (t?.text === text ? null : t)), 2400);
+    // undoable toasts linger longer so there's time to tap
+    setTimeout(() => setToast((t) => (t?.text === text ? null : t)), undo ? 6000 : 2400);
   }, []);
 
   const lookup = useCallback(async (code: string): Promise<Lookup | null> => {
@@ -175,8 +176,15 @@ export default function ScanPanel({
         // Bulk tagging: every scanned catalog book gets the chosen tag.
         const data = await lookup(code);
         if (data?.found && data.book) {
-          const ok = await tagBook(data.book.dedupe_key, bulkTagRef.current);
-          if (ok) say(true, `${data.book.title} → ${CATEGORIES[bulkTagRef.current].label}`);
+          const previous = data.book.tag;
+          const key = data.book.dedupe_key;
+          const ok = await tagBook(key, bulkTagRef.current);
+          if (ok)
+            say(true, `${data.book.title} → ${CATEGORIES[bulkTagRef.current].label}`, async () => {
+              await tagBook(key, previous);
+              lastSeen.current.delete(code); // allow an immediate re-scan
+              say(true, "Undone.");
+            });
         } else {
           say(false, data?.external ? `Not in catalog: ${data.external.title}` : "Not in the catalog.");
         }
@@ -246,11 +254,20 @@ export default function ScanPanel({
 
   async function setResultTag(tag: CategoryId | null) {
     if (!result?.book || busy) return;
+    const previous = result.book.tag;
+    const key = result.book.dedupe_key;
     setBusy(true);
-    const ok = await tagBook(result.book.dedupe_key, tag);
+    const ok = await tagBook(key, tag);
     if (ok) {
       setResult({ ...result, book: { ...result.book, tag } });
-      say(true, tag ? `Tagged ${CATEGORIES[tag].label}` : "Tag cleared");
+      say(true, tag ? `Tagged ${CATEGORIES[tag].label}` : "Tag cleared", async () => {
+        if (await tagBook(key, previous)) {
+          setResult((cur) =>
+            cur?.book && cur.book.dedupe_key === key ? { ...cur, book: { ...cur.book, tag: previous } } : cur
+          );
+          say(true, "Undone.");
+        }
+      });
     }
     setBusy(false);
   }
@@ -267,12 +284,46 @@ export default function ScanPanel({
     if (!res.ok) {
       say(false, data.error ?? "Couldn't update copies.");
     } else if (data.removed) {
-      say(true, "Removed from the catalog.");
+      const gone = result.book;
+      say(true, "Removed from the catalog.", async () => {
+        const back = await fetch("/api/admin/books/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: gone.title,
+            creators: gone.creators,
+            isbn13: gone.isbn13,
+            isbn10: gone.isbn10,
+          }),
+        });
+        const restored = await back.json().catch(() => ({}));
+        if (back.ok && restored.book) {
+          pausedRef.current = true;
+          setResult({ code: gone.isbn13 ?? gone.isbn10 ?? "", found: true, book: restored.book });
+          say(true, "Restored.");
+          onCatalogChange?.();
+        }
+      });
       dismissResult();
       onCatalogChange?.();
     } else {
+      const bookId = data.book.id;
       setResult({ ...result, book: data.book });
-      say(true, delta > 0 ? "Copy added." : "Copy removed.");
+      say(true, delta > 0 ? "Copy added." : "Copy removed.", async () => {
+        const rev = await fetch(`/api/admin/books/${bookId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ delta: -delta }),
+        });
+        const revData = await rev.json().catch(() => ({}));
+        if (rev.ok && revData.book) {
+          setResult((cur) =>
+            cur && cur.book && cur.book.id === bookId ? { ...cur, book: revData.book as Book } : cur
+          );
+          say(true, "Undone.");
+          onCatalogChange?.();
+        }
+      });
       onCatalogChange?.();
     }
     setBusy(false);
@@ -289,8 +340,21 @@ export default function ScanPanel({
     const data = await res.json().catch(() => ({}));
     if (!res.ok) say(false, data.error ?? "Couldn't add the book.");
     else {
-      setResult({ code: result.code, found: true, book: data.book });
-      say(true, "Added to the catalog.");
+      const ext = result.external;
+      const code = result.code;
+      setResult({ code, found: true, book: data.book });
+      say(true, "Added to the catalog.", async () => {
+        const rev = await fetch(`/api/admin/books/${data.book.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ delta: -1 }),
+        });
+        if (rev.ok) {
+          setResult({ code, found: false, external: ext });
+          say(true, "Undone — not added.");
+          onCatalogChange?.();
+        }
+      });
       onCatalogChange?.();
     }
     setBusy(false);
@@ -379,7 +443,24 @@ export default function ScanPanel({
           </div>
         )}
 
-        {toast && <div className={`scan-toast ${toast.ok ? "ok" : "bad"}`}>{toast.text}</div>}
+        {toast && (
+          <div className={`scan-toast ${toast.ok ? "ok" : "bad"}`}>
+            {toast.text}
+            {toast.undo && (
+              <button
+                type="button"
+                className="toast-undo"
+                onClick={async () => {
+                  const u = toast.undo!;
+                  setToast(null);
+                  await u();
+                }}
+              >
+                Undo
+              </button>
+            )}
+          </div>
+        )}
 
         <form className="scan-manual" onSubmit={submitManual}>
           <input

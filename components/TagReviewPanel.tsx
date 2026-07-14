@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CategoryId } from "@/lib/categories";
+import { CATEGORIES, type CategoryId } from "@/lib/categories";
 import TagPicker, { TagPill } from "@/components/TagPicker";
 
 type Book = {
@@ -25,6 +25,7 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
   const [idx, setIdx] = useState(0);
   const [tagged, setTagged] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [last, setLast] = useState<{ book: Book; tag: CategoryId; idx: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const suggestions = useRef<Map<string, Suggestion | "pending" | "none">>(new Map());
@@ -82,7 +83,26 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
         return;
       }
       setTagged((n) => n + 1);
+      setLast({ book, tag, idx });
       setIdx((i) => i + 1);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function undoLast() {
+    if (!last || busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/books/tag", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ book_key: last.book.dedupe_key, category: null }),
+      });
+      if (!res.ok) return;
+      setTagged((n) => Math.max(0, n - 1));
+      setIdx(last.idx);
+      setLast(null);
     } finally {
       setBusy(false);
     }
@@ -101,6 +121,17 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
       </div>
 
       {error && <div className="error">{error}</div>}
+
+      {last && (
+        <div className="notice" style={{ display: "flex", alignItems: "center", gap: 10, maxWidth: 520, margin: "0 auto 12px" }}>
+          <span style={{ flex: 1 }}>
+            Tagged “{last.book.title}” → {CATEGORIES[last.tag].label}
+          </span>
+          <button className="btn" style={{ padding: "5px 12px", fontSize: 12 }} disabled={busy} onClick={undoLast}>
+            ↩ Undo
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <p className="hint" style={{ padding: 20 }}>Loading untagged books…</p>
