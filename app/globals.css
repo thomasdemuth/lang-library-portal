@@ -209,7 +209,22 @@ textarea.input { font-weight: 500; resize: vertical; min-height: 110px; line-hei
   border: 1.5px dashed var(--line); border-radius: 999px; padding: 3px 10px; white-space: nowrap;
 }
 .tagbtn:hover .tag-none { color: var(--brand-blue); border-color: var(--brand-blue); }
+/* "Untagged" filter chip: hollow dashed swatch; solid ink when active */
+.dot.dot-none { background: transparent; border: 1.5px dashed var(--muted); box-sizing: border-box; }
+.tagchip.untagged.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+html[data-theme="dark"] .tagchip.untagged.active { color: #10131c; }
 .tablewrap { overflow-x: auto; }
+
+/* ── Expandable catalog rows (tap a book → cover, description, notes) */
+.bookrow { cursor: pointer; }
+.bookrow:hover td { background: #f8f9fc; }
+html[data-theme="dark"] .bookrow:hover td { background: var(--panel-2); }
+.bookrow.open td { border-bottom: 0; }
+.bookrow-detail td { padding-top: 0; }
+.bookdetail { display: flex; gap: 14px; align-items: flex-start; }
+.bookcover { width: 72px; border-radius: 6px; box-shadow: 0 2px 8px rgba(16, 24, 40, .18); flex: none; }
+.bookdesc { margin: 0; font-size: 13px; line-height: 1.55; max-width: 640px; white-space: pre-line; }
+.booknotes { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); max-width: 640px; }
 
 /* ── Barcode scanner ────────────────────────────── */
 .scan-overlay {
@@ -355,6 +370,11 @@ html[data-theme="dark"] .mapsvg .mapimg { filter: invert(1) hue-rotate(180deg); 
   .table.books td[data-th="ISBN-13"] { grid-column: 1; color: var(--muted); font-size: 12px; }
   .table.books td[data-th="Copies"] { grid-column: 2; justify-self: end; color: var(--muted); font-size: 12px; }
   .table.books td[data-th="Copies"]::after { content: " in stock"; }
+  .table.books tr.bookrow.open { border-bottom: 0; padding-bottom: 4px; }
+  .table.books tr.bookrow-detail { display: block; padding-top: 0; }
+  /* Filter chips collapse to their color swatch until selected */
+  .tagfilter .tagchip:not(.active) { padding: 8px; }
+  .tagfilter .tagchip:not(.active) .tagchip-label { display: none; }
 }
 @media (min-width: 641px) {
   .mobile-only { display: none !important; }
