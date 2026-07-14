@@ -3,6 +3,7 @@ import { currentAdmin } from "@/lib/server";
 import { canDo } from "@/lib/permissions";
 import MobileTabBar from "@/components/MobileTabBar";
 import MobileHeader from "@/components/MobileHeader";
+import { canPublishUpdates } from "@/lib/updates";
 
 export default async function AdminShell({ children }: { children: React.ReactNode }) {
   const admin = await currentAdmin();
@@ -26,6 +27,7 @@ export default async function AdminShell({ children }: { children: React.ReactNo
   const toolLinks = [
     { href: "/admin/sign-maker", label: "Sign Maker", show: canDo(admin, "signmaker") },
     { href: "/admin/analytics", label: "Site Usage", show: canDo(admin, "analytics") },
+    { href: "/admin/updates", label: "Updates", show: canPublishUpdates(admin.email) },
   ].filter((l) => l.show);
 
   return (

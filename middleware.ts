@@ -93,8 +93,11 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
     audience = "staff";
   }
 
-  // The web-app manifest is public on both hosts (home-screen install)
-  if (pathname === "/manifest.webmanifest") return applyHeaders(NextResponse.next());
+  // The web-app manifest and service worker are public on both hosts
+  // (home-screen install + push notifications)
+  if (pathname === "/manifest.webmanifest" || pathname === "/sw.js") {
+    return applyHeaders(NextResponse.next());
+  }
 
   // ── 2. Never expose internal route prefixes ───────────────────────────
   if (pathname.startsWith("/student") || pathname.startsWith("/staff")) return hard404();

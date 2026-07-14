@@ -19,21 +19,28 @@ export function TagPill({ tag, small }: { tag: CategoryId; small?: boolean }) {
   );
 }
 
-/** Tap-to-set row of category chips; tapping the active one clears it. */
+/**
+ * Tap-to-set row of category chips; tapping the active one clears it.
+ * Pass `suggested` to draw a dotted outline around the chip the
+ * auto-tagger recommends, with a small "suggested" caption.
+ */
 export default function TagPicker({
   value,
   onChange,
   disabled,
+  suggested,
 }: {
   value: CategoryId | null;
   onChange: (tag: CategoryId | null) => void;
   disabled?: boolean;
+  suggested?: CategoryId | null;
 }) {
   return (
     <div className="tagpicker" role="radiogroup" aria-label="Category tag">
       {CATEGORY_IDS.map((id) => {
         const c = CATEGORIES[id];
         const active = value === id;
+        const isSuggested = !active && value === null && suggested === id;
         return (
           <button
             key={id}
@@ -41,12 +48,19 @@ export default function TagPicker({
             role="radio"
             aria-checked={active}
             disabled={disabled}
-            className={`tagchip${active ? " active" : ""}`}
-            style={active ? { background: c.color, borderColor: c.color, color: "#fff" } : undefined}
+            className={`tagchip${active ? " active" : ""}${isSuggested ? " suggested" : ""}`}
+            style={
+              active
+                ? { background: c.color, borderColor: c.color, color: "#fff" }
+                : isSuggested
+                  ? { borderColor: c.color }
+                  : undefined
+            }
             onClick={() => onChange(active ? null : id)}
           >
             {!active && <span className="dot" style={{ background: c.color }} />}
             {c.label}
+            {isSuggested && <small className="sug-mini">suggested</small>}
           </button>
         );
       })}

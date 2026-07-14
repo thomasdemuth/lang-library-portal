@@ -430,18 +430,12 @@ export default function ScanPanel({
               </div>
               {canImport && (
                 <>
-                  {!result.book.tag && suggestion && (
-                    <button
-                      type="button"
-                      className="suggest-chip"
-                      disabled={busy}
-                      onClick={() => setResultTag(suggestion.tag)}
-                      title={suggestion.reasons.join(", ")}
-                    >
-                      ✨ Suggested: <TagPill tag={suggestion.tag} small /> {suggestion.confidence}% — tap to apply
-                    </button>
-                  )}
-                  <TagPicker value={result.book.tag} onChange={setResultTag} disabled={busy} />
+                  <TagPicker
+                    value={result.book.tag}
+                    onChange={setResultTag}
+                    disabled={busy}
+                    suggested={suggestion?.tag ?? null}
+                  />
                   <div className="scan-actions">
                     <button className="btn" disabled={busy} onClick={() => adjustCopies(1)}>
                       + Add copy

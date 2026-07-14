@@ -69,6 +69,7 @@ const I = {
   moon: "M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z",
   size: "M4 18V6m0 0 3 3M4 6 1 9m9 9h11M10 12h8M10 6h5",
   rocket: "M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2M12 15l-3-3c1-4 4-8 10-9-1 6-5 9-9 10z",
+  bell: "M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0",
   team: "M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87",
   plus: "M12 5v14M5 12h14",
   key: "M21 2l-9.6 9.6M15.5 7.5l3 3L22 7l-3-3M11.6 11.6A5.5 5.5 0 1 0 14 16l-2.4-4.4z",
@@ -137,20 +138,24 @@ export default function MobileSettings({
   username,
   email,
   role,
+  canPublish,
   isChief,
   selfId,
   notifyRequests,
   notifyWeekly,
+  notifyUpdates,
   canDelete,
 }: {
   name: string;
   username: string;
   email: string;
   role: "chief" | "admin";
+  canPublish?: boolean;
   isChief: boolean;
   selfId: string;
   notifyRequests: boolean;
   notifyWeekly: boolean | null;
+  notifyUpdates?: boolean | null;
   canDelete: boolean;
 }) {
   const [view, setView] = useState<View>("root");
@@ -206,7 +211,12 @@ export default function MobileSettings({
     return (
       <div className="subview">
         {back}
-        <NotificationPrefs isChief={isChief} notifyRequests={notifyRequests} notifyWeekly={notifyWeekly} />
+        <NotificationPrefs
+          isChief={isChief}
+          notifyRequests={notifyRequests}
+          notifyWeekly={notifyWeekly}
+          notifyUpdates={notifyUpdates}
+        />
       </div>
     );
 
@@ -339,6 +349,15 @@ export default function MobileSettings({
           <div className="settings-rows">
             <Row icon={I.team} bg="#7c4dbc" label="Manage admins" onClick={() => setView("admins")} />
             <Row icon={I.plus} bg="#c2417f" label="Invite a new admin" onClick={() => setView("invite")} />
+          </div>
+        </div>
+      )}
+
+      {canPublish && (
+        <div className="settings-group">
+          <p className="settings-title">Developer</p>
+          <div className="settings-rows">
+            <Row icon={I.bell} bg="var(--brand-blue)" label="Updates" href="/admin/updates" />
           </div>
         </div>
       )}

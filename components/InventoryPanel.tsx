@@ -240,6 +240,17 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
       {error && <div className="error">{error}</div>}
       {notice && <div className="notice">{notice}</div>}
 
+      {/* Mobile: sits directly under the Manage Book Requests button */}
+      {canImport && (
+        <button
+          className="btn mobile-only"
+          style={{ width: "100%", marginBottom: 14 }}
+          onClick={() => setReviewing(true)}
+        >
+          ✨ Review suggested tags
+        </button>
+      )}
+
       <div className="card desk-only" style={{ marginBottom: 20 }}>
         <h2 style={{ marginTop: 0 }}>Current inventory</h2>
         {active ? (
@@ -320,14 +331,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
       )}
 
       <div className="card" style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <h2 style={{ margin: 0, flex: 1 }}>Search the catalog</h2>
-          {canImport && (
-            <button className="btn" onClick={() => setReviewing(true)}>
-              ✨ Review suggested tags
-            </button>
-          )}
-        </div>
+        <h2 style={{ marginTop: 0 }}>Search the catalog</h2>
         {reviewing && (
           <TagReviewPanel
             onDone={() => {
@@ -374,6 +378,11 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
               </button>
             );
           })}
+          {canImport && (
+            <button type="button" className="tagchip desk-only" onClick={() => setReviewing(true)}>
+              ✨ Suggested tags
+            </button>
+          )}
         </div>
         {tagError && <div className="error" style={{ marginTop: 10 }}>{tagError}</div>}
         {results && (

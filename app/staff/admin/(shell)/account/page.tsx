@@ -7,23 +7,33 @@ import DeleteAccountForm from "@/components/DeleteAccountForm";
 import MobileSettings from "@/components/MobileSettings";
 import SignOutButton from "@/components/SignOutButton";
 import LaunchPrefCard from "@/components/LaunchPrefCard";
+import { canPublishUpdates } from "@/lib/updates";
 
 export const dynamic = "force-dynamic";
 
-/** notify_weekly isn't part of the shared identity select; fetch it here (pre-0005-safe). */
-async function weeklyPref(adminId: string): Promise<boolean | null> {
+/** Preference columns newer than the shared identity select (pre-migration-safe). */
+async function extraPrefs(adminId: string): Promise<{ weekly: boolean | null; updates: boolean | null }> {
   try {
-    const { data, error } = await db().from("admins").select("notify_weekly").eq("id", adminId).maybeSingle();
-    if (error) return null;
-    return (data?.notify_weekly ?? null) as boolean | null;
+    let { data, error } = await db()
+      .from("admins")
+      .select("notify_weekly, notify_updates")
+      .eq("id", adminId)
+      .maybeSingle();
+    if (error && /notify_updates|column/i.test(error.message ?? "")) {
+      ({ data, error } = await db().from("admins").select("notify_weekly").eq("id", adminId).maybeSingle());
+    }
+    if (error) return { weekly: null, updates: null };
+    const row = (data ?? {}) as { notify_weekly?: boolean | null; notify_updates?: boolean | null };
+    return { weekly: row.notify_weekly ?? null, updates: row.notify_updates ?? null };
   } catch {
-    return null;
+    return { weekly: null, updates: null };
   }
 }
 
 export default async function AccountPage() {
   const admin = await requireAdminPage();
-  const notifyWeekly = await weeklyPref(admin.id);
+  const prefs = await extraPrefs(admin.id);
+  const notifyWeekly = prefs.weekly;
   const canDelete = admin.email.toLowerCase() !== "library@thelangschool.org";
   return (
     <>
@@ -57,6 +67,7 @@ export default async function AccountPage() {
           isChief={admin.role === "chief"}
           notifyRequests={admin.notify_requests}
           notifyWeekly={notifyWeekly}
+          notifyUpdates={prefs.updates}
         />
         <LaunchPrefCard />
         {canDelete && <DeleteAccountForm />}
@@ -69,10 +80,12 @@ export default async function AccountPage() {
           username={admin.username}
           email={admin.email}
           role={admin.role}
+          canPublish={canPublishUpdates(admin.email)}
           isChief={admin.role === "chief"}
           selfId={admin.id}
           notifyRequests={admin.notify_requests}
           notifyWeekly={notifyWeekly}
+          notifyUpdates={prefs.updates}
           canDelete={canDelete}
         />
       </div>
