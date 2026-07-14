@@ -605,6 +605,7 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
             >
               {hasPlan && (
                 <image
+                  className="mapimg"
                   href={`/api/map/floorplan?v=${encodeURIComponent(settings?.updated_at ?? "")}`}
                   x={0}
                   y={0}
