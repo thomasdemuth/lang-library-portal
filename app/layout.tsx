@@ -44,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               'if(dark)document.documentElement.dataset.theme="dark";',
               'var s=localStorage.getItem("ll-textsize");',
               'if(s&&s!=="medium")document.documentElement.dataset.textsize=s;',
+              'if(localStorage.getItem("ll-sidenav")==="collapsed")document.documentElement.dataset.sidenav="collapsed";',
               "}catch(e){}",
             ].join(""),
           }}

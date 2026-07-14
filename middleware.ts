@@ -24,9 +24,10 @@ function hard404(): NextResponse {
   return applyHeaders(new NextResponse("Not Found", { status: 404 }));
 }
 
-function applyHeaders(res: NextResponse): NextResponse {
+function applyHeaders(res: NextResponse, opts?: { frameable?: boolean }): NextResponse {
   const dev = process.env.NODE_ENV !== "production";
-  res.headers.set("X-Frame-Options", "DENY");
+  // frameable: same-origin framing only — for the sign maker iframe.
+  res.headers.set("X-Frame-Options", opts?.frameable ? "SAMEORIGIN" : "DENY");
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   if (!dev) res.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
@@ -39,7 +40,7 @@ function applyHeaders(res: NextResponse): NextResponse {
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob:",
       `connect-src 'self'${dev ? " ws:" : ""}`,
-      "frame-ancestors 'none'",
+      `frame-ancestors ${opts?.frameable ? "'self'" : "'none'"}`,
       "base-uri 'self'",
       "form-action 'self'",
     ].join("; ")
@@ -157,7 +158,9 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
   }
   const url = req.nextUrl.clone();
   url.pathname = `/${audience}${pathname === "/" ? "" : pathname}`;
-  const res = applyHeaders(NextResponse.rewrite(url));
+  const res = applyHeaders(NextResponse.rewrite(url), {
+    frameable: audience === "staff" && pathname === "/admin/sign-maker/frame",
+  });
 
   // ── 6. Usage logging — real page loads only, never blocking ──────────
   const dest = req.headers.get("sec-fetch-dest");
