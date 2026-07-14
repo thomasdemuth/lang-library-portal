@@ -299,6 +299,9 @@ a.scan-close { display: flex; align-items: center; justify-content: center; text
 .maplayout { display: grid; grid-template-columns: var(--map-cols, 1fr); gap: 16px; }
 .map-toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
 .mapsvg { width: 100%; height: 70vh; display: block; will-change: transform; }
+/* Dark mode: invert the floorplan raster so its white paper reads as dark
+   without repainting the shelves (they're SVG, drawn on top). */
+html[data-theme="dark"] .mapsvg .mapimg { filter: invert(1) hue-rotate(180deg); }
 @media (max-width: 640px) {
   .maplayout { grid-template-columns: 1fr; }
   .map-toolbar { display: none; } /* the map is just there — pinch, pan, tap */
