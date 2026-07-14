@@ -409,6 +409,8 @@ html[data-theme="dark"] .scan-sheet { background: var(--panel); color: var(--ink
 html[data-theme="dark"] .tagchip { background: var(--panel-2); color: var(--ink); border-color: var(--line); }
 html[data-theme="dark"] .scan-bulkbar { background: #171e2fee; }
 html[data-theme="dark"] .settings-row { background: var(--panel); border-color: var(--line); }
+/* Dark mode: the active mode "puck" is a raised slate pill, not white */
+html[data-theme="dark"] .scan-mode.on { background: #454f6b; color: #fff; }
 
 /* ── Mobile app header (colored bar + page title) ── */
 .mheader { display: none; }
