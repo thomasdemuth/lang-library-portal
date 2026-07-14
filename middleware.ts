@@ -100,7 +100,15 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
   }
 
   // ── 2. Never expose internal route prefixes ───────────────────────────
-  if (pathname.startsWith("/student") || pathname.startsWith("/staff")) return hard404();
+  // (exact-segment match: public paths like /students/… must stay reachable)
+  if (
+    pathname === "/student" ||
+    pathname.startsWith("/student/") ||
+    pathname === "/staff" ||
+    pathname.startsWith("/staff/")
+  ) {
+    return hard404();
+  }
   // The admin surface does not exist on the student host — don't even reveal it
   if (audience === "student" && (pathname.startsWith("/admin") || pathname.startsWith("/api/admin"))) {
     return hard404();

@@ -6,7 +6,7 @@ import AvatarView from "@/components/AvatarView";
 import { DEFAULT_AVATAR, displayName, type Avatar } from "@/lib/play";
 import { Ic } from "@/components/icons";
 
-type Leader = { rank: number; name: string; books: number; avatar: Avatar };
+type Leader = { rank: number; name: string; books: number; avatar: Avatar; id: string | null };
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -82,29 +82,41 @@ export default function StudentHome({ email }: { email: string }) {
       </div>
 
       <BookRow title="New on the shelves" emoji="✨" kind="new" onPoints={onPoints} />
+      <BookRow title="Because you read…" emoji="💡" kind="because" index={0} onPoints={onPoints} />
+      <BookRow title="Class favorites" emoji="❤️" kind="loved" onPoints={onPoints} />
       <BookRow title="Story time" emoji="📖" kind="tag" tag="fiction" onPoints={onPoints} />
       <BookRow title="Totally true" emoji="🔬" kind="tag" tag="nonfiction" onPoints={onPoints} />
       <BookRow title="Comics corner" emoji="💥" kind="tag" tag="comics" onPoints={onPoints} />
       <BookRow title="Young readers" emoji="🌟" kind="tag" tag="young" onPoints={onPoints} />
+      <BookRow title="Because you read…" emoji="💡" kind="because" index={1} onPoints={onPoints} />
       <BookRow title="Lucky dip" emoji="🎲" kind="random" onPoints={onPoints} />
 
       {leaders.length > 0 && (
         <div className="card leaderboard">
           <h2>🏆 Top readers</h2>
           <div className="leader-rows">
-            {leaders.map((l) => (
-              <div key={l.rank} className="leader-row">
-                <span className="leader-rank">{MEDALS[l.rank - 1] ?? `#${l.rank}`}</span>
-                <AvatarView avatar={l.avatar} size={38} />
-                <b>{l.name}</b>
-                <span className="leader-books">
-                  {l.books} book{l.books === 1 ? "" : "s"}
-                </span>
-              </div>
-            ))}
+            {leaders.map((l) => {
+              const inner = (
+                <>
+                  <span className="leader-rank">{MEDALS[l.rank - 1] ?? `#${l.rank}`}</span>
+                  <AvatarView avatar={l.avatar} size={38} />
+                  <b>{l.name}</b>
+                  <span className="leader-books">
+                    {l.books} book{l.books === 1 ? "" : "s"}
+                  </span>
+                </>
+              );
+              return l.id ? (
+                <a key={l.rank} className="leader-row tappable" href={`/students/${l.id}`} title={`See ${l.name}'s favorites`}>
+                  {inner}
+                </a>
+              ) : (
+                <div key={l.rank} className="leader-row">{inner}</div>
+              );
+            })}
           </div>
           <p className="hint" style={{ marginBottom: 0 }}>
-            Tap ⭐ “I read this” on any book to climb the board.
+            Tap ⭐ “I read this” to climb the board — tap a reader to see their favorites.
           </p>
         </div>
       )}

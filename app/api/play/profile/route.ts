@@ -8,14 +8,22 @@ function migrationPending(message: string | undefined): boolean {
   return /student_profiles|reading_log|relation|does not exist/i.test(message ?? "");
 }
 
-type ProfileRow = { email: string; avatar: Avatar; owned: string[]; points: number };
+type ProfileRow = { email: string; avatar: Avatar; owned: string[]; points: number; public_id?: string };
 
 async function loadProfile(email: string): Promise<ProfileRow | "missing-table" | null> {
-  const { data, error } = await db()
+  // public_id arrives with migration 0012 — retry without it before then
+  let { data, error } = await db()
     .from("student_profiles")
-    .select("email, avatar, owned, points")
+    .select("email, avatar, owned, points, public_id")
     .eq("email", email)
     .maybeSingle();
+  if (error && /public_id/i.test(error.message ?? "")) {
+    ({ data, error } = await db()
+      .from("student_profiles")
+      .select("email, avatar, owned, points")
+      .eq("email", email)
+      .maybeSingle());
+  }
   if (error) return migrationPending(error.message) ? "missing-table" : null;
   if (data) return data as ProfileRow;
   const fresh = { email, avatar: DEFAULT_AVATAR, owned: [], points: 0 };

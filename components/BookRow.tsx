@@ -3,38 +3,65 @@
 import { useEffect, useState } from "react";
 import type { CategoryId } from "@/lib/categories";
 import { TagPill } from "@/components/TagPicker";
+import { getFavorites, isFavorite, onFavoritesChange, toggleFavorite } from "@/lib/favorites-client";
 
 type Book = { id: number; title: string; creators: string | null; isbn13: string | null; dedupe_key: string; tag: CategoryId | null };
+
+export type RowKind = "new" | "random" | "tag" | "because" | "loved";
 
 /**
  * One horizontal shelf of covers. Books whose cover fails to load are
  * dropped from the row entirely (this page is a cover gallery). Each
- * card links into search; the ⭐ button logs "I read this".
+ * card links into search; ⭐ logs "I read this", ❤️ toggles a favorite.
+ * kind="because" asks the server for books like one you read — the
+ * server names the seed and the row titles itself after it.
  */
 export default function BookRow({
   title,
   emoji,
   kind,
   tag,
+  index,
   onPoints,
 }: {
   title: string;
   emoji: string;
-  kind: "new" | "random" | "tag";
+  kind: RowKind;
   tag?: CategoryId;
+  index?: number;
   onPoints?: (points: number) => void;
 }) {
   const [books, setBooks] = useState<Book[]>([]);
+  const [rowTitle, setRowTitle] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [hidden, setHidden] = useState<Set<number>>(new Set());
   const [logged, setLogged] = useState<Set<string>>(new Set());
+  const [favTick, setFavTick] = useState(0); // re-render when the shared heart set changes
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/catalog/row?kind=${kind}${tag ? `&tag=${tag}` : ""}`)
+    const params = new URLSearchParams({ kind });
+    if (tag) params.set("tag", tag);
+    if (index !== undefined) params.set("i", String(index));
+    fetch(`/api/catalog/row?${params}`)
       .then((r) => r.json())
-      .then((d) => setBooks((d.books ?? []).filter((b: Book) => b.isbn13)))
-      .catch(() => {});
-  }, [kind, tag]);
+      .then((d) => {
+        setBooks((d.books ?? []).filter((b: Book) => b.isbn13));
+        if (d.seedTitle) setRowTitle(`Because you read “${d.seedTitle}”`);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, [kind, tag, index]);
+
+  useEffect(() => {
+    getFavorites().then(() => setFavTick((n) => n + 1));
+    return onFavoritesChange(() => setFavTick((n) => n + 1));
+  }, []);
+
+  function say(text: string) {
+    setToast(text);
+    setTimeout(() => setToast(null), 2600);
+  }
 
   async function markRead(e: React.MouseEvent, b: Book) {
     e.preventDefault();
@@ -47,21 +74,28 @@ export default function BookRow({
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       setLogged((cur) => new Set(cur).add(b.dedupe_key));
-      setToast(`+${data.earned} ⭐ Nice reading!`);
+      say(`+${data.earned} ⭐ Nice reading!`);
       onPoints?.(data.points);
     } else {
-      setToast(data.error ?? "Couldn't log that one.");
+      say(data.error ?? "Couldn't log that one.");
     }
-    setTimeout(() => setToast(null), 2600);
+  }
+
+  async function heart(e: React.MouseEvent, b: Book) {
+    e.preventDefault();
+    e.stopPropagation();
+    const result = await toggleFavorite({ book_key: b.dedupe_key, title: b.title, isbn13: b.isbn13 });
+    if ("error" in result) say(result.error);
+    else if (result.favorited) say("Added to your favorites ❤️");
   }
 
   const visible = books.filter((b) => !hidden.has(b.id));
-  if (books.length > 0 && visible.length === 0) return null;
+  if (loaded && visible.length === 0) return null;
 
   return (
-    <div className="newshelf">
+    <div className="newshelf" data-favtick={favTick}>
       <h2>
-        <span className="newshelf-spark">{emoji}</span> {title}
+        <span className="newshelf-spark">{emoji}</span> {rowTitle ?? title}
         {toast && <span className="row-toast">{toast}</span>}
       </h2>
       <div className="newshelf-row">
@@ -74,6 +108,15 @@ export default function BookRow({
               loading="lazy"
               onError={() => setHidden((cur) => new Set(cur).add(b.id))}
             />
+            <button
+              type="button"
+              className={`fav-btn${isFavorite(b.dedupe_key) ? " on" : ""}`}
+              onClick={(e) => heart(e, b)}
+              title={isFavorite(b.dedupe_key) ? "Remove from favorites" : "Add to favorites"}
+              aria-label="Favorite"
+            >
+              {isFavorite(b.dedupe_key) ? "❤️" : "🤍"}
+            </button>
             <span className="newshelf-title">{b.title}</span>
             <span className="newshelf-foot">
               {b.tag && <TagPill tag={b.tag} small />}

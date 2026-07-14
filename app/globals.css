@@ -804,6 +804,30 @@ html[data-theme="dark"] .play-links a { background: var(--panel); color: var(--i
 .read-btn.done { color: #147a55; border-color: #bfe5df; background: #e7f6f3; }
 html[data-theme="dark"] .read-btn { background: var(--panel-2); }
 
+/* hearts: favorite button on covers + favorites walls */
+.newshelf-card { position: relative; }
+.fav-btn {
+  position: absolute; top: 14px; right: 14px; font: inherit; font-size: 15px; line-height: 1;
+  cursor: pointer; border: none; border-radius: 999px; padding: 5px 6px;
+  background: rgba(255, 255, 255, .88); box-shadow: 0 1px 5px rgba(16, 24, 40, .22);
+  transition: transform .12s; opacity: .92;
+}
+.fav-btn:hover { transform: scale(1.15); opacity: 1; }
+.fav-btn.on { animation: toast-pop .25s ease; }
+html[data-theme="dark"] .fav-btn { background: rgba(24, 30, 48, .88); }
+.fav-wall { display: flex; gap: 10px; flex-wrap: wrap; }
+.fav-cover img {
+  width: 74px; height: 106px; object-fit: cover; border-radius: 8px;
+  border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(16, 24, 40, .12);
+  transition: transform .12s;
+}
+.fav-cover:hover img { transform: translateY(-3px) rotate(-1.5deg); }
+.linklike {
+  font: inherit; font-size: 12px; font-weight: 700; color: var(--muted); cursor: pointer;
+  background: none; border: none; padding: 0; text-decoration: underline;
+}
+.linklike:hover { color: #c2417f; }
+
 /* leaderboard */
 .leaderboard h2 { margin-bottom: 12px; }
 .leader-rows { display: flex; flex-direction: column; gap: 8px; }
@@ -812,6 +836,9 @@ html[data-theme="dark"] .read-btn { background: var(--panel-2); }
   border-radius: 12px; background: var(--bg); font-size: 14px;
 }
 html[data-theme="dark"] .leader-row { background: var(--panel-2); }
+a.leader-row { text-decoration: none; color: inherit; }
+.leader-row.tappable { transition: transform .12s, box-shadow .12s; }
+.leader-row.tappable:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(46, 80, 200, .13); }
 .leader-rank { width: 30px; text-align: center; font-size: 17px; font-weight: 800; }
 .leader-books { margin-left: auto; font-weight: 700; color: var(--muted); font-size: 13px; }
 
