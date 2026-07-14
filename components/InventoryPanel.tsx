@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Papa from "papaparse";
 import { mergeBooks, rowToBook, type BookRecord } from "@/lib/match";
 import { CATEGORIES, CATEGORY_IDS, type CategoryId } from "@/lib/categories";
@@ -27,6 +27,16 @@ type Book = {
   tag: CategoryId | null;
 };
 
+/** "untagged" narrows to books with no tag yet; null is no filter. */
+type TagFilter = CategoryId | "untagged" | null;
+
+type BookDetail = {
+  isbn13: string | null;
+  isbn10: string | null;
+  description: string | null;
+  notes: string | null;
+};
+
 type Parsed = {
   filename: string;
   rawRows: number;
@@ -49,7 +59,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [q, setQ] = useState("");
-  const [filter, setFilter] = useState<CategoryId | null>(null);
+  const [filter, setFilter] = useState<TagFilter>(null);
   const [results, setResults] = useState<Book[] | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -58,6 +68,8 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const [tagError, setTagError] = useState<string | null>(null);
   const [finding, setFinding] = useState<number | null>(null);
   const [reviewing, setReviewing] = useState(false);
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [details, setDetails] = useState<Record<number, BookDetail>>({});
 
   async function load() {
     const res = await fetch("/api/admin/inventory/syncs");
@@ -157,22 +169,26 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     }
   }
 
-  async function search(e?: React.FormEvent, tagOverride?: CategoryId | null) {
+  const filterParam = (tag: TagFilter) =>
+    tag === "untagged" ? "&untagged=1" : tag ? `&tag=${tag}` : "";
+
+  async function search(e?: React.FormEvent, tagOverride?: TagFilter) {
     e?.preventDefault();
     setTagError(null);
     const tag = tagOverride === undefined ? filter : tagOverride;
-    const res = await fetch(`/api/admin/books?q=${encodeURIComponent(q)}${tag ? `&tag=${tag}` : ""}`);
+    const res = await fetch(`/api/admin/books?q=${encodeURIComponent(q)}${filterParam(tag)}`);
     const data = await res.json();
     if (res.ok) {
       setResults(data.books);
       setTotal(data.total);
       setPage(0);
+      setExpanded(null);
     } else {
       setTagError(data.error ?? "Search failed.");
     }
   }
 
-  function setFilterAndSearch(tag: CategoryId | null) {
+  function setFilterAndSearch(tag: TagFilter) {
     setFilter(tag);
     search(undefined, tag);
   }
@@ -187,7 +203,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     setLoadingMore(true);
     try {
       const res = await fetch(
-        `/api/admin/books?q=${encodeURIComponent(q)}&page=${page + 1}${filter ? `&tag=${filter}` : ""}`
+        `/api/admin/books?q=${encodeURIComponent(q)}&page=${page + 1}${filterParam(filter)}`
       );
       const data = await res.json();
       if (res.ok) {
@@ -233,6 +249,26 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     }
     setResults((cur) => cur?.map((b) => (b.dedupe_key === book.dedupe_key ? { ...b, tag } : b)) ?? cur);
     setTagOpen(null);
+  }
+
+  /** Tap a row → expand it with cover, description, internal notes. */
+  function toggleExpand(b: Book) {
+    setExpanded((cur) => (cur === b.id ? null : b.id));
+    if (details[b.id]) return;
+    fetch(`/api/admin/books/${b.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setDetails((cur) => ({
+          ...cur,
+          [b.id]: data.book ?? { isbn13: b.isbn13, isbn10: null, description: null, notes: null },
+        }));
+      })
+      .catch(() => {
+        setDetails((cur) => ({
+          ...cur,
+          [b.id]: { isbn13: b.isbn13, isbn10: null, description: null, notes: null },
+        }));
+      });
   }
 
   return (
@@ -331,7 +367,6 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
       )}
 
       <div className="card" style={{ marginBottom: 20 }}>
-        <h2 style={{ marginTop: 0 }}>Search the catalog</h2>
         {reviewing && (
           <TagReviewPanel
             onDone={() => {
@@ -340,7 +375,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
             }}
           />
         )}
-        <form onSubmit={search} className="searchrow" style={{ marginTop: 12 }}>
+        <form onSubmit={search} className="searchrow">
           <input
             className="input"
             placeholder="Title or author…"
@@ -354,30 +389,36 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
             </svg>
           </button>
         </form>
-        <div className="tagpicker" style={{ marginTop: 10 }} role="radiogroup" aria-label="Filter by tag">
-          <button
-            type="button"
-            className={`tagchip${filter === null ? " active" : ""}`}
-            style={filter === null ? { background: "var(--ink)", borderColor: "var(--ink)", color: "#fff" } : undefined}
-            onClick={() => setFilterAndSearch(null)}
-          >
-            All
-          </button>
+        <div className="tagpicker tagfilter" style={{ marginTop: 10 }} role="radiogroup" aria-label="Filter by tag">
           {CATEGORY_IDS.map((id) => {
             const active = filter === id;
             return (
               <button
                 key={id}
                 type="button"
+                role="radio"
+                aria-checked={active}
                 className={`tagchip${active ? " active" : ""}`}
                 style={active ? { background: CATEGORIES[id].color, borderColor: CATEGORIES[id].color, color: "#fff" } : undefined}
                 onClick={() => setFilterAndSearch(active ? null : id)}
+                title={CATEGORIES[id].label}
               >
                 {!active && <span className="dot" style={{ background: CATEGORIES[id].color }} />}
-                {CATEGORIES[id].label}
+                <span className="tagchip-label">{CATEGORIES[id].label}</span>
               </button>
             );
           })}
+          <button
+            type="button"
+            role="radio"
+            aria-checked={filter === "untagged"}
+            className={`tagchip untagged${filter === "untagged" ? " active" : ""}`}
+            onClick={() => setFilterAndSearch(filter === "untagged" ? null : "untagged")}
+            title="Untagged"
+          >
+            {filter !== "untagged" && <span className="dot dot-none" />}
+            <span className="tagchip-label">Untagged</span>
+          </button>
           {canImport && (
             <button type="button" className="tagchip desk-only" onClick={() => setReviewing(true)}>
               ✨ Suggested tags
@@ -403,48 +444,98 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {results.map((b) => (
-                    <tr key={b.id}>
-                      <td data-th="Title">{b.title}</td>
-                      <td data-th="Tag">
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          {canImport ? (
-                            tagOpen === b.id ? (
-                              <TagPicker value={b.tag} onChange={(t) => setTag(b, t)} />
-                            ) : (
-                              <button
-                                type="button"
-                                className="tagbtn"
-                                onClick={() => setTagOpen(b.id)}
-                                aria-label={`Change tag for ${b.title}`}
-                              >
-                                {b.tag ? <TagPill tag={b.tag} /> : <span className="tag-none">+ tag</span>}
-                              </button>
-                            )
-                          ) : b.tag ? (
-                            <TagPill tag={b.tag} />
-                          ) : (
-                            "—"
-                          )}
-                          {b.tag && tagOpen !== b.id && (
-                            <button
-                              type="button"
-                              className="findbtn"
-                              disabled={finding === b.id}
-                              onClick={() => findShelf(b)}
-                              aria-label={`Show ${b.title} on the map`}
-                              title="Show on the map"
+                  {results.map((b) => {
+                    const open = expanded === b.id;
+                    const d = details[b.id];
+                    const coverIsbn = d?.isbn13 ?? d?.isbn10 ?? b.isbn13;
+                    return (
+                      <Fragment key={b.id}>
+                        <tr
+                          className={`bookrow${open ? " open" : ""}`}
+                          aria-expanded={open}
+                          onClick={() => toggleExpand(b)}
+                        >
+                          <td data-th="Title">{b.title}</td>
+                          <td data-th="Tag">
+                            <span
+                              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              {finding === b.id ? "…" : "📍"}
-                            </button>
-                          )}
-                        </span>
-                      </td>
-                      <td data-th="Creators">{b.creators ?? "—"}</td>
-                      <td data-th="ISBN-13">{b.isbn13 ?? "—"}</td>
-                      <td data-th="Copies">{b.copies}</td>
-                    </tr>
-                  ))}
+                              {canImport ? (
+                                tagOpen === b.id ? (
+                                  <TagPicker value={b.tag} onChange={(t) => setTag(b, t)} />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="tagbtn"
+                                    onClick={() => setTagOpen(b.id)}
+                                    aria-label={`Change tag for ${b.title}`}
+                                  >
+                                    {b.tag ? <TagPill tag={b.tag} /> : <span className="tag-none">+ tag</span>}
+                                  </button>
+                                )
+                              ) : b.tag ? (
+                                <TagPill tag={b.tag} />
+                              ) : (
+                                "—"
+                              )}
+                              {b.tag && tagOpen !== b.id && (
+                                <button
+                                  type="button"
+                                  className="findbtn"
+                                  disabled={finding === b.id}
+                                  onClick={() => findShelf(b)}
+                                  aria-label={`Show ${b.title} on the map`}
+                                  title="Show on the map"
+                                >
+                                  {finding === b.id ? "…" : "📍"}
+                                </button>
+                              )}
+                            </span>
+                          </td>
+                          <td data-th="Creators">{b.creators ?? "—"}</td>
+                          <td data-th="ISBN-13">{b.isbn13 ?? "—"}</td>
+                          <td data-th="Copies">{b.copies}</td>
+                        </tr>
+                        {open && (
+                          <tr className="bookrow-detail">
+                            <td colSpan={5}>
+                              <div className="bookdetail">
+                                {coverIsbn && (
+                                  <img
+                                    className="bookcover"
+                                    src={`/api/admin/books/cover?isbn=${coverIsbn}`}
+                                    alt={`Cover of ${b.title}`}
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = "none";
+                                    }}
+                                  />
+                                )}
+                                <div>
+                                  {!d ? (
+                                    <p className="hint" style={{ marginTop: 0 }}>Loading…</p>
+                                  ) : (
+                                    <>
+                                      {d.description ? (
+                                        <p className="bookdesc">{d.description}</p>
+                                      ) : (
+                                        <p className="hint" style={{ marginTop: 0 }}>No description on file.</p>
+                                      )}
+                                      {d.notes && (
+                                        <p className="booknotes">
+                                          <b>Internal:</b> {d.notes}
+                                        </p>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

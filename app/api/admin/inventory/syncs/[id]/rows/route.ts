@@ -10,6 +10,8 @@ const Row = z.object({
   isbn10: z.string().max(20).nullable(),
   publisher: z.string().max(300).nullable(),
   publish_date: z.string().max(50).nullable(),
+  description: z.string().max(5000).nullable(),
+  notes: z.string().max(2000).nullable(),
   group_name: z.string().max(300).nullable(),
   tags: z.string().max(1000).nullable(),
   item_type: z.string().max(50).nullable(),
@@ -49,7 +51,15 @@ export const POST = guarded(
         parsed.data.rows.map((r) => ({ ...r, sync_id: syncId })),
         { onConflict: "sync_id,dedupe_key", ignoreDuplicates: true }
       );
-    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
+    if (error) {
+      if (/column/i.test(error.message ?? "") && /(description|notes)/.test(error.message ?? "")) {
+        return NextResponse.json(
+          { error: "Imports need the pending database migration — run 0010 in Supabase." },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
+    }
     return NextResponse.json({ ok: true });
   }
 );

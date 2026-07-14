@@ -73,6 +73,8 @@ export type BookRecord = {
   isbn10: string | null;
   publisher: string | null;
   publish_date: string | null;
+  description: string | null;
+  notes: string | null;
   group_name: string | null;
   tags: string | null;
   item_type: string | null;
@@ -120,6 +122,8 @@ export function rowToBook(row: Record<string, unknown>): BookRecord | null {
     isbn10,
     publisher: text(row.publisher, 300),
     publish_date: text(row.publish_date, 50),
+    description: text(row.description, 5000),
+    notes: text(row.notes, 2000),
     group_name: text(row.group, 300),
     tags: text(row.tags, 1000),
     item_type: text(row.item_type, 50),
