@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Papa from "papaparse";
 import { mergeBooks, rowToBook, type BookRecord } from "@/lib/match";
-import { type CategoryId } from "@/lib/categories";
+import { CATEGORIES, CATEGORY_IDS, type CategoryId } from "@/lib/categories";
 import TagPicker, { TagPill } from "@/components/TagPicker";
 
 type Sync = {
@@ -48,12 +48,14 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [q, setQ] = useState("");
+  const [filter, setFilter] = useState<CategoryId | null>(null);
   const [results, setResults] = useState<Book[] | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [tagOpen, setTagOpen] = useState<number | null>(null);
   const [tagError, setTagError] = useState<string | null>(null);
+  const [finding, setFinding] = useState<number | null>(null);
 
   async function load() {
     const res = await fetch("/api/admin/inventory/syncs");
@@ -153,15 +155,24 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     }
   }
 
-  async function search(e?: React.FormEvent) {
+  async function search(e?: React.FormEvent, tagOverride?: CategoryId | null) {
     e?.preventDefault();
-    const res = await fetch(`/api/admin/books?q=${encodeURIComponent(q)}`);
+    setTagError(null);
+    const tag = tagOverride === undefined ? filter : tagOverride;
+    const res = await fetch(`/api/admin/books?q=${encodeURIComponent(q)}${tag ? `&tag=${tag}` : ""}`);
     const data = await res.json();
     if (res.ok) {
       setResults(data.books);
       setTotal(data.total);
       setPage(0);
+    } else {
+      setTagError(data.error ?? "Search failed.");
     }
+  }
+
+  function setFilterAndSearch(tag: CategoryId | null) {
+    setFilter(tag);
+    search(undefined, tag);
   }
 
   // Browse without typing: the whole catalog, A→Z, straight away.
@@ -173,7 +184,9 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   async function loadMore() {
     setLoadingMore(true);
     try {
-      const res = await fetch(`/api/admin/books?q=${encodeURIComponent(q)}&page=${page + 1}`);
+      const res = await fetch(
+        `/api/admin/books?q=${encodeURIComponent(q)}&page=${page + 1}${filter ? `&tag=${filter}` : ""}`
+      );
       const data = await res.json();
       if (res.ok) {
         setResults((cur) => [...(cur ?? []), ...data.books]);
@@ -181,6 +194,27 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
       }
     } finally {
       setLoadingMore(false);
+    }
+  }
+
+  /** "Where is this book?" → jump to the map with its shelf highlighted. */
+  async function findShelf(b: Book) {
+    setFinding(b.id);
+    setTagError(null);
+    try {
+      const res = await fetch(`/api/admin/books/where?key=${encodeURIComponent(b.dedupe_key)}`);
+      const data = await res.json();
+      if (data.found && data.shelves?.length) {
+        window.location.href = `/admin/map?shelf=${data.shelves[0].id}`;
+        return;
+      }
+      setTagError(
+        data.reason === "untagged"
+          ? `Tag “${b.title}” first — the shelf is found through its category tag.`
+          : `No shelf matches “${b.title}” yet — set categories and letter ranges on the map.`
+      );
+    } finally {
+      setFinding(null);
     }
   }
 
@@ -299,6 +333,31 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
             </svg>
           </button>
         </form>
+        <div className="tagpicker" style={{ marginTop: 10 }} role="radiogroup" aria-label="Filter by tag">
+          <button
+            type="button"
+            className={`tagchip${filter === null ? " active" : ""}`}
+            style={filter === null ? { background: "var(--ink)", borderColor: "var(--ink)", color: "#fff" } : undefined}
+            onClick={() => setFilterAndSearch(null)}
+          >
+            All
+          </button>
+          {CATEGORY_IDS.map((id) => {
+            const active = filter === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                className={`tagchip${active ? " active" : ""}`}
+                style={active ? { background: CATEGORIES[id].color, borderColor: CATEGORIES[id].color, color: "#fff" } : undefined}
+                onClick={() => setFilterAndSearch(active ? null : id)}
+              >
+                {!active && <span className="dot" style={{ background: CATEGORIES[id].color }} />}
+                {CATEGORIES[id].label}
+              </button>
+            );
+          })}
+        </div>
         {tagError && <div className="error" style={{ marginTop: 10 }}>{tagError}</div>}
         {results && (
           <>
@@ -322,24 +381,38 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                     <tr key={b.id}>
                       <td data-th="Title">{b.title}</td>
                       <td data-th="Tag">
-                        {canImport ? (
-                          tagOpen === b.id ? (
-                            <TagPicker value={b.tag} onChange={(t) => setTag(b, t)} />
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          {canImport ? (
+                            tagOpen === b.id ? (
+                              <TagPicker value={b.tag} onChange={(t) => setTag(b, t)} />
+                            ) : (
+                              <button
+                                type="button"
+                                className="tagbtn"
+                                onClick={() => setTagOpen(b.id)}
+                                aria-label={`Change tag for ${b.title}`}
+                              >
+                                {b.tag ? <TagPill tag={b.tag} /> : <span className="tag-none">+ tag</span>}
+                              </button>
+                            )
+                          ) : b.tag ? (
+                            <TagPill tag={b.tag} />
                           ) : (
+                            "—"
+                          )}
+                          {b.tag && tagOpen !== b.id && (
                             <button
                               type="button"
-                              className="tagbtn"
-                              onClick={() => setTagOpen(b.id)}
-                              aria-label={`Change tag for ${b.title}`}
+                              className="findbtn"
+                              disabled={finding === b.id}
+                              onClick={() => findShelf(b)}
+                              aria-label={`Show ${b.title} on the map`}
+                              title="Show on the map"
                             >
-                              {b.tag ? <TagPill tag={b.tag} /> : <span className="tag-none">+ tag</span>}
+                              {finding === b.id ? "…" : "📍"}
                             </button>
-                          )
-                        ) : b.tag ? (
-                          <TagPill tag={b.tag} />
-                        ) : (
-                          "—"
-                        )}
+                          )}
+                        </span>
                       </td>
                       <td data-th="Creators">{b.creators ?? "—"}</td>
                       <td data-th="ISBN-13">{b.isbn13 ?? "—"}</td>

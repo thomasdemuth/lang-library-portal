@@ -221,6 +221,22 @@ export default function LibraryMap({ editable }: { editable: boolean }) {
     load();
   }, []);
 
+  // "Where is this book?" landing: /map?shelf=<id> selects that shelf and
+  // flies the view to it (the selection pulse in CSS does the pointing).
+  const focusedOnce = useRef(false);
+  useEffect(() => {
+    if (!loaded || focusedOnce.current) return;
+    focusedOnce.current = true;
+    const id = new URLSearchParams(window.location.search).get("shelf");
+    if (!id) return;
+    const s = shelves.find((x) => x.id === id);
+    if (!s) return;
+    setSelected(s.id);
+    const z = Math.min(8, Math.max(2.2, Math.min(W / (s.w * 6), H / (s.h * 6))));
+    applyView({ cx: s.x + s.w / 2, cy: s.y + s.h / 2, z });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
+
   /** Screen event → floorplan coordinates (exact, letterbox-safe). */
   const svgPoint = useCallback((e: { clientX: number; clientY: number }) => {
     const svg = svgRef.current!;
@@ -785,7 +801,7 @@ const ShelfNode = memo(function ShelfNode({
   const fontSize = Math.max(14, Math.min(s.w, s.h) * 0.3);
   const numSize = Math.max(11, Math.min(s.w, s.h) * 0.16);
   return (
-    <g transform={`rotate(${s.rotation} ${s.x + s.w / 2} ${s.y + s.h / 2})`}>
+    <g className={isSel ? "shelf-sel" : undefined} transform={`rotate(${s.rotation} ${s.x + s.w / 2} ${s.y + s.h / 2})`}>
       <rect
         x={s.x}
         y={s.y}

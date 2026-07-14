@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guarded, requirePermission } from "@/lib/guards";
 import { normalizeTitle } from "@/lib/match";
-import { attachTags } from "@/lib/tags";
+import { attachTags, isCategoryId } from "@/lib/tags";
 
 const PAGE_SIZE = 50;
 
-/** Search the active inventory generation. */
+/** Search the active inventory generation, optionally filtered by tag. */
 export const GET = guarded(async (req: NextRequest) => {
   await requirePermission(req, "inventory_view");
   const q = (req.nextUrl.searchParams.get("q") ?? "").slice(0, 200);
   const page = Math.max(0, parseInt(req.nextUrl.searchParams.get("page") ?? "0", 10) || 0);
+  const tagParam = req.nextUrl.searchParams.get("tag");
+  const tag = isCategoryId(tagParam) ? tagParam : null;
 
   const { data: active } = await db()
     .from("inventory_syncs")
@@ -19,10 +21,13 @@ export const GET = guarded(async (req: NextRequest) => {
     .maybeSingle();
   if (!active) return NextResponse.json({ books: [], total: 0, page, pageSize: PAGE_SIZE });
 
-  let query = db()
-    .from("books")
-    .select("id, title, creators, isbn13, copies, group_name, dedupe_key", { count: "exact" })
-    .eq("sync_id", active.id);
+  // Tag filtering goes through the books_tagged view (books ⋈ book_tags);
+  // untagged browsing keeps hitting the base table so it works pre-0008.
+  const cols = "id, title, creators, isbn13, copies, group_name, dedupe_key";
+  let query = tag
+    ? db().from("books_tagged").select(`${cols}, tag`, { count: "exact" }).eq("tag", tag)
+    : db().from("books").select(cols, { count: "exact" });
+  query = query.eq("sync_id", active.id);
 
   const norm = normalizeTitle(q);
   if (norm) {
@@ -33,10 +38,18 @@ export const GET = guarded(async (req: NextRequest) => {
   const { data, count, error } = await query
     .order("title", { ascending: true })
     .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
-  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
+  if (error) {
+    if (tag && /books_tagged|relation|does not exist/i.test(error.message ?? "")) {
+      return NextResponse.json(
+        { error: "Tag filters need the pending database migration — run 0008 in Supabase." },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
 
   return NextResponse.json({
-    books: await attachTags(data ?? []),
+    books: tag ? data : await attachTags(data ?? []),
     total: count ?? 0,
     page,
     pageSize: PAGE_SIZE,

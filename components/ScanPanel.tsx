@@ -26,6 +26,7 @@ type External = {
   cover: boolean;
 };
 type Lookup = { code: string; found: boolean; book?: Book; external?: External | null };
+type ShelfHit = { id: string; label: string; shelf_number: string | null; letter_range: string | null };
 
 const COOLDOWN_MS = 3000;
 
@@ -49,6 +50,24 @@ export default function ScanPanel({
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [manual, setManual] = useState("");
   const [flash, setFlash] = useState(false);
+  const [shelf, setShelf] = useState<ShelfHit | null>(null);
+
+  // The put-away line: whenever a tagged catalog book is on the sheet,
+  // resolve which shelf it belongs on and show it right there.
+  useEffect(() => {
+    setShelf(null);
+    const book = result?.found ? result.book : null;
+    if (!book?.tag) return;
+    let stale = false;
+    (async () => {
+      const res = await fetch(`/api/admin/books/where?key=${encodeURIComponent(book.dedupe_key)}`);
+      const data = await res.json().catch(() => null);
+      if (!stale && data?.found && data.shelves?.length) setShelf(data.shelves[0]);
+    })();
+    return () => {
+      stale = true;
+    };
+  }, [result]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const scanner = useRef<ScannerHandle | null>(null);
@@ -315,6 +334,13 @@ export default function ScanPanel({
                     {result.book.group_name ? ` · ${result.book.group_name}` : ""}
                   </div>
                   <div className="scan-meta ok">✓ In the catalog</div>
+                  {shelf && (
+                    <a className="scan-shelf" href={`/admin/map?shelf=${shelf.id}`}>
+                      📍 {shelf.shelf_number ? `Shelf ${shelf.shelf_number} · ` : ""}
+                      {shelf.label}
+                      {shelf.letter_range ? ` (${shelf.letter_range})` : ""} →
+                    </a>
+                  )}
                 </div>
               </div>
               {canImport && (
