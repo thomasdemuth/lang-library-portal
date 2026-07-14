@@ -14,6 +14,8 @@ export const ICON_PATHS: Record<string, string> = {
   sparkle: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3zM19 15l.9 2.4L22 18l-2.1.6L19 21l-.9-2.4L16 18l2.1-.6L19 15z",
   megaphone: "M3 11v3a1 1 0 0 0 1 1h2l3 5h2v-5h1l8 3V3l-8 3H6a3 3 0 0 0-3 3v2zM12 16v3",
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.5-4.5",
+  collapse: "M11 17l-5-5 5-5M18 17l-5-5 5-5",
+  expand: "M7 17l5-5-5-5M14 17l5-5-5-5",
 };
 
 export function Ic({ name, size = 18, width = 2 }: { name: string; size?: number; width?: number }) {
