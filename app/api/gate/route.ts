@@ -34,13 +34,13 @@ export async function POST(req: NextRequest) {
       );
     }
     if (audience === "staff" && emailAllowedFor("student", email)) {
-      return NextResponse.json(
-        {
-          error: "This is the staff site — students have their own.",
-          hint: { label: "Go to the student site", url: `${studentUrl()}/gate` },
-        },
-        { status: 403 }
-      );
+      // Students who land on the staff site glide straight through: the
+      // student gate auto-submits this email on arrival (neither gate has
+      // a password, so the handoff carries nothing sensitive).
+      return NextResponse.json({
+        ok: true,
+        redirect: `${studentUrl()}/gate?email=${encodeURIComponent(email)}&auto=1`,
+      });
     }
     const domain = audience === "student" ? STUDENT_EMAIL_DOMAIN : STAFF_EMAIL_DOMAIN;
     return NextResponse.json(
