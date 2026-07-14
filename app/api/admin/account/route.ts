@@ -3,15 +3,35 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { guarded, requireAdmin } from "@/lib/guards";
 import { verifyPassword } from "@/lib/passwords";
-import { SESSION_COOKIE } from "@/lib/session";
+import { SESSION_COOKIE, sessionCookieOptions, signSession } from "@/lib/session";
 
 const Body = z.object({ password: z.string().min(1, "Enter your password to confirm.") });
+const NameBody = z.object({ name: z.string().trim().min(1, "Enter a display name.").max(80) });
 
 const PROTECTED_EMAIL = "library@thelangschool.org";
 
 function isForeignKeyViolation(message: string | undefined): boolean {
   return /foreign key|violates.*constraint/i.test(message ?? "");
 }
+
+/** Change your own display name (any admin, own row only). */
+export const PATCH = guarded(async (req: NextRequest) => {
+  const admin = await requireAdmin(req);
+  const parsed = NameBody.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
+  }
+  const name = parsed.data.name;
+
+  const { error } = await db().from("admins").update({ name }).eq("id", admin.id);
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
+
+  // Re-issue this browser's session so the token's cached name stays in sync.
+  const token = await signSession({ aud: "admin", email: admin.email, sub: admin.id, name, v: admin.session_v });
+  const res = NextResponse.json({ ok: true, name });
+  res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions("admin"));
+  return res;
+});
 
 /**
  * Self-service account deletion. The shared `library@` mailbox account can't

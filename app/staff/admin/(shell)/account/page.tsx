@@ -1,9 +1,11 @@
 import { requireAdminPage } from "@/lib/server";
 import { db } from "@/lib/db";
 import PasswordForm from "@/components/PasswordForm";
+import ProfileForm from "@/components/ProfileForm";
 import NotificationPrefs from "@/components/NotificationPrefs";
 import DeleteAccountForm from "@/components/DeleteAccountForm";
 import MobileSettings from "@/components/MobileSettings";
+import SignOutButton from "@/components/SignOutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -25,15 +27,27 @@ export default async function AccountPage() {
   return (
     <>
       <h1>My account</h1>
-      <p className="sub">
-        Signed in as <b>{admin.name}</b> ({admin.username} · {admin.email}) ·{" "}
-        <span className="pill" style={{ background: admin.role === "chief" ? "#eef1fb" : "#eef0f5" }}>
-          {admin.role === "chief" ? "Chief Admin" : "Admin"}
-        </span>
-      </p>
 
       {/* Desktop keeps the classic account page (admins live on their own page) */}
       <div className="desk-only">
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 14, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>
+                {admin.username}{" "}
+                <span className="pill" style={{ background: admin.role === "chief" ? "#eef1fb" : "#eef0f5", verticalAlign: "middle" }}>
+                  {admin.role === "chief" ? "Chief Admin" : "Admin"}
+                </span>
+              </div>
+              <div className="hint" style={{ marginTop: 4, fontSize: 13 }}>{admin.email}</div>
+            </div>
+            <SignOutButton />
+          </div>
+        </div>
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h2 style={{ marginTop: 0 }}>Display name</h2>
+          <ProfileForm initialName={admin.name} />
+        </div>
         <div className="card">
           <h2 style={{ marginTop: 0 }}>Change password</h2>
           <PasswordForm />
@@ -50,6 +64,9 @@ export default async function AccountPage() {
       <div className="mobile-only">
         <MobileSettings
           name={admin.name}
+          username={admin.username}
+          email={admin.email}
+          role={admin.role}
           isChief={admin.role === "chief"}
           selfId={admin.id}
           notifyRequests={admin.notify_requests}

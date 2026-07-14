@@ -1,5 +1,3 @@
-import SignOutButton from "@/components/SignOutButton";
-
 export default function SiteHeader({
   tagline,
   links,
@@ -24,10 +22,7 @@ export default function SiteHeader({
           </a>
         ))}
       </nav>
-      <div className="whoami">
-        {email && <span>{email}</span>}
-        {email && <SignOutButton />}
-      </div>
+      <div className="whoami">{email && <span>{email}</span>}</div>
     </header>
   );
 }

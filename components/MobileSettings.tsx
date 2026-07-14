@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PERMISSIONS, type PermKey } from "@/lib/permissions";
 import NotificationPrefs from "@/components/NotificationPrefs";
 import PasswordForm from "@/components/PasswordForm";
+import ProfileForm from "@/components/ProfileForm";
 import DeleteAccountForm from "@/components/DeleteAccountForm";
 
 type View =
@@ -15,6 +16,7 @@ type View =
   | "admins"
   | "invite"
   | "password"
+  | "name"
   | "delete";
 
 type AdminRow = {
@@ -70,6 +72,7 @@ const I = {
   team: "M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87",
   plus: "M12 5v14M5 12h14",
   key: "M21 2l-9.6 9.6M15.5 7.5l3 3L22 7l-3-3M11.6 11.6A5.5 5.5 0 1 0 14 16l-2.4-4.4z",
+  user: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
   out: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
   trash: "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6",
   chev: "M9 18l6-6-6-6",
@@ -131,6 +134,9 @@ function Seg<T extends string>({
 
 export default function MobileSettings({
   name,
+  username,
+  email,
+  role,
   isChief,
   selfId,
   notifyRequests,
@@ -138,6 +144,9 @@ export default function MobileSettings({
   canDelete,
 }: {
   name: string;
+  username: string;
+  email: string;
+  role: "chief" | "admin";
   isChief: boolean;
   selfId: string;
   notifyRequests: boolean;
@@ -253,6 +262,17 @@ export default function MobileSettings({
       </div>
     );
 
+  if (view === "name")
+    return (
+      <div className="subview">
+        {back}
+        <div className="card">
+          <h2 style={{ marginTop: 0 }}>Display name</h2>
+          <ProfileForm initialName={name} />
+        </div>
+      </div>
+    );
+
   if (view === "password")
     return (
       <div className="subview">
@@ -274,6 +294,17 @@ export default function MobileSettings({
 
   return (
     <>
+      <div className="settings-profile">
+        <div className="sp-line">
+          <span className="sp-name">{username}</span>
+          <span className="sp-dot">•</span>
+          <span className="sp-email">{email}</span>
+        </div>
+        <span className="pill" style={{ background: role === "chief" ? "#eef1fb" : "#eef0f5", color: "#1c2330", marginTop: 6 }}>
+          {role === "chief" ? "Chief Admin" : "Admin"}
+        </span>
+      </div>
+
       <div className="settings-group" style={{ marginTop: 4 }}>
         <p className="settings-title">Preferences</p>
         <div className="settings-rows">
@@ -313,8 +344,9 @@ export default function MobileSettings({
       )}
 
       <div className="settings-group">
-        <p className="settings-title">Account · signed in as {name}</p>
+        <p className="settings-title">Account</p>
         <div className="settings-rows">
+          <Row icon={I.user} bg="var(--brand-green)" label="Display name" value={name} onClick={() => setView("name")} />
           <Row icon={I.key} bg="#b7791f" label="Change password" onClick={() => setView("password")} />
           <Row icon={I.out} bg="#68727f" label="Sign out" onClick={signOut} />
           {canDelete && (
