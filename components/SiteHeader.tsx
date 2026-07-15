@@ -15,10 +15,7 @@ export default function SiteHeader({
     <header className="topbar">
       <a className="brand" href="/">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="brand-mark" src="/icon-192.png" alt="" width={30} height={30} />
-        <b>
-          <span className="lang">Lang</span> <span className="lib">Library</span>
-        </b>
+        <img className="brand-mark" src="/icon-192.png" alt="" width={38} height={38} />
         <span className="brand-tag">{tagline}</span>
       </a>
       <nav className="nav">
