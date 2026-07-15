@@ -947,7 +947,12 @@ html[data-theme="dark"] .bookcard { background: var(--panel); }
   margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--ink);
   overflow: auto; min-height: 0; flex: 1;
 }
-.bc-body .bookact { margin-top: auto; padding-top: 6px; }
+/* Panel buttons stack vertically — narrower panel, nicer spacing */
+.bc-body .bookact {
+  margin-top: auto; padding-top: 8px; flex-direction: column; align-items: stretch;
+  gap: 7px; width: 100%;
+}
+.bc-body .b-btn { text-align: center; }
 
 /* hearts: favorite button on covers + favorites walls */
 .fav-btn {

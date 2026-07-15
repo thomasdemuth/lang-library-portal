@@ -40,6 +40,7 @@ export default function BookRow({
   const [favTick, setFavTick] = useState(0); // re-render when the shared heart set changes
   const [toast, setToast] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedW, setExpandedW] = useState<number | null>(null);
   const [details, setDetails] = useState<Record<number, BookDetail | null>>({});
 
   useEffect(() => {
@@ -73,6 +74,13 @@ export default function BookRow({
         if (details[b.id] === undefined) {
           fetchDetail(b.dedupe_key).then((d) => setDetails((cur2) => ({ ...cur2, [b.id]: d })));
         }
+        // Size the card to THIS cover: full card height at the cover's own
+        // aspect ratio, plus a fixed-width panel. Explicit px keeps the
+        // width transition smooth everywhere.
+        const img = el.querySelector<HTMLImageElement>(".bc-cover img");
+        const ratio = img && img.naturalWidth > 0 ? img.naturalWidth / img.naturalHeight : 0.68;
+        const coverW = Math.round(234 * Math.min(1.1, Math.max(0.45, ratio)));
+        setExpandedW(coverW + 218);
         // keep the growing card in view within the horizontal scroller
         requestAnimationFrame(() => el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }));
       }
@@ -121,6 +129,7 @@ export default function BookRow({
             <div
               key={b.id}
               className={`bookcard${open ? " expanded" : ""}`}
+              style={open && expandedW ? { width: `min(${expandedW}px, 86vw)` } : undefined}
               onClick={(e) => toggle(b, e.currentTarget)}
               role="button"
               tabIndex={0}
