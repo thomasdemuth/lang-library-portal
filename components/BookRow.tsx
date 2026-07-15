@@ -167,8 +167,12 @@ export default function BookRow({
 
               {open && (
                 <div className="bc-body">
+                  {b.tag && (
+                    <span className="bc-tag">
+                      <TagPill tag={b.tag} small />
+                    </span>
+                  )}
                   <span className="bc-title">{b.title}</span>
-                  {b.tag && <TagPill tag={b.tag} small />}
                   <span className="bc-author">{b.creators ?? "Unknown author"}</span>
                   {d === undefined ? (
                     <p className="hint" style={{ margin: 0 }}>Loading…</p>

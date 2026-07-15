@@ -941,6 +941,7 @@ html[data-theme="dark"] .bookcard { background: var(--panel); }
   from { opacity: 0; transform: translateX(-10px); }
   to { opacity: 1; transform: none; }
 }
+.bc-tag { display: inline-flex; margin-bottom: 3px; }
 .bc-title { font-size: 13.5px; font-weight: 800; color: var(--ink); line-height: 1.3; }
 .bc-author { font-size: 11.5px; font-weight: 700; color: var(--muted); }
 .bc-desc {
