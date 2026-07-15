@@ -54,12 +54,6 @@ export default function SideNav({
 
   return (
     <aside className="side">
-      <span className="side-label">Library</span>
-      {library.map(item)}
-      {tools.length > 0 && <span className="side-label">Tools</span>}
-      {tools.map(item)}
-      <span className="side-label">Account</span>
-      {account.map(item)}
       <button
         type="button"
         className="side-collapse"
@@ -70,8 +64,14 @@ export default function SideNav({
         <span className="side-ico">
           <Ic name={collapsed ? "expand" : "collapse"} size={17} />
         </span>
-        <span className="side-text">Collapse</span>
+        <span className="side-text">{collapsed ? "Expand" : "Collapse"}</span>
       </button>
+      <span className="side-label">Library</span>
+      {library.map(item)}
+      {tools.length > 0 && <span className="side-label">Tools</span>}
+      {tools.map(item)}
+      <span className="side-label">Account</span>
+      {account.map(item)}
     </aside>
   );
 }

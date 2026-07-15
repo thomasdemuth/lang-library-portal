@@ -89,7 +89,7 @@ export default function StudentHome({ email }: { email: string }) {
       <BookRow title="Graphic Novels" kind="tag" tag="comics" onPoints={onPoints} emoji={""} />
       <BookRow title="Shorter Books" kind="tag" tag="young" onPoints={onPoints} emoji={""} />
       <BookRow title="Because you read…" kind="because" index={1} onPoints={onPoints} emoji={""} />
-      <BookRow title="Feeling Lucky?" emoji="🎲" kind="random" onPoints={onPoints} emoji={""} />
+      <BookRow title="Feeling Lucky?" kind="random" onPoints={onPoints} emoji={""} />
 
       {leaders.length > 0 && (
         <div className="card leaderboard">

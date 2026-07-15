@@ -155,13 +155,14 @@ textarea.input { font-weight: 500; resize: vertical; min-height: 110px; line-hei
 .side-ico { flex: none; width: 36px; display: flex; justify-content: center; }
 .side-ico svg { width: 18px; height: 18px; }
 /* The collapse toggle is a nav row like any other — same padding, gap, and
-   icon box as the links, so everything sits on one vertical axis. It follows
-   the account section with a little breathing room and a hairline separator. */
+   icon box as the links, so everything sits on one vertical axis. It leads the
+   sidebar with a little breathing room and a hairline separating it from the
+   "Library" section below. */
 .side-collapse {
-  margin-top: 10px; padding-top: 12px; display: flex; align-items: center; gap: 10px;
-  white-space: nowrap; border: 0; border-top: 1px solid var(--line); background: none;
+  margin-bottom: 6px; padding-bottom: 12px; display: flex; align-items: center; gap: 10px;
+  white-space: nowrap; border: 0; border-bottom: 1px solid var(--line); background: none;
   cursor: pointer; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--muted);
-  padding-left: 12px; padding-right: 12px; padding-bottom: 9px; border-radius: 0;
+  padding-left: 12px; padding-right: 12px; padding-top: 9px; border-radius: 0;
   flex: none; transition: color .12s;
 }
 .side-collapse:hover { color: var(--brand-blue); }
@@ -192,7 +193,7 @@ textarea.input { font-weight: 500; resize: vertical; min-height: 110px; line-hei
     content: ""; position: absolute; left: 0; width: 36px; bottom: 7px; height: 2px;
     border-radius: 1px; background: var(--brand-green);
   }
-  html[data-sidenav="collapsed"] .side:not(:hover) > .side-label:first-child::after { display: none; }
+  html[data-sidenav="collapsed"] .side:not(:hover) > .side-collapse + .side-label::after { display: none; }
 }
 .admin-main { padding: 26px; max-width: 1060px; }
 @media (max-width: 860px) {
