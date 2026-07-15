@@ -81,15 +81,15 @@ export default function StudentHome({ email }: { email: string }) {
         </div>
       </div>
 
-      <BookRow title="New on the shelves" emoji="✨" kind="new" onPoints={onPoints} />
-      <BookRow title="Because you read…" emoji="💡" kind="because" index={0} onPoints={onPoints} />
-      <BookRow title="Class favorites" emoji="❤️" kind="loved" onPoints={onPoints} />
-      <BookRow title="Story time" emoji="📖" kind="tag" tag="fiction" onPoints={onPoints} />
-      <BookRow title="Totally true" emoji="🔬" kind="tag" tag="nonfiction" onPoints={onPoints} />
-      <BookRow title="Comics corner" emoji="💥" kind="tag" tag="comics" onPoints={onPoints} />
-      <BookRow title="Young readers" emoji="🌟" kind="tag" tag="young" onPoints={onPoints} />
-      <BookRow title="Because you read…" emoji="💡" kind="because" index={1} onPoints={onPoints} />
-      <BookRow title="Lucky dip" emoji="🎲" kind="random" onPoints={onPoints} />
+      <BookRow title="Fresh picks" kind="new" onPoints={onPoints} emoji={""} />
+      <BookRow title="Because you read…" kind="because" index={0} onPoints={onPoints} emoji={""} />
+      <BookRow title="Class favorites" kind="loved" onPoints={onPoints} emoji={""} />
+      <BookRow title="Fictional Reads" kind="tag" tag="fiction" onPoints={onPoints} emoji={""} />
+      <BookRow title="True Stories" kind="tag" tag="nonfiction" onPoints={onPoints} emoji={""} />
+      <BookRow title="Graphic Novels" kind="tag" tag="comics" onPoints={onPoints} emoji={""} />
+      <BookRow title="Shorter Books" kind="tag" tag="young" onPoints={onPoints} emoji={""} />
+      <BookRow title="Because you read…" kind="because" index={1} onPoints={onPoints} emoji={""} />
+      <BookRow title="Feeling Lucky?" emoji="🎲" kind="random" onPoints={onPoints} emoji={""} />
 
       {leaders.length > 0 && (
         <div className="card leaderboard">
