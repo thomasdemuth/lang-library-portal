@@ -1,20 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { CategoryId } from "@/lib/categories";
+import { CATEGORIES, type CategoryId } from "@/lib/categories";
 import { TagPill } from "@/components/TagPicker";
 import { getFavorites, isFavorite, onFavoritesChange, toggleFavorite } from "@/lib/favorites-client";
+import { fetchDetail, findShelf, logRead, type BookDetail } from "@/lib/book-actions-client";
 
 type Book = { id: number; title: string; creators: string | null; isbn13: string | null; dedupe_key: string; tag: CategoryId | null };
 
 export type RowKind = "new" | "random" | "tag" | "because" | "loved";
 
 /**
- * One horizontal shelf of covers. Books whose cover fails to load are
- * dropped from the row entirely (this page is a cover gallery). Each
- * card links into search; ⭐ logs "I read this", ❤️ toggles a favorite.
- * kind="because" asks the server for books like one you read — the
- * server names the seed and the row titles itself after it.
+ * One horizontal shelf of covers. Closed, a card is pure cover art: the
+ * title sits on a bottom scrim, the genre glows from the top-right corner,
+ * and ❤️ favorites from the cover. Tapping slides a white panel out to the
+ * right with the genre tag, author, description, "I read this", and
+ * "Where is it?". Books whose cover fails to load are dropped entirely.
  */
 export default function BookRow({
   title,
@@ -38,6 +39,8 @@ export default function BookRow({
   const [logged, setLogged] = useState<Set<string>>(new Set());
   const [favTick, setFavTick] = useState(0); // re-render when the shared heart set changes
   const [toast, setToast] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [details, setDetails] = useState<Record<number, BookDetail | null>>({});
 
   useEffect(() => {
     const params = new URLSearchParams({ kind });
@@ -63,30 +66,41 @@ export default function BookRow({
     setTimeout(() => setToast(null), 2600);
   }
 
-  async function markRead(e: React.MouseEvent, b: Book) {
-    e.preventDefault();
-    e.stopPropagation();
-    const res = await fetch("/api/play/read", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ book_key: b.dedupe_key, title: b.title }),
+  function toggle(b: Book, el: HTMLElement) {
+    setExpandedId((cur) => {
+      const next = cur === b.id ? null : b.id;
+      if (next !== null) {
+        if (details[b.id] === undefined) {
+          fetchDetail(b.dedupe_key).then((d) => setDetails((cur2) => ({ ...cur2, [b.id]: d })));
+        }
+        // keep the growing card in view within the horizontal scroller
+        requestAnimationFrame(() => el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }));
+      }
+      return next;
     });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok) {
-      setLogged((cur) => new Set(cur).add(b.dedupe_key));
-      say(`+${data.earned} ⭐ Nice reading!`);
-      onPoints?.(data.points);
-    } else {
-      say(data.error ?? "Couldn't log that one.");
-    }
+  }
+
+  async function markRead(e: React.MouseEvent, b: Book) {
+    e.stopPropagation();
+    const result = await logRead(b);
+    if ("error" in result) return say(result.error);
+    setLogged((cur) => new Set(cur).add(b.dedupe_key));
+    say(`+${result.earned} ⭐ Nice reading!`);
+    onPoints?.(result.points);
   }
 
   async function heart(e: React.MouseEvent, b: Book) {
-    e.preventDefault();
     e.stopPropagation();
     const result = await toggleFavorite({ book_key: b.dedupe_key, title: b.title, isbn13: b.isbn13 });
     if ("error" in result) say(result.error);
     else if (result.favorited) say("Added to your favorites ❤️");
+  }
+
+  async function where(e: React.MouseEvent, b: Book) {
+    e.stopPropagation();
+    const result = await findShelf(b);
+    if ("shelfId" in result) window.location.href = `/map?shelf=${result.shelfId}`;
+    else say(result.message);
   }
 
   const visible = books.filter((b) => !hidden.has(b.id));
@@ -99,38 +113,78 @@ export default function BookRow({
         {toast && <span className="row-toast">{toast}</span>}
       </h2>
       <div className="newshelf-row">
-        {visible.map((b) => (
-          <a key={b.id} className="newshelf-card" href={`/search?q=${encodeURIComponent(b.title)}`}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/api/catalog/cover?isbn=${b.isbn13}`}
-              alt=""
-              loading="lazy"
-              onError={() => setHidden((cur) => new Set(cur).add(b.id))}
-            />
-            <button
-              type="button"
-              className={`fav-btn${isFavorite(b.dedupe_key) ? " on" : ""}`}
-              onClick={(e) => heart(e, b)}
-              title={isFavorite(b.dedupe_key) ? "Remove from favorites" : "Add to favorites"}
-              aria-label="Favorite"
+        {visible.map((b) => {
+          const open = expandedId === b.id;
+          const d = details[b.id];
+          const coverIsbn = d?.isbn13 ?? d?.isbn10 ?? b.isbn13;
+          return (
+            <div
+              key={b.id}
+              className={`bookcard${open ? " expanded" : ""}`}
+              onClick={(e) => toggle(b, e.currentTarget)}
+              role="button"
+              tabIndex={0}
+              aria-expanded={open}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggle(b, e.currentTarget)}
             >
-              {isFavorite(b.dedupe_key) ? "❤️" : "🤍"}
-            </button>
-            <span className="newshelf-title">{b.title}</span>
-            <span className="newshelf-foot">
-              {b.tag && <TagPill tag={b.tag} small />}
-              <button
-                type="button"
-                className={`read-btn${logged.has(b.dedupe_key) ? " done" : ""}`}
-                onClick={(e) => markRead(e, b)}
-                title="I read this — earn stars!"
-              >
-                {logged.has(b.dedupe_key) ? "✓ logged" : "⭐ I read this"}
-              </button>
-            </span>
-          </a>
-        ))}
+              <div className="bc-cover">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/catalog/cover?isbn=${coverIsbn}`}
+                  alt=""
+                  loading="lazy"
+                  onError={() => setHidden((cur) => new Set(cur).add(b.id))}
+                />
+                {b.tag && (
+                  <span
+                    className="bc-glow"
+                    style={{ background: `radial-gradient(circle at top right, ${CATEGORIES[b.tag].color} 0%, transparent 72%)` }}
+                    aria-hidden
+                  />
+                )}
+                <button
+                  type="button"
+                  className={`fav-btn${isFavorite(b.dedupe_key) ? " on" : ""}`}
+                  onClick={(e) => heart(e, b)}
+                  title={isFavorite(b.dedupe_key) ? "Remove from favorites" : "Add to favorites"}
+                  aria-label="Favorite"
+                >
+                  {isFavorite(b.dedupe_key) ? "❤️" : "🤍"}
+                </button>
+                <span className="bc-titlebar">
+                  <span>{b.title}</span>
+                </span>
+              </div>
+
+              {open && (
+                <div className="bc-body">
+                  <span className="bc-title">{b.title}</span>
+                  {b.tag && <TagPill tag={b.tag} small />}
+                  <span className="bc-author">{b.creators ?? "Unknown author"}</span>
+                  {d === undefined ? (
+                    <p className="hint" style={{ margin: 0 }}>Loading…</p>
+                  ) : d?.description ? (
+                    <p className="bc-desc">{d.description}</p>
+                  ) : (
+                    <p className="hint" style={{ margin: 0 }}>No description on file yet.</p>
+                  )}
+                  <div className="bookact">
+                    <button
+                      type="button"
+                      className={`b-btn b-read${logged.has(b.dedupe_key) ? " done" : ""}`}
+                      onClick={(e) => markRead(e, b)}
+                    >
+                      {logged.has(b.dedupe_key) ? "✓ logged" : "⭐ I read this"}
+                    </button>
+                    <button type="button" className="b-btn b-where" onClick={(e) => where(e, b)}>
+                      📍 Where is it?
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

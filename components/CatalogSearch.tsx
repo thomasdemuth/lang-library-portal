@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { CATEGORIES, CATEGORY_IDS, type CategoryId } from "@/lib/categories";
 import { TagPill } from "@/components/TagPicker";
+import { getFavorites, isFavorite, onFavoritesChange, toggleFavorite } from "@/lib/favorites-client";
+import { fetchDetail, findShelf, logRead, type BookDetail } from "@/lib/book-actions-client";
 
 type Book = {
   id: number;
@@ -14,7 +16,8 @@ type Book = {
   tag: CategoryId | null;
 };
 
-/** Read-only catalog search for students & teachers, with the shelf finder. */
+/** Read-only catalog search for students & teachers. Tap a book to open its
+ *  cover, description, and actions (favorite / I read this / where is it). */
 export default function CatalogSearch() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<CategoryId | null>(null);
@@ -22,12 +25,16 @@ export default function CatalogSearch() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [finding, setFinding] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [details, setDetails] = useState<Record<number, BookDetail | null>>({});
+  const [logged, setLogged] = useState<Set<string>>(new Set());
+  const [favTick, setFavTick] = useState(0);
   const [note, setNote] = useState<string | null>(null);
 
   async function search(e?: React.FormEvent, tagOverride?: CategoryId | null) {
     e?.preventDefault();
     setNote(null);
+    setExpandedId(null);
     const tag = tagOverride === undefined ? filter : tagOverride;
     const res = await fetch(`/api/catalog?q=${encodeURIComponent(q)}${tag ? `&tag=${tag}` : ""}`);
     const data = await res.json();
@@ -39,7 +46,12 @@ export default function CatalogSearch() {
   }
 
   useEffect(() => {
-    // arriving from a "new on the shelves" card prefills the query
+    getFavorites().then(() => setFavTick((n) => n + 1));
+    return onFavoritesChange(() => setFavTick((n) => n + 1));
+  }, []);
+
+  useEffect(() => {
+    // arriving from a discovery card prefills the query
     const preset = new URLSearchParams(window.location.search).get("q");
     if (preset) {
       setQ(preset);
@@ -73,24 +85,43 @@ export default function CatalogSearch() {
     }
   }
 
-  async function findShelf(b: Book) {
-    setFinding(b.id);
-    setNote(null);
-    try {
-      const res = await fetch(`/api/catalog/where?key=${encodeURIComponent(b.dedupe_key)}`);
-      const data = await res.json();
-      if (data.found && data.shelves?.length) {
-        window.location.href = `/map?shelf=${data.shelves[0].id}`;
-        return;
+  function say(text: string) {
+    setNote(text);
+    setTimeout(() => setNote((cur) => (cur === text ? null : cur)), 3200);
+  }
+
+  function toggle(b: Book) {
+    setExpandedId((cur) => {
+      const next = cur === b.id ? null : b.id;
+      if (next !== null && details[b.id] === undefined) {
+        fetchDetail(b.dedupe_key).then((d) => setDetails((cur2) => ({ ...cur2, [b.id]: d })));
       }
-      setNote(`“${b.title}” doesn't have a shelf on the map yet — ask at the library desk.`);
-    } finally {
-      setFinding(null);
-    }
+      return next;
+    });
+  }
+
+  async function markRead(b: Book) {
+    const result = await logRead(b);
+    if ("error" in result) return say(result.error);
+    setLogged((cur) => new Set(cur).add(b.dedupe_key));
+    say(`+${result.earned} ⭐ Nice reading!`);
+  }
+
+  async function heart(b: Book) {
+    const result = await toggleFavorite({ book_key: b.dedupe_key, title: b.title, isbn13: b.isbn13 });
+    if ("error" in result) say(result.error);
+    else say(result.favorited ? "Added to your favorites ❤️" : "Removed from favorites");
+  }
+
+  async function where(b: Book) {
+    setNote(null);
+    const result = await findShelf(b);
+    if ("shelfId" in result) window.location.href = `/map?shelf=${result.shelfId}`;
+    else say(result.message);
   }
 
   return (
-    <div className="card">
+    <div className="card" data-favtick={favTick}>
       <form onSubmit={search} className="searchrow">
         <input
           className="input"
@@ -134,34 +165,72 @@ export default function CatalogSearch() {
             {total.toLocaleString()} {q.trim() || filter ? `match${total === 1 ? "" : "es"}` : "books"}
             {total > results.length ? ` (showing ${results.length.toLocaleString()})` : ""}
           </p>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            {results.map((b) => (
-              <div
-                key={b.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto",
-                  gap: "2px 10px",
-                  padding: "10px 2px",
-                  borderBottom: "1px solid var(--line)",
-                }}
-              >
-                <span style={{ fontWeight: 700, fontSize: 14 }}>{b.title}</span>
-                <span style={{ justifySelf: "end" }}>{b.tag && <TagPill tag={b.tag} small />}</span>
-                <span className="hint" style={{ margin: 0 }}>
-                  {b.creators ?? "Unknown author"} · {b.copies} in the library
-                </span>
-                <button
-                  type="button"
-                  className="btn"
-                  style={{ justifySelf: "end", padding: "5px 11px", fontSize: 12 }}
-                  disabled={finding === b.id}
-                  onClick={() => findShelf(b)}
-                >
-                  {finding === b.id ? "…" : "📍 Where is it?"}
-                </button>
-              </div>
-            ))}
+          <div className="catlist">
+            {results.map((b) => {
+              const open = expandedId === b.id;
+              const d = details[b.id];
+              const coverIsbn = d?.isbn13 ?? b.isbn13;
+              return (
+                <div key={b.id} className={`catrow${open ? " open" : ""}`}>
+                  <button type="button" className="catrow-head" onClick={() => toggle(b)} aria-expanded={open}>
+                    <span className="catrow-main">
+                      <span className="catrow-title">{b.title}</span>
+                      <span className="catrow-meta">
+                        {b.creators ?? "Unknown author"} · {b.copies} in the library
+                      </span>
+                    </span>
+                    {b.tag && <TagPill tag={b.tag} small />}
+                    <span className={`catrow-chev${open ? " open" : ""}`} aria-hidden>
+                      ›
+                    </span>
+                  </button>
+
+                  {open && (
+                    <div className="catrow-detail">
+                      <div className="bookdetail">
+                        {coverIsbn && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            className="bookcover"
+                            src={`/api/catalog/cover?isbn=${coverIsbn}`}
+                            alt=""
+                            onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+                          />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {d === undefined ? (
+                            <p className="hint" style={{ marginTop: 0 }}>Loading…</p>
+                          ) : d?.description ? (
+                            <p className="bookdesc">{d.description}</p>
+                          ) : (
+                            <p className="hint" style={{ marginTop: 0 }}>No description on file yet.</p>
+                          )}
+                          <div className="bookact">
+                            <button
+                              type="button"
+                              className={`b-btn b-fav${isFavorite(b.dedupe_key) ? " on" : ""}`}
+                              onClick={() => heart(b)}
+                            >
+                              {isFavorite(b.dedupe_key) ? "❤️ Favorited" : "🤍 Favorite"}
+                            </button>
+                            <button
+                              type="button"
+                              className={`b-btn b-read${logged.has(b.dedupe_key) ? " done" : ""}`}
+                              onClick={() => markRead(b)}
+                            >
+                              {logged.has(b.dedupe_key) ? "✓ logged" : "⭐ I read this"}
+                            </button>
+                            <button type="button" className="b-btn b-where" onClick={() => where(b)}>
+                              📍 Where is it?
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
           {results.length < total && (
             <button className="btn" style={{ marginTop: 12, width: "100%" }} onClick={loadMore} disabled={loadingMore}>
