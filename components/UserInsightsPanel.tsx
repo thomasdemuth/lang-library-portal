@@ -92,6 +92,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
   const [openEmail, setOpenEmail] = useState<string | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
+  const [starDraft, setStarDraft] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const loadList = useCallback((t: Tab) => {
@@ -121,6 +122,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
     setOpenEmail(email);
     setDetail(null);
     setNoteDraft("");
+    setStarDraft("");
     fetch(`/api/admin/users/detail?email=${encodeURIComponent(email)}`)
       .then((r) => r.json())
       .then((d) => setDetail(d))
@@ -149,6 +151,27 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
           action === "reset_avatar"
             ? { ...detail.profile, avatar: DEFAULT_AVATAR }
             : { ...detail.profile, hidden: action === "hide" },
+      });
+    }
+  }
+
+  async function giveStars(email: string, delta: number) {
+    if (!Number.isInteger(delta) || delta === 0) return say(false, "Enter a whole number of stars (like 25 or -10).");
+    const res = await fetch("/api/admin/users/stars", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, delta }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return say(false, data.error ?? "Couldn't adjust stars.");
+    setStarDraft("");
+    say(true, delta > 0 ? `Gave ${delta} stars.` : `Removed ${-delta} stars.`);
+    setRows((cur) => cur.map((r) => (r.email === email ? { ...r, points: data.points, notes: data.note ? r.notes + 1 : r.notes } : r)));
+    if (detail?.profile) {
+      setDetail({
+        ...detail,
+        profile: { ...detail.profile, points: data.points },
+        notes: data.note ? [data.note, ...detail.notes] : detail.notes,
       });
     }
   }
@@ -268,6 +291,35 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
                               Reset avatar
                             </button>
                           </div>
+                        </div>
+                      )}
+
+                      {tab === "students" && detail.profile && (
+                        <div className="stargrant">
+                          <span className="stargrant-now">
+                            <Star size={14} /> <b>{detail.profile.points}</b> stars
+                          </span>
+                          {[5, 10, 25].map((n) => (
+                            <button key={n} type="button" className="btn ghost" onClick={() => giveStars(r.email, n)}>
+                              +{n}
+                            </button>
+                          ))}
+                          <input
+                            className="input stargrant-input"
+                            type="number"
+                            placeholder="± custom"
+                            value={starDraft}
+                            onChange={(e) => setStarDraft(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && giveStars(r.email, Number(starDraft))}
+                          />
+                          <button
+                            type="button"
+                            className="btn"
+                            disabled={!starDraft.trim()}
+                            onClick={() => giveStars(r.email, Number(starDraft))}
+                          >
+                            Give stars
+                          </button>
                         </div>
                       )}
 

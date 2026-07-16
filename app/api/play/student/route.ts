@@ -2,16 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guarded, requireSession } from "@/lib/guards";
 import { DEFAULT_AVATAR, displayName, type Avatar } from "@/lib/play";
+import { loadCollections } from "@/lib/collections";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Another student's public page, looked up by their non-guessable
  * public_id. Shares only what's meant to be shared: display name,
- * avatar, books-read count, and favorites — never the email.
+ * avatar, books-read count, favorites, and collections — never the email.
  */
 export const GET = guarded(async (req: NextRequest) => {
-  await requireSession(req);
+  const session = await requireSession(req);
   const id = req.nextUrl.searchParams.get("id") ?? "";
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -38,7 +39,7 @@ export const GET = guarded(async (req: NextRequest) => {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const [{ count: booksRead }, { data: favorites }] = await Promise.all([
+  const [{ count: booksRead }, { data: favorites }, collections, { data: friendRow }] = await Promise.all([
     db().from("reading_log").select("id", { count: "exact", head: true }).eq("email", profile.email),
     db()
       .from("favorites")
@@ -46,6 +47,14 @@ export const GET = guarded(async (req: NextRequest) => {
       .eq("email", profile.email)
       .order("created_at", { ascending: false })
       .limit(60),
+    loadCollections(profile.email),
+    // pre-0016 the friends table doesn't exist — the error just reads as "not a friend"
+    db()
+      .from("friends")
+      .select("id")
+      .eq("email", session.email)
+      .eq("friend_email", profile.email)
+      .maybeSingle(),
   ]);
 
   return NextResponse.json({
@@ -53,5 +62,8 @@ export const GET = guarded(async (req: NextRequest) => {
     avatar: { ...DEFAULT_AVATAR, ...(profile.avatar as Avatar) },
     booksRead: booksRead ?? 0,
     favorites: favorites ?? [],
+    collections: Array.isArray(collections) ? collections.filter((c) => c.books.length > 0) : [],
+    isFriend: Boolean(friendRow),
+    isMe: profile.email === session.email,
   });
 });

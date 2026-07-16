@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import AvatarView from "@/components/AvatarView";
+import Collections from "@/components/Collections";
+import FriendsCard from "@/components/FriendsCard";
 import { Heart, Ic, Star } from "@/components/icons";
 import { displayName, type Avatar } from "@/lib/play";
 import { toggleFavorite, type FavBook } from "@/lib/favorites-client";
@@ -11,9 +13,9 @@ type LogRow = { id: number; title: string; created_at: string };
 type Fav = FavBook & { isbn13: string | null };
 
 /**
- * My Page: the student's collections — favorites and reading history —
- * plus their stats. Avatar editing lives in the Avatar Studio (/avatar);
- * friends, badges, and more collections land here later.
+ * My Page: the student's collections — favorites, custom book lists,
+ * friends, and reading history — plus their stats. Avatar editing lives
+ * in the Avatar Studio (/avatar).
  */
 export default function MyPage({ email }: { email: string }) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -92,6 +94,8 @@ export default function MyPage({ email }: { email: string }) {
 
       {msg && <div className="error">{msg}</div>}
 
+      <FriendsCard />
+
       <div className="card" style={{ marginBottom: 14 }}>
         <h2>
           <Heart filled size={16} /> My favorite books
@@ -132,6 +136,8 @@ export default function MyPage({ email }: { email: string }) {
           </>
         )}
       </div>
+
+      <Collections />
 
       <div className="card">
         <h2>
