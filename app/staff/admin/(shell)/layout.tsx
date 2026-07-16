@@ -4,6 +4,8 @@ import { canDo } from "@/lib/permissions";
 import MobileTabBar from "@/components/MobileTabBar";
 import MobileHeader from "@/components/MobileHeader";
 import SideNav from "@/components/SideNav";
+import Shortcuts from "@/components/Shortcuts";
+import { navShortcutsFor } from "@/lib/shortcuts";
 import { canPublishUpdates } from "@/lib/updates";
 
 export default async function AdminShell({ children }: { children: React.ReactNode }) {
@@ -41,6 +43,7 @@ export default async function AdminShell({ children }: { children: React.ReactNo
 
   return (
     <div className="admin-grid">
+      <Shortcuts links={navShortcutsFor(admin)} />
       <SideNav library={libraryLinks} tools={toolLinks} account={accountLinks} />
       <main className="admin-main">
         <MobileHeader />

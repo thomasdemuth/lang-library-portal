@@ -8,6 +8,8 @@ import TagPicker, { TagPill } from "@/components/TagPicker";
 import TagReviewPanel from "@/components/TagReviewPanel";
 import BookEditModal, { type EditableBook } from "@/components/BookEditModal";
 import AddBookModal, { type AddedBook } from "@/components/AddBookModal";
+import UndoHint from "@/components/UndoHint";
+import { clearUndo, pushUndo } from "@/lib/undo";
 import { Ic, Pencil, Pin } from "@/components/icons";
 
 type Sync = {
@@ -83,7 +85,7 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
   const [loadingMore, setLoadingMore] = useState(false);
   const [tagOpen, setTagOpen] = useState<number | null>(null);
   const [tagError, setTagError] = useState<string | null>(null);
-  const [tagUndo, setTagUndo] = useState<{ text: string; run: () => Promise<void> } | null>(null);
+  const [tagNote, setTagNote] = useState<string | null>(null);
   const [finding, setFinding] = useState<number | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -96,6 +98,9 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const lastIdx = useRef<number | null>(null);
   const [bulk, setBulk] = useState<{ busy: boolean; msg: string | null }>({ busy: false, msg: null });
+
+  // Undo history belongs to this screen — don't let it outlive the panel.
+  useEffect(() => clearUndo, []);
 
   const [cols, setCols] = useState<ColPref[]>(DEFAULT_COLS);
   useEffect(() => {
@@ -274,28 +279,46 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
   }
 
   /** Apply (or clear) a tag on every selected book at once. */
+  /** Write one tag across many books. No history — the do/undo/redo step. */
+  async function putBulk(keys: string[], tag: CategoryId | null): Promise<boolean> {
+    const res = await fetch("/api/admin/books/tag/bulk", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ book_keys: keys, category: tag }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setBulk({ busy: false, msg: data.error ?? "Couldn't update tags." });
+      return false;
+    }
+    const hit = new Set(keys);
+    setResults((cur) => cur?.map((b) => (hit.has(b.dedupe_key) ? { ...b, tag } : b)) ?? cur);
+    return true;
+  }
+
   async function bulkTag(tag: CategoryId | null) {
     if (!results || selected.size === 0) return;
-    const keys = results.filter((b) => selected.has(b.id)).map((b) => b.dedupe_key);
+    const picked = results.filter((b) => selected.has(b.id));
+    const keys = picked.map((b) => b.dedupe_key);
+    // Remember each book's own tag — the selection can be a mixed bag, so
+    // undo has to restore them one group at a time, not blanket-clear.
+    const before = new Map<CategoryId | null, string[]>();
+    for (const b of picked) before.set(b.tag, [...(before.get(b.tag) ?? []), b.dedupe_key]);
+
     setBulk({ busy: true, msg: null });
     try {
-      const res = await fetch("/api/admin/books/tag/bulk", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ book_keys: keys, category: tag }),
+      if (!(await putBulk(keys, tag))) return;
+      const label = tag
+        ? `Tagged ${keys.length} book${keys.length === 1 ? "" : "s"} → ${CATEGORIES[tag].label}`
+        : `Cleared the tag on ${keys.length} book${keys.length === 1 ? "" : "s"}`;
+      pushUndo({
+        label,
+        undo: async () => {
+          for (const [old, group] of before) await putBulk(group, old);
+        },
+        redo: async () => void (await putBulk(keys, tag)),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setBulk({ busy: false, msg: data.error ?? "Couldn't update tags." });
-        return;
-      }
-      setResults((cur) => cur?.map((b) => (selected.has(b.id) ? { ...b, tag } : b)) ?? cur);
-      setBulk({
-        busy: false,
-        msg: tag
-          ? `Tagged ${keys.length} book${keys.length === 1 ? "" : "s"} → ${CATEGORIES[tag].label}`
-          : `Cleared the tag on ${keys.length} book${keys.length === 1 ? "" : "s"}`,
-      });
+      setBulk({ busy: false, msg: label });
       setTimeout(() => setBulk((b) => ({ ...b, msg: null })), 5000);
     } catch {
       setBulk({ busy: false, msg: "Couldn't update tags." });
@@ -415,9 +438,9 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
     }
   }
 
-  async function setTag(book: Book, tag: CategoryId | null, isUndo = false) {
+  /** Write one book's tag. No history — the shared step for do/undo/redo. */
+  async function putTag(book: Book, tag: CategoryId | null): Promise<boolean> {
     setTagError(null);
-    const previous = book.tag;
     const res = await fetch("/api/admin/books/tag", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -425,19 +448,24 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
     });
     if (!res.ok) {
       setTagError((await res.json().catch(() => ({}))).error ?? "Couldn't save the tag.");
-      return;
+      return false;
     }
     setResults((cur) => cur?.map((b) => (b.dedupe_key === book.dedupe_key ? { ...b, tag } : b)) ?? cur);
+    return true;
+  }
+
+  async function setTag(book: Book, tag: CategoryId | null) {
+    const previous = book.tag;
+    if (!(await putTag(book, tag))) return;
     setTagOpen(null);
-    if (isUndo) {
-      setTagUndo(null);
-    } else {
-      setTagUndo({
-        text: tag ? `Tagged “${book.title}” → ${CATEGORIES[tag].label}` : `Cleared the tag on “${book.title}”`,
-        run: () => setTag({ ...book, tag }, previous, true),
-      });
-      setTimeout(() => setTagUndo(null), 8000);
-    }
+    const label = tag ? `Tagged “${book.title}” → ${CATEGORIES[tag].label}` : `Cleared the tag on “${book.title}”`;
+    pushUndo({
+      label,
+      undo: async () => void (await putTag(book, previous)),
+      redo: async () => void (await putTag(book, tag)),
+    });
+    setTagNote(label);
+    setTimeout(() => setTagNote((cur) => (cur === label ? null : cur)), 8000);
   }
 
   /** Tap a row → expand it with cover, description, internal notes. */
@@ -829,12 +857,10 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
           )}
         </div>
         {tagError && <div className="error" style={{ marginTop: 10 }}>{tagError}</div>}
-        {tagUndo && (
+        {tagNote && (
           <div className="notice" style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
-            <span style={{ flex: 1 }}>{tagUndo.text}</span>
-            <button className="btn" style={{ padding: "5px 12px", fontSize: 12 }} onClick={() => tagUndo.run()}>
-              ↩ Undo
-            </button>
+            <span style={{ flex: 1 }}>{tagNote}</span>
+            <UndoHint />
           </div>
         )}
         {canImport && selected.size > 0 && (
@@ -845,7 +871,11 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
             <button type="button" className="btn ghost" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => setSelected(new Set())}>
               Deselect
             </button>
-            {bulk.msg && <span className="hint" style={{ margin: 0 }}>{bulk.msg}</span>}
+            {bulk.msg && (
+              <span className="hint" style={{ margin: 0, display: "inline-flex", alignItems: "center", gap: 8 }}>
+                {bulk.msg} <UndoHint />
+              </span>
+            )}
           </div>
         )}
         {results && (

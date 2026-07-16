@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CATEGORIES, type CategoryId } from "@/lib/categories";
 import TagPicker, { TagPill } from "@/components/TagPicker";
+import UndoHint from "@/components/UndoHint";
+import { pushUndo } from "@/lib/undo";
 import { Check, Ic } from "@/components/icons";
 
 type Book = {
@@ -80,41 +82,48 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
   const suggestion = book ? suggestions.current.get(book.dedupe_key) : undefined;
   const description = book ? descriptions.current.get(book.id) : undefined;
 
+  /** Write a tag. No history — the shared step for do/undo/redo. */
+  async function putTag(key: string, tag: CategoryId | null): Promise<boolean> {
+    const res = await fetch("/api/admin/books/tag", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ book_key: key, category: tag }),
+    });
+    if (!res.ok) {
+      setError((await res.json().catch(() => ({}))).error ?? "Couldn't save the tag.");
+      return false;
+    }
+    return true;
+  }
+
   async function applyTag(tag: CategoryId) {
     if (!book || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/books/tag", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ book_key: book.dedupe_key, category: tag }),
-      });
-      if (!res.ok) {
-        setError((await res.json().catch(() => ({}))).error ?? "Couldn't save the tag.");
-        return;
-      }
+      if (!(await putTag(book.dedupe_key, tag))) return;
+      // Capture this card and its place in the queue: undo has to rewind
+      // to the same book, not to wherever the reviewer has since moved.
+      const target = book;
+      const at = idx;
       setTagged((n) => n + 1);
-      setLast({ book, tag, idx });
-      setIdx((i) => i + 1);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function undoLast() {
-    if (!last || busy) return;
-    setBusy(true);
-    try {
-      const res = await fetch("/api/admin/books/tag", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ book_key: last.book.dedupe_key, category: null }),
+      setLast({ book: target, tag, idx: at });
+      setIdx(at + 1);
+      pushUndo({
+        label: `Tagged “${target.title}” → ${CATEGORIES[tag].label}`,
+        undo: async () => {
+          if (!(await putTag(target.dedupe_key, null))) return;
+          setTagged((n) => Math.max(0, n - 1));
+          setLast(null);
+          setIdx(at);
+        },
+        redo: async () => {
+          if (!(await putTag(target.dedupe_key, tag))) return;
+          setTagged((n) => n + 1);
+          setLast({ book: target, tag, idx: at });
+          setIdx(at + 1);
+        },
       });
-      if (!res.ok) return;
-      setTagged((n) => Math.max(0, n - 1));
-      setIdx(last.idx);
-      setLast(null);
     } finally {
       setBusy(false);
     }
@@ -139,9 +148,7 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
           <span style={{ flex: 1 }}>
             Tagged “{last.book.title}” → {CATEGORIES[last.tag].label}
           </span>
-          <button className="btn" style={{ padding: "5px 12px", fontSize: 12 }} disabled={busy} onClick={undoLast}>
-            ↩ Undo
-          </button>
+          <UndoHint />
         </div>
       )}
 

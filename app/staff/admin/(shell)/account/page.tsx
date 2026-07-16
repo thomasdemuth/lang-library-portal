@@ -6,7 +6,8 @@ import NotificationPrefs from "@/components/NotificationPrefs";
 import DeleteAccountForm from "@/components/DeleteAccountForm";
 import MobileSettings from "@/components/MobileSettings";
 import SignOutButton from "@/components/SignOutButton";
-import LaunchPrefCard from "@/components/LaunchPrefCard";
+import KeyboardShortcutsCard from "@/components/KeyboardShortcutsCard";
+import { navShortcutsFor } from "@/lib/shortcuts";
 import { canPublishUpdates } from "@/lib/updates";
 
 export const dynamic = "force-dynamic";
@@ -69,7 +70,7 @@ export default async function AccountPage() {
           notifyWeekly={notifyWeekly}
           notifyUpdates={prefs.updates}
         />
-        <LaunchPrefCard />
+        <KeyboardShortcutsCard links={navShortcutsFor(admin)} />
         {canDelete && <DeleteAccountForm />}
       </div>
 
