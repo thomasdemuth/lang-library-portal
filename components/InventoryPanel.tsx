@@ -6,6 +6,8 @@ import { mergeBooks, rowToBook, type BookRecord } from "@/lib/match";
 import { CATEGORIES, CATEGORY_IDS, type CategoryId } from "@/lib/categories";
 import TagPicker, { TagPill } from "@/components/TagPicker";
 import TagReviewPanel from "@/components/TagReviewPanel";
+import BookEditModal, { type EditableBook } from "@/components/BookEditModal";
+import { Pencil } from "@/components/icons";
 
 type Sync = {
   id: number;
@@ -87,6 +89,10 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const [details, setDetails] = useState<Record<number, BookDetail>>({});
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reindex, setReindex] = useState<{ busy: boolean; msg: string | null }>({ busy: false, msg: null });
+  const [editing, setEditing] = useState<EditableBook | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const lastIdx = useRef<number | null>(null);
+  const [bulk, setBulk] = useState<{ busy: boolean; msg: string | null }>({ busy: false, msg: null });
 
   const [cols, setCols] = useState<ColPref[]>(DEFAULT_COLS);
   useEffect(() => {
@@ -231,9 +237,94 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
       setTotal(data.total);
       setPage(0);
       setExpanded(null);
+      setSelected(new Set()); // selection is per result set
+      lastIdx.current = null;
     } else {
       setTagError(data.error ?? "Search failed.");
     }
+  }
+
+  /** Toggle a row's checkbox; shift-click extends the range from the last one. */
+  function toggleSelect(id: number, index: number, shift: boolean) {
+    const anchor = lastIdx.current; // capture before it's overwritten below
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (shift && anchor !== null && results) {
+        const [lo, hi] = [anchor, index].sort((a, b) => a - b);
+        for (let i = lo; i <= hi; i++) next.add(results[i].id);
+      } else if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+    lastIdx.current = index;
+  }
+
+  function toggleSelectAll() {
+    setSelected((cur) => {
+      if (!results) return cur;
+      const all = results.every((b) => cur.has(b.id));
+      return all ? new Set() : new Set(results.map((b) => b.id));
+    });
+  }
+
+  /** Apply (or clear) a tag on every selected book at once. */
+  async function bulkTag(tag: CategoryId | null) {
+    if (!results || selected.size === 0) return;
+    const keys = results.filter((b) => selected.has(b.id)).map((b) => b.dedupe_key);
+    setBulk({ busy: true, msg: null });
+    try {
+      const res = await fetch("/api/admin/books/tag/bulk", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ book_keys: keys, category: tag }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBulk({ busy: false, msg: data.error ?? "Couldn't update tags." });
+        return;
+      }
+      setResults((cur) => cur?.map((b) => (selected.has(b.id) ? { ...b, tag } : b)) ?? cur);
+      setBulk({
+        busy: false,
+        msg: tag
+          ? `Tagged ${keys.length} book${keys.length === 1 ? "" : "s"} → ${CATEGORIES[tag].label}`
+          : `Cleared the tag on ${keys.length} book${keys.length === 1 ? "" : "s"}`,
+      });
+      setTimeout(() => setBulk((b) => ({ ...b, msg: null })), 5000);
+    } catch {
+      setBulk({ busy: false, msg: "Couldn't update tags." });
+    }
+  }
+
+  /** Merge a saved edit back into the loaded list + detail cache. */
+  function onEdited(u: EditableBook) {
+    setResults((cur) =>
+      cur?.map((b) =>
+        b.id === u.id ? { ...b, title: u.title, creators: u.creators, isbn13: u.isbn13, copies: u.copies, tag: u.tag } : b
+      ) ?? cur
+    );
+    setDetails((cur) => ({ ...cur, [u.id]: { isbn13: u.isbn13, isbn10: u.isbn10, description: u.description, notes: u.notes } }));
+    setEditing(null);
+  }
+
+  /** Drop a deleted book from the list, count, and any selection. */
+  function onDeletedBook(id: number) {
+    setResults((cur) => cur?.filter((b) => b.id !== id) ?? cur);
+    setTotal((t) => Math.max(0, t - 1));
+    setBookCount((c) => Math.max(0, c - 1));
+    setSelected((cur) => {
+      if (!cur.has(id)) return cur;
+      const next = new Set(cur);
+      next.delete(id);
+      return next;
+    });
+    setExpanded((cur) => (cur === id ? null : cur));
+    setEditing(null);
+    setNotice("Book deleted from the live catalog.");
+    setTimeout(() => setNotice(null), 4000);
   }
 
   function setFilterAndSearch(tag: TagFilter) {
@@ -340,7 +431,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
           >
             {canImport ? (
               tagOpen === b.id ? (
-                <TagPicker value={b.tag} onChange={(t) => setTag(b, t)} />
+                <TagPicker value={b.tag} onChange={(t) => setTag(b, t)} dots />
               ) : (
                 <button
                   type="button"
@@ -379,6 +470,14 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
 
   return (
     <>
+      {editing && (
+        <BookEditModal
+          book={editing}
+          onClose={() => setEditing(null)}
+          onSaved={onEdited}
+          onDeleted={onDeletedBook}
+        />
+      )}
       {error && <div className="error">{error}</div>}
       {notice && <div className="notice">{notice}</div>}
 
@@ -615,6 +714,17 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
             </button>
           </div>
         )}
+        {canImport && selected.size > 0 && (
+          <div className="bulkbar">
+            <b>{selected.size} selected</b>
+            <span className="hint" style={{ margin: 0 }}>Set tag:</span>
+            <TagPicker value={null} onChange={(t) => bulkTag(t)} dots disabled={bulk.busy} />
+            <button type="button" className="btn ghost" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => setSelected(new Set())}>
+              Deselect
+            </button>
+            {bulk.msg && <span className="hint" style={{ margin: 0 }}>{bulk.msg}</span>}
+          </div>
+        )}
         {results && (
           <>
             <p className="hint" style={{ marginTop: 10 }}>
@@ -625,6 +735,16 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
               <table className="table books">
                 <thead>
                   <tr>
+                    {canImport && (
+                      <th className="selcol">
+                        <input
+                          type="checkbox"
+                          aria-label="Select all"
+                          checked={results.length > 0 && results.every((b) => selected.has(b.id))}
+                          onChange={toggleSelectAll}
+                        />
+                      </th>
+                    )}
                     <th>Title</th>
                     {visibleCols.map((c) => (
                       <th key={c.id}>{COL_LABEL[c.id]}</th>
@@ -632,23 +752,38 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {results.map((b) => {
+                  {results.map((b, i) => {
                     const open = expanded === b.id;
                     const d = details[b.id];
                     const coverIsbn = d?.isbn13 ?? d?.isbn10 ?? b.isbn13;
+                    const cols = (canImport ? 1 : 0) + 1 + visibleCols.length;
                     return (
                       <Fragment key={b.id}>
                         <tr
-                          className={`bookrow${open ? " open" : ""}`}
+                          className={`bookrow${open ? " open" : ""}${selected.has(b.id) ? " selected" : ""}`}
                           aria-expanded={open}
                           onClick={() => toggleExpand(b)}
                         >
+                          {canImport && (
+                            <td className="selcol" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ${b.title}`}
+                                checked={selected.has(b.id)}
+                                onChange={() => {}}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleSelect(b.id, i, e.shiftKey);
+                                }}
+                              />
+                            </td>
+                          )}
                           <td data-th="Title">{b.title}</td>
                           {visibleCols.map((c) => cellFor(b, c.id))}
                         </tr>
                         {open && (
                           <tr className="bookrow-detail">
-                            <td colSpan={1 + visibleCols.length}>
+                            <td colSpan={cols}>
                               <div className="bookdetail">
                                 {coverIsbn && (
                                   <img
@@ -660,7 +795,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                                     }}
                                   />
                                 )}
-                                <div>
+                                <div style={{ flex: 1 }}>
                                   {!d ? (
                                     <p className="hint" style={{ marginTop: 0 }}>Loading…</p>
                                   ) : (
@@ -676,6 +811,28 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                                         </p>
                                       )}
                                     </>
+                                  )}
+                                  {canImport && (
+                                    <button
+                                      className="btn editbtn"
+                                      style={{ marginTop: 10, padding: "6px 14px", fontSize: 13 }}
+                                      onClick={() =>
+                                        setEditing({
+                                          id: b.id,
+                                          title: b.title,
+                                          creators: b.creators,
+                                          isbn13: d?.isbn13 ?? b.isbn13,
+                                          isbn10: d?.isbn10 ?? null,
+                                          copies: b.copies,
+                                          description: d?.description ?? null,
+                                          notes: d?.notes ?? null,
+                                          tag: b.tag,
+                                          dedupe_key: b.dedupe_key,
+                                        })
+                                      }
+                                    >
+                                      <Pencil size={14} /> Edit book
+                                    </button>
                                   )}
                                 </div>
                               </div>

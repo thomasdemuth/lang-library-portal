@@ -29,12 +29,49 @@ export default function TagPicker({
   onChange,
   disabled,
   suggested,
+  dots,
 }: {
   value: CategoryId | null;
   onChange: (tag: CategoryId | null) => void;
   disabled?: boolean;
   suggested?: CategoryId | null;
+  /** Compact swatch row — just color dots, no labels (keeps table cells from resizing). */
+  dots?: boolean;
 }) {
+  if (dots) {
+    return (
+      <div className="tagdots" role="radiogroup" aria-label="Category tag">
+        {CATEGORY_IDS.map((id) => {
+          const c = CATEGORIES[id];
+          const active = value === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              disabled={disabled}
+              className={`tagdot${active ? " active" : ""}`}
+              style={{ background: c.color }}
+              title={active ? `Clear ${c.label}` : c.label}
+              aria-label={c.label}
+              onClick={() => onChange(active ? null : id)}
+            />
+          );
+        })}
+        <button
+          type="button"
+          disabled={disabled}
+          className={`tagdot tagdot-clear${value === null ? " active" : ""}`}
+          title="No tag"
+          aria-label="No tag"
+          onClick={() => onChange(null)}
+        >
+          ×
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="tagpicker" role="radiogroup" aria-label="Category tag">
       {CATEGORY_IDS.map((id) => {
