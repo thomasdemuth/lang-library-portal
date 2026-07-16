@@ -89,6 +89,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const [details, setDetails] = useState<Record<number, BookDetail>>({});
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reindex, setReindex] = useState<{ busy: boolean; msg: string | null }>({ busy: false, msg: null });
+  const [enrichProg, setEnrichProg] = useState<{ total: number; withDescription: number } | null>(null);
   const [editing, setEditing] = useState<EditableBook | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const lastIdx = useRef<number | null>(null);
@@ -326,6 +327,17 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     setNotice("Book deleted from the live catalog.");
     setTimeout(() => setNotice(null), 4000);
   }
+
+  /** Load enrichment progress for the status line (lazy, when settings open). */
+  const loadEnrichProgress = useCallback(() => {
+    fetch("/api/admin/inventory/enrich")
+      .then((r) => r.json())
+      .then((d) => setEnrichProg({ total: d.total ?? 0, withDescription: d.withDescription ?? 0 }))
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (settingsOpen && !enrichProg) loadEnrichProgress();
+  }, [settingsOpen, enrichProg, loadEnrichProgress]);
 
   function setFilterAndSearch(tag: TagFilter) {
     setFilter(tag);
@@ -665,6 +677,28 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
               </button>
               {reindex.msg && (
                 <p className="hint" style={{ margin: "8px 0 0" }}>{reindex.msg}</p>
+              )}
+            </div>
+            <div>
+              <label className="lbl">Covers & descriptions</label>
+              <p className="hint" style={{ margin: "2px 0 8px" }}>
+                Missing descriptions and covers fill in <b>automatically</b> from Open Library and
+                Google Books — a little each night over the coming weeks. Nothing to press; it only
+                ever fills blanks and never overwrites your Libib data.
+              </p>
+              {enrichProg && enrichProg.total > 0 && (
+                <>
+                  <div className="enrich-bar" aria-hidden>
+                    <div
+                      className="enrich-fill"
+                      style={{ width: `${Math.round((enrichProg.withDescription / enrichProg.total) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="hint" style={{ margin: "6px 0 0" }}>
+                    {enrichProg.withDescription.toLocaleString()} of {enrichProg.total.toLocaleString()} books have a
+                    description ({Math.round((enrichProg.withDescription / enrichProg.total) * 100)}%).
+                  </p>
+                </>
               )}
             </div>
           </div>

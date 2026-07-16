@@ -4,8 +4,12 @@ import { notifyChiefEmails, sendEmail, weeklyDigestEmails } from "@/lib/email";
 import { staffUrl } from "@/lib/hosts";
 import { allowHit } from "@/lib/ratelimit";
 import { STATUS_LABELS } from "@/lib/labels";
+import { enrichDrip } from "@/lib/enrich";
 
 export const dynamic = "force-dynamic";
+// Housekeeping + a time-boxed enrichment drip (enrichment runs last, so the
+// emails/pruning always complete even if the function is cut short).
+export const maxDuration = 60;
 
 /**
  * Daily housekeeping (Vercel Cron, bearer-protected):
@@ -196,5 +200,13 @@ export async function GET(req: NextRequest) {
     weekly = await sendWeeklyDigest(date);
   }
 
-  return NextResponse.json({ ok: true, reminded, weekly, ranAt: new Date().toISOString() });
+  // Cover/description enrichment — runs LAST, time-boxed, best-effort.
+  let enrich = { scanned: 0, filledDesc: 0, filledIsbn: 0, gbQuotaHit: false, done: true };
+  try {
+    enrich = await enrichDrip(40_000);
+  } catch {
+    /* never let enrichment fail the cron */
+  }
+
+  return NextResponse.json({ ok: true, reminded, weekly, enrich, ranAt: new Date().toISOString() });
 }

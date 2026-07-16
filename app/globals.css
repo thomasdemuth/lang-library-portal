@@ -316,6 +316,8 @@ html[data-theme="dark"] .modal { background: #161c2b; }
 .btn.modal-delete:hover { color: #8f1b23; }
 .editbtn { display: inline-flex; align-items: center; gap: 6px; }
 .editbtn svg { flex: none; }
+.enrich-bar { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; max-width: 320px; }
+.enrich-fill { height: 100%; border-radius: 999px; background: var(--brand-gradient); transition: width .4s ease; }
 .bookedit-body { display: flex; gap: 16px; padding: 6px 18px 4px; }
 .bookedit-cover { flex: none; width: 120px; display: flex; flex-direction: column; gap: 6px; }
 .bookedit-cover img { width: 120px; border-radius: 8px; box-shadow: 0 2px 10px rgba(16, 24, 40, .2); }
