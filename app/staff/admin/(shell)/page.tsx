@@ -2,12 +2,14 @@ import { db } from "@/lib/db";
 import { currentAdmin } from "@/lib/server";
 import { canDo } from "@/lib/permissions";
 import { Ic } from "@/components/icons";
+import DashboardCards, { type DashKpi, type DashWidget } from "@/components/DashboardCards";
 
 export const dynamic = "force-dynamic";
 
 async function counts() {
   const client = db();
-  const [requests, feedback, active] = await Promise.all([
+  const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const [requests, feedback, active, reads, favs] = await Promise.all([
     client.from("book_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
     client.from("feedback").select("id", { count: "exact", head: true }).eq("status", "new"),
     client
@@ -15,18 +17,29 @@ async function counts() {
       .select("id, activated_at, merged_count")
       .eq("status", "active")
       .maybeSingle(),
+    client.from("reading_log").select("id", { count: "exact", head: true }).gte("created_at", weekAgo),
+    client.from("favorites").select("id", { count: "exact", head: true }).gte("created_at", weekAgo),
   ]);
   return {
     newRequests: requests.count ?? 0,
     newFeedback: feedback.count ?? 0,
     books: active.data?.merged_count ?? 0,
     lastSync: active.data?.activated_at ?? null,
+    readsWeek: reads.count ?? 0,
+    favsWeek: favs.count ?? 0,
   };
 }
 
 export default async function AdminDashboard() {
   const admin = await currentAdmin();
-  let stats = { newRequests: 0, newFeedback: 0, books: 0, lastSync: null as string | null };
+  let stats = {
+    newRequests: 0,
+    newFeedback: 0,
+    books: 0,
+    lastSync: null as string | null,
+    readsWeek: 0,
+    favsWeek: 0,
+  };
   try {
     stats = await counts();
   } catch {
@@ -36,26 +49,34 @@ export default async function AdminDashboard() {
   const isChief = admin?.role === "chief";
   const can = (k: Parameters<typeof canDo>[1]) => (admin ? canDo(admin, k) : false);
 
-  const kpis = [
-    { show: can("requests"), b: String(stats.newRequests), label: "new book requests" },
-    { show: can("feedback_view"), b: String(stats.newFeedback), label: "unread feedback" },
-    { show: can("inventory_view"), b: stats.books.toLocaleString(), label: "titles in inventory" },
+  // Every stat this admin could put in the top row (the picker's catalog)
+  const kpis: (DashKpi & { show: boolean })[] = [
+    { id: "requests", show: can("requests"), value: String(stats.newRequests), label: "new book requests" },
+    { id: "feedback", show: can("feedback_view"), value: String(stats.newFeedback), label: "unread feedback" },
+    { id: "books", show: can("inventory_view"), value: stats.books.toLocaleString(), label: "titles in inventory" },
     {
+      id: "sync",
       show: can("inventory_view"),
-      b: stats.lastSync ? new Date(stats.lastSync).toLocaleDateString() : "never",
-      label: "last Libib sync",
+      value: stats.lastSync ? new Date(stats.lastSync).toLocaleDateString() : "never",
+      label: "last catalog update",
     },
-  ].filter((k) => k.show);
+    { id: "reads", show: can("users"), value: String(stats.readsWeek), label: "books read this week" },
+    { id: "favs", show: can("users"), value: String(stats.favsWeek), label: "favorites this week" },
+  ];
 
-  const cards = [
-    { show: can("requests"), href: "/admin/requests", icon: "requests", badge: stats.newRequests, h: "Book Requests", p: "Review teacher requests and set their status." },
-    { show: can("feedback_view"), href: "/admin/feedback", icon: "feedback", badge: stats.newFeedback, h: "Feedback", p: "What students and teachers are telling you." },
-    { show: can("inventory_view") || can("inventory_import"), href: "/admin/inventory", icon: "book", badge: 0, h: "Inventory", p: "Scan, tag, and search the catalog; sync from Libib." },
-    { show: can("map_edit") || can("map_floorplan"), href: "/admin/map", icon: "map", badge: 0, h: "Map Editor", p: "Place shelves, set categories, keep internal notes." },
-    { show: can("signmaker"), href: "/admin/sign-maker", icon: "sign", badge: 0, h: "Sign Maker", p: "Print shelf tabs, banners, and wayfinding signs." },
-    { show: can("analytics"), href: "/admin/analytics", icon: "chart", badge: 0, h: "Site Usage", p: "Visits and activity across both sites." },
-    { show: isChief, href: "/admin/admins", icon: "users", badge: 0, h: "Admins & Invites", p: "Add admins, set their powers, and manage invites." },
-  ].filter((c) => c.show);
+  const widgets: (DashWidget & { show: boolean })[] = [
+    { id: "requests", show: can("requests"), href: "/admin/requests", icon: "requests", badge: stats.newRequests, title: "Book Requests", desc: "Review teacher requests and set their status." },
+    { id: "feedback", show: can("feedback_view"), href: "/admin/feedback", icon: "feedback", badge: stats.newFeedback, title: "Feedback", desc: "What students and teachers are telling you." },
+    { id: "inventory", show: can("inventory_view") || can("inventory_import"), href: "/admin/inventory", icon: "book", badge: 0, title: "Inventory", desc: "Scan, tag, and search the catalog." },
+    { id: "map", show: can("map_edit") || can("map_floorplan"), href: "/admin/map", icon: "map", badge: 0, title: "Map Editor", desc: "Place shelves, set categories, keep internal notes." },
+    { id: "signmaker", show: can("signmaker"), href: "/admin/sign-maker", icon: "sign", badge: 0, title: "Sign Maker", desc: "Print shelf tabs, banners, and wayfinding signs." },
+    { id: "analytics", show: can("analytics"), href: "/admin/analytics", icon: "chart", badge: 0, title: "Site Usage", desc: "Visits and activity across both sites." },
+    { id: "users", show: can("users"), href: "/admin/users", icon: "users", badge: 0, title: "User Insights", desc: "Student & teacher accounts, activity, and notes." },
+    { id: "admins", show: isChief, href: "/admin/admins", icon: "users", badge: 0, title: "Admins & Invites", desc: "Add admins, set their powers, and manage invites." },
+  ];
+
+  const availableKpis = kpis.filter((k) => k.show).map(({ show: _s, ...k }) => k);
+  const availableWidgets = widgets.filter((w) => w.show).map(({ show: _s, ...w }) => w);
 
   const hour = Number(
     new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: "America/New_York" }).format(new Date())
@@ -75,33 +96,12 @@ export default async function AdminDashboard() {
         </span>
       </p>
 
-      {kpis.length > 0 && (
-        <div className="kpis" style={{ marginBottom: 22 }}>
-          {kpis.map((k, i) => (
-            <div className="kpi" key={i}>
-              <b>{k.b}</b>
-              <span>{k.label}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {cards.length > 0 ? (
-        <div className="cards">
-          {cards.map((c) => (
-            <a className="card navcard" href={c.href} key={c.href}>
-              <h2>
-                <span className="navcard-icon">
-                  <Ic name={c.icon} size={17} />
-                </span>
-                {c.h}
-                {c.badge > 0 && <span className="navcard-badge">{c.badge}</span>}
-                <span className="navcard-arrow" aria-hidden>→</span>
-              </h2>
-              <p>{c.p}</p>
-            </a>
-          ))}
-        </div>
+      {availableWidgets.length > 0 || availableKpis.length > 0 ? (
+        <DashboardCards
+          kpis={availableKpis}
+          widgets={availableWidgets}
+          defaultStats={["requests", "feedback", "books", "sync"]}
+        />
       ) : (
         <div className="card">
           <p className="hint" style={{ margin: 0 }}>

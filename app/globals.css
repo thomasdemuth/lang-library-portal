@@ -1373,3 +1373,27 @@ html[data-theme="dark"] kbd { background: #232b3d; border-color: #39435a; }
 }
 .kbd-row:last-child { border-bottom: 0; }
 .kbd-keys { flex: none; width: 84px; }
+
+/* Customizable dashboard: edit chrome, wide widgets, stat picker */
+.dash-tools { display: flex; justify-content: flex-end; align-items: center; gap: 14px; margin: -6px 0 12px; }
+.dash-statpick, .dash-tray { margin-bottom: 16px; padding: 14px 16px; }
+.dash-statpick b, .dash-tray b { font-size: 13px; }
+.navcard-wide { grid-column: span 2; }
+@media (max-width: 660px) { .navcard-wide { grid-column: span 1; } }
+.navcard.editing { border-style: dashed; cursor: default; }
+.navcard.editing:hover { transform: none; }
+.navcard.editing h2 { padding-right: 100px; }
+.widget-ctrl {
+  position: absolute; top: 10px; right: 10px; display: flex; gap: 4px; z-index: 2;
+}
+.navcard { position: relative; }
+.widget-ctrl button {
+  width: 26px; height: 26px; border-radius: 8px; border: 1.5px solid var(--line);
+  background: #fff; color: var(--muted); font: inherit; font-size: 12px; font-weight: 800;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  transition: color .12s, border-color .12s;
+}
+html[data-theme="dark"] .widget-ctrl button { background: var(--panel-2); }
+.widget-ctrl button:hover:not(:disabled) { color: var(--brand-blue); border-color: var(--brand-blue); }
+.widget-ctrl button.ctrl-x:hover { color: var(--danger); border-color: var(--danger); }
+.widget-ctrl button:disabled { opacity: .35; cursor: default; }
