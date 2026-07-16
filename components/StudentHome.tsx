@@ -122,25 +122,25 @@ export default function StudentHome({ email }: { email: string }) {
       )}
 
       <div className="cards" style={{ marginTop: 18 }}>
-        <a className="card navcard soon" href="/ebooks">
+        <a className="card navcard" href="https://nypl.overdrive.com/" target="_blank" rel="noopener noreferrer">
           <h2>
             <span className="navcard-icon" style={{ background: "#7c4dbc" }}>
               <Ic name="book" size={17} />
             </span>
             E-Books
-            <span className="soon-pill">soon</span>
+            <span className="navcard-arrow" aria-hidden>↗</span>
           </h2>
-          <p>Read on a screen — a digital shelf is on its way.</p>
+          <p>Read on a screen — borrow digital books through OverDrive.</p>
         </a>
-        <a className="card navcard soon" href="/audiobooks">
+        <a className="card navcard" href="https://nypl.overdrive.com/" target="_blank" rel="noopener noreferrer">
           <h2>
             <span className="navcard-icon" style={{ background: "#c2417f" }}>
               <Ic name="megaphone" size={17} />
             </span>
             Audiobooks
-            <span className="soon-pill">soon</span>
+            <span className="navcard-arrow" aria-hidden>↗</span>
           </h2>
-          <p>Stories read aloud — coming to the library soon.</p>
+          <p>Stories read aloud — listen through OverDrive.</p>
         </a>
       </div>
 
