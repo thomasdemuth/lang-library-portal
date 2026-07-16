@@ -45,7 +45,7 @@ export default async function AccountPage() {
           <div style={{ display: "flex", alignItems: "flex-start", gap: 14, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 200 }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>
-                {admin.username}{" "}
+                {admin.name || admin.username}{" "}
                 <span className="pill" style={{ background: admin.role === "chief" ? "#eef1fb" : "#eef0f5", verticalAlign: "middle" }}>
                   {admin.role === "chief" ? "Chief Admin" : "Admin"}
                 </span>

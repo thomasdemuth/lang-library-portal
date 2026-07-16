@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { guarded, requirePermission } from "@/lib/guards";
+import { guarded, requireDeveloper, requirePermission } from "@/lib/guards";
 
 const CreateBody = z.object({ source_filename: z.string().trim().max(200).optional() });
 
 /** Start a new pending inventory generation. */
 export const POST = guarded(async (req: NextRequest) => {
-  const admin = await requirePermission(req, "inventory_import");
+  const admin = await requireDeveloper(req);
   const parsed = CreateBody.safeParse(await req.json().catch(() => ({})));
 
   // Only one pending sync at a time: abort any stale ones first.

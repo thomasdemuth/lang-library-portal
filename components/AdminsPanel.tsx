@@ -30,6 +30,13 @@ function inviteState(i: Invite): string {
   return "active";
 }
 
+/** Split a display name into first + last (last = everything after the first word). */
+function splitName(full: string): { first: string; last: string } {
+  const parts = (full ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { first: "—", last: "" };
+  return { first: parts[0], last: parts.slice(1).join(" ") };
+}
+
 const EMPTY_PERMS: Record<string, boolean> = {};
 
 export default function AdminsPanel({ selfId }: { selfId: string }) {
@@ -194,7 +201,8 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
         <table className="table">
           <thead>
             <tr>
-              <th>Name</th>
+              <th>First Name</th>
+              <th>Last Name</th>
               <th>Email</th>
               <th>Role</th>
               <th>Powers</th>
@@ -205,19 +213,20 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
             {admins.map((a) => {
               const perms = a.permissions ?? {};
               const grantedCount = PERMISSIONS.filter((p) => perms[p.key]).length;
+              const { first, last } = splitName(a.name);
               return (
                 <Fragment key={a.id}>
                   <tr style={a.disabled_at ? { opacity: 0.55 } : undefined}>
-                    <td>
-                      <b>{a.name}</b>
+                    <td data-th="First Name">
+                      <b>{first}</b>
                       {a.id === selfId && (
                         <span className="pill" style={{ background: "#eef1fb", marginLeft: 8 }}>you</span>
                       )}
                       {a.disabled_at && (
                         <span className="pill" style={{ background: "#fdecec", marginLeft: 8 }}>disabled</span>
                       )}
-                      <div className="hint" style={{ marginTop: 2 }}>{a.username}</div>
                     </td>
+                    <td data-th="Last Name"><b>{last || "—"}</b></td>
                     <td>{a.email}</td>
                     <td>
                       <select
@@ -253,7 +262,7 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
                   </tr>
                   {a.role === "admin" && openPowers === a.id && (
                     <tr>
-                      <td colSpan={5} style={{ background: "var(--bg)" }}>
+                      <td colSpan={6} style={{ background: "var(--bg)" }}>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 6, padding: "4px 2px" }}>
                           {PERMISSIONS.map((p) => (
                             <label key={p.key} className="check" title={p.desc}>

@@ -7,6 +7,7 @@ import { CATEGORIES, CATEGORY_IDS, type CategoryId } from "@/lib/categories";
 import TagPicker, { TagPill } from "@/components/TagPicker";
 import TagReviewPanel from "@/components/TagReviewPanel";
 import BookEditModal, { type EditableBook } from "@/components/BookEditModal";
+import AddBookModal, { type AddedBook } from "@/components/AddBookModal";
 import { Ic, Pencil, Pin } from "@/components/icons";
 
 type Sync = {
@@ -63,7 +64,7 @@ const DEFAULT_COLS: ColPref[] = CATALOG_COLS.map((c) => ({ id: c.id, on: true })
 const COL_LABEL = Object.fromEntries(CATALOG_COLS.map((c) => [c.id, c.label])) as Record<ColId, string>;
 const COLS_KEY = "ll-catalog-cols";
 
-export default function InventoryPanel({ canImport }: { canImport: boolean }) {
+export default function InventoryPanel({ canImport, canLibib }: { canImport: boolean; canLibib: boolean }) {
   const [active, setActive] = useState<Sync | null>(null);
   const [bookCount, setBookCount] = useState(0);
   const [history, setHistory] = useState<Sync[]>([]);
@@ -88,6 +89,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [details, setDetails] = useState<Record<number, BookDetail>>({});
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [reindex, setReindex] = useState<{ busy: boolean; msg: string | null }>({ busy: false, msg: null });
   const [enrichProg, setEnrichProg] = useState<{ total: number; withDescription: number } | null>(null);
   const [editing, setEditing] = useState<EditableBook | null>(null);
@@ -328,6 +330,27 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     setTimeout(() => setNotice(null), 4000);
   }
 
+  /** A newly-added title jumps to the top of the list so it's visible. */
+  function onAdded(book: AddedBook, wasNew: boolean) {
+    setAddOpen(false);
+    setResults((cur) => {
+      if (!cur) return cur;
+      const existing = cur.findIndex((b) => b.id === book.id);
+      if (existing >= 0) {
+        const next = [...cur];
+        next[existing] = { ...next[existing], copies: book.copies, tag: book.tag };
+        return next;
+      }
+      return [book, ...cur];
+    });
+    if (wasNew) {
+      setTotal((t) => t + 1);
+      setBookCount((c) => c + 1);
+    }
+    setNotice(wasNew ? `Added “${book.title}” to the catalog.` : `“${book.title}” is already here — added a copy (now ${book.copies}).`);
+    setTimeout(() => setNotice(null), 4000);
+  }
+
   /** Load enrichment progress for the status line (lazy, when settings open). */
   const loadEnrichProgress = useCallback(() => {
     fetch("/api/admin/inventory/enrich")
@@ -490,6 +513,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
           onDeleted={onDeletedBook}
         />
       )}
+      {addOpen && <AddBookModal onClose={() => setAddOpen(false)} onAdded={onAdded} />}
       {error && <div className="error">{error}</div>}
       {notice && <div className="notice">{notice}</div>}
 
@@ -529,23 +553,37 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
             </button>
           </form>
           {canImport && (
-            <button
-              type="button"
-              className={`gearbtn desk-only${settingsOpen ? " on" : ""}`}
-              aria-label="Catalog settings"
-              aria-expanded={settingsOpen}
-              title="Catalog settings"
-              onClick={() => setSettingsOpen((o) => !o)}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
+            <div className="invtools desk-only">
+              <button
+                type="button"
+                className="gearbtn addbtn"
+                aria-label="Add a title"
+                title="Add a title"
+                onClick={() => setAddOpen(true)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className={`gearbtn${settingsOpen ? " on" : ""}`}
+                aria-label="Catalog settings"
+                aria-expanded={settingsOpen}
+                title="Catalog settings"
+                onClick={() => setSettingsOpen((o) => !o)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
+            </div>
           )}
         </div>
         {canImport && settingsOpen && (
           <div className="catset desk-only">
+            {canLibib && (
             <div>
               <label className="lbl">Inventory</label>
               <p className="hint" style={{ margin: "2px 0 10px" }}>
@@ -615,6 +653,52 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                 )}
               </div>
             </div>
+            )}
+            {canLibib && (
+              <div>
+                <label className="lbl">Import history</label>
+                {history.length === 0 ? (
+                  <p className="hint" style={{ margin: "2px 0 0" }}>No imports yet.</p>
+                ) : (
+                  <div className="tablewrap" style={{ marginTop: 6 }}>
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>When</th>
+                          <th>File</th>
+                          <th>Titles</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {history.map((s) => (
+                          <tr key={s.id}>
+                            <td>{new Date(s.started_at).toLocaleString()}</td>
+                            <td>{s.source_filename ?? "—"}</td>
+                            <td>{s.merged_count?.toLocaleString() ?? "—"}</td>
+                            <td>
+                              <span
+                                className="pill"
+                                style={{
+                                  background:
+                                    s.status === "active"
+                                      ? "#e7f6f3"
+                                      : s.status === "pending"
+                                        ? "#fff6e6"
+                                        : "#f3f4f7",
+                                }}
+                              >
+                                {s.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
             <div>
               <label className="lbl">Catalog columns</label>
               <p className="hint" style={{ margin: "2px 0 8px" }}>
@@ -684,7 +768,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
               <p className="hint" style={{ margin: "2px 0 8px" }}>
                 Missing descriptions and covers fill in <b>automatically</b> from Open Library and
                 Google Books — a little each night over the coming weeks. Nothing to press; it only
-                ever fills blanks and never overwrites your Libib data.
+                ever fills blanks and never overwrites your catalog data.
               </p>
               {enrichProg && enrichProg.total > 0 && (
                 <>
@@ -885,48 +969,6 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
               </button>
             )}
           </>
-        )}
-      </div>
-
-      <div className="card desk-only">
-        <h2 style={{ marginTop: 0 }}>Import history</h2>
-        {history.length === 0 ? (
-          <p className="hint">No imports yet.</p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>File</th>
-                <th>Titles</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((s) => (
-                <tr key={s.id}>
-                  <td>{new Date(s.started_at).toLocaleString()}</td>
-                  <td>{s.source_filename ?? "—"}</td>
-                  <td>{s.merged_count?.toLocaleString() ?? "—"}</td>
-                  <td>
-                    <span
-                      className="pill"
-                      style={{
-                        background:
-                          s.status === "active"
-                            ? "#e7f6f3"
-                            : s.status === "pending"
-                              ? "#fff6e6"
-                              : "#f3f4f7",
-                      }}
-                    >
-                      {s.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         )}
       </div>
     </>

@@ -1,15 +1,10 @@
 import webpush from "web-push";
 import { db } from "@/lib/db";
+import { isDeveloper } from "@/lib/permissions";
 
-/**
- * Who can publish app updates (the developer). Both spellings of
- * Thomas's address are accepted — the admin account currently uses the
- * students-domain one.
- */
-const UPDATE_AUTHORS = new Set(["thomas.demuth@thelangschool.org", "thomas.demuth@students.thelangschool.org"]);
-
+/** Who can publish app updates (the developer account). */
 export function canPublishUpdates(email: string): boolean {
-  return UPDATE_AUTHORS.has(email.toLowerCase());
+  return isDeveloper(email);
 }
 
 export function pushConfigured(): boolean {

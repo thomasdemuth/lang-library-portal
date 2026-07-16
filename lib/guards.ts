@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken, type Session } from "@/lib/session";
 import { db } from "@/lib/db";
-import { canDo, type AdminRole, type PermKey } from "@/lib/permissions";
+import { canDo, isDeveloper, type AdminRole, type PermKey } from "@/lib/permissions";
 
 export type AdminIdentity = {
   id: string;
@@ -83,6 +83,13 @@ export async function requireChief(req: NextRequest): Promise<AdminIdentity> {
 export async function requirePermission(req: NextRequest, key: PermKey): Promise<AdminIdentity> {
   const admin = await requireAdmin(req);
   if (!canDo(admin, key)) throw deny(403, "You don't have permission for that.");
+  return admin;
+}
+
+/** Developer-only actions (Libib import, publishing updates). */
+export async function requireDeveloper(req: NextRequest): Promise<AdminIdentity> {
+  const admin = await requireAdmin(req);
+  if (!isDeveloper(admin.email)) throw deny(403, "That's restricted to the developer account.");
   return admin;
 }
 

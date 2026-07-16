@@ -22,6 +22,21 @@ export const PERMISSIONS = [
 export type PermKey = (typeof PERMISSIONS)[number]["key"];
 export const PERM_KEYS = PERMISSIONS.map((p) => p.key) as PermKey[];
 
+/**
+ * The developer account(s). A few tools are theirs alone regardless of
+ * role or granted powers — the Libib CSV import and publishing app
+ * updates. Both spellings of Thomas's address are accepted (the admin
+ * account currently uses the students-domain one).
+ */
+export const DEVELOPER_EMAILS = new Set([
+  "thomas.demuth@thelangschool.org",
+  "thomas.demuth@students.thelangschool.org",
+]);
+
+export function isDeveloper(email: string | null | undefined): boolean {
+  return !!email && DEVELOPER_EMAILS.has(email.toLowerCase());
+}
+
 export type AdminLike = { role: AdminRole; permissions?: Record<string, boolean> | null };
 
 /** Whether an admin may perform an action. Chief can do everything. */

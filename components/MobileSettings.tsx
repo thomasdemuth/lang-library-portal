@@ -306,7 +306,7 @@ export default function MobileSettings({
     <>
       <div className="settings-profile">
         <div className="sp-line">
-          <span className="sp-name">{username}</span>
+          <span className="sp-name">{name || username}</span>
           <span className="sp-dot">•</span>
           <span className="sp-email">{email}</span>
         </div>
