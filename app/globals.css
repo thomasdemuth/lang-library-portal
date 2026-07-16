@@ -952,8 +952,8 @@ html[data-theme="dark"] .bookcard { background: var(--panel); }
   from { opacity: 0; transform: translateX(-10px); }
   to { opacity: 1; transform: none; }
 }
-.bc-tag { display: inline-flex; margin-bottom: 3px; }
-.bc-title { font-size: 13.5px; font-weight: 800; color: var(--ink); line-height: 1.3; }
+.bc-tag { display: inline-flex; margin-bottom: 3px; padding-right: 30px; }
+.bc-title { font-size: 13.5px; font-weight: 800; color: var(--ink); line-height: 1.3; padding-right: 30px; }
 .bc-author { font-size: 11.5px; font-weight: 700; color: var(--muted); }
 .bc-desc {
   margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--ink);
@@ -980,11 +980,13 @@ html[data-theme="dark"] .fav-btn { background: rgba(24, 30, 48, .88); }
 /* Shared action pills on expanded cards (BookRow + catalog search detail) */
 .bookact { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .b-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap;
   border: 1.5px solid var(--line); background: #fff; color: var(--muted);
   border-radius: 999px; padding: 6px 12px;
   transition: transform .1s, color .12s, border-color .12s, background .12s;
 }
+.b-btn svg { flex: none; }
 .b-btn:hover { transform: scale(1.04); }
 .b-btn.b-read:hover { color: #b7791f; border-color: #f5c95c; }
 .b-btn.b-read.done { color: #147a55; border-color: #bfe5df; background: #e7f6f3; }
@@ -992,6 +994,16 @@ html[data-theme="dark"] .fav-btn { background: rgba(24, 30, 48, .88); }
 .b-btn.b-fav:hover { color: #c2417f; border-color: #f3c6dd; }
 .b-btn.b-fav.on { color: #c2417f; border-color: #f3c6dd; background: #fdeef5; }
 html[data-theme="dark"] .b-btn { background: var(--panel-2); }
+
+/* Icon states: heart (fills red, animates on hover), read check, pin */
+.i-heart { fill: transparent; stroke: #3b4048; transition: fill .28s ease, stroke .22s ease; }
+.i-heart.on { fill: #e11d48; stroke: #e11d48; }
+.bc-fav:hover .i-heart:not(.on),
+.b-btn.b-fav:hover .i-heart:not(.on) { fill: #e11d48; stroke: #e11d48; }
+.i-check { stroke: #3b4048; transition: stroke .18s ease; }
+.i-check.on { stroke: var(--brand-green); }
+html[data-theme="dark"] .i-heart:not(.on) { stroke: #aeb6c2; }
+html[data-theme="dark"] .i-check:not(.on) { stroke: #aeb6c2; }
 
 /* Catalog search: tap a row to open its cover + description + actions */
 .catlist { display: flex; flex-direction: column; }

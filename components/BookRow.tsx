@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { CATEGORIES, type CategoryId } from "@/lib/categories";
 import { TagPill } from "@/components/TagPicker";
-import { Heart } from "@/components/icons";
+import { Check, Heart, Pin } from "@/components/icons";
 import { getFavorites, isFavorite, onFavoritesChange, toggleFavorite } from "@/lib/favorites-client";
 import { fetchDetail, findShelf, logRead, type BookDetail } from "@/lib/book-actions-client";
 
@@ -188,10 +188,10 @@ export default function BookRow({
                       className={`b-btn b-read${logged.has(b.dedupe_key) ? " done" : ""}`}
                       onClick={(e) => markRead(e, b)}
                     >
-                      {logged.has(b.dedupe_key) ? "✓ logged" : "⭐ I read this"}
+                      <Check done={logged.has(b.dedupe_key)} /> {logged.has(b.dedupe_key) ? "Logged" : "I read this"}
                     </button>
                     <button type="button" className="b-btn b-where" onClick={(e) => where(e, b)}>
-                      📍 Where is it?
+                      <Pin /> Where is it?
                     </button>
                   </div>
                 </div>

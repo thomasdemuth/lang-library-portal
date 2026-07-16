@@ -36,22 +36,61 @@ export function Ic({ name, size = 18, width = 2 }: { name: string; size?: number
   );
 }
 
-/** Favorite heart: grey-black outline, filling red when favorited. */
+/** Favorite heart. Colors/hover-fill are CSS-driven (.i-heart / .i-heart.on). */
 export function Heart({ filled = false, size = 17 }: { filled?: boolean; size?: number }) {
-  const color = filled ? "#e11d48" : "#3b4048";
   return (
     <svg
       viewBox="0 0 24 24"
       width={size}
       height={size}
-      fill={filled ? "#e11d48" : "none"}
-      stroke={color}
+      className={`i-heart${filled ? " on" : ""}`}
       strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
     >
       <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+    </svg>
+  );
+}
+
+/** Read check: grey-black tick when unread, green ticked-in-a-circle when logged. */
+export function Check({ done = false, size = 15 }: { done?: boolean; size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      className={`i-check${done ? " on" : ""}`}
+      fill="none"
+      strokeWidth={2.4}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {done && <circle cx="12" cy="12" r="10" strokeWidth={1.8} />}
+      <path d="M7 12.4l3.3 3.3L17 8.2" />
+    </svg>
+  );
+}
+
+/** Location pin, inherits the button's text color. */
+export function Pin({ size = 14 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      className="i-pin"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 21s-6.5-5.8-6.5-10.5a6.5 6.5 0 1 1 13 0C18.5 15.2 12 21 12 21z" />
+      <circle cx="12" cy="10.5" r="2.4" />
     </svg>
   );
 }
