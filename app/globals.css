@@ -520,6 +520,8 @@ html[data-theme="dark"] .mapsvg .mapimg { filter: invert(1) hue-rotate(180deg); 
   .table.books td[data-th="Copies"]::after { content: " in stock"; }
   .table.books tr.bookrow.open { border-bottom: 0; padding-bottom: 4px; }
   .table.books tr.bookrow-detail { display: block; padding-top: 0; }
+  /* No bulk multi-select on mobile — hide the checkbox column entirely */
+  .table.books td.selcol, .table.books th.selcol { display: none; }
   /* Filter chips collapse to their color swatch until selected */
   .tagfilter .tagchip:not(.active) { padding: 8px; }
   .tagfilter .tagchip:not(.active) .tagchip-label { display: none; }
