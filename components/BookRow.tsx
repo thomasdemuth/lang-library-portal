@@ -25,6 +25,7 @@ export default function BookRow({
   tag,
   index,
   onPoints,
+  hideTitle,
 }: {
   title: string;
   emoji: string;
@@ -32,6 +33,9 @@ export default function BookRow({
   tag?: CategoryId;
   index?: number;
   onPoints?: (points: number) => void;
+  /** Drop the heading — used for the infinite "Keep exploring" grid, which
+   *  carries a single shared title above the stack of rows. */
+  hideTitle?: boolean;
 }) {
   const [books, setBooks] = useState<Book[]>([]);
   const [rowTitle, setRowTitle] = useState<string | null>(null);
@@ -116,11 +120,15 @@ export default function BookRow({
   if (loaded && visible.length === 0) return null;
 
   return (
-    <div className="newshelf" data-favtick={favTick}>
-      <h2>
-        <span className="newshelf-spark">{emoji}</span> {rowTitle ?? title}
-        {toast && <span className="row-toast">{toast}</span>}
-      </h2>
+    <div className={`newshelf${hideTitle ? " newshelf-untitled" : ""}`} data-favtick={favTick}>
+      {hideTitle ? (
+        toast && <span className="row-toast row-toast-float">{toast}</span>
+      ) : (
+        <h2>
+          <span className="newshelf-spark">{emoji}</span> {rowTitle ?? title}
+          {toast && <span className="row-toast">{toast}</span>}
+        </h2>
+      )}
       <div className="newshelf-row">
         {visible.map((b) => {
           const open = expandedId === b.id;

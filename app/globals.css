@@ -928,6 +928,16 @@ html[data-theme="dark"] .newshelf-card { background: var(--panel); }
 .student-theme .newshelf { margin: 14px 0 8px; }
 .student-theme .newshelf h2 { font-size: 18px; }
 
+/* Endless "Keep exploring" grid: one heading, then title-less rows that
+   stack tightly into an infinite wall of covers. */
+.explore-head { font-size: 18px; color: var(--brand-blue-deep); margin: 18px 0 4px; }
+html[data-theme="dark"] .explore-head { color: #9db1ee; }
+.newshelf-untitled { position: relative; margin: 0; }
+/* Reserve a row's worth of height so a not-yet-loaded row still pushes the
+   infinite-scroll sentinel down — keeps top-up bounded to a few rows. */
+.newshelf-untitled .newshelf-row { min-height: 210px; }
+.row-toast-float { position: absolute; top: -2px; right: 4px; z-index: 3; margin: 0; }
+
 .play-hero {
   display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
   background: linear-gradient(120deg, #eef1fb 0%, #eaf5f0 100%);

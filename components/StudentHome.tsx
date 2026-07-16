@@ -1,14 +1,33 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import BookRow from "@/components/BookRow";
+import BookRow, { type RowKind } from "@/components/BookRow";
 import AvatarView from "@/components/AvatarView";
 import { DEFAULT_AVATAR, displayName, type Avatar } from "@/lib/play";
+import { type CategoryId } from "@/lib/categories";
 import { Ic } from "@/components/icons";
 
 type Leader = { rank: number; name: string; books: number; avatar: Avatar; id: string | null };
 
 const MEDALS = ["🥇", "🥈", "🥉"];
+
+/**
+ * The rotation the endless "Keep exploring" grid cycles through. Every entry
+ * resamples fresh books on each mount (random sample / random-offset category
+ * slice), so rows stay varied and rarely repeat. The curated "Because you
+ * read…" rows are deliberately NOT reused here — their content is fixed and
+ * would repeat, which we avoid.
+ */
+const EXPLORE_KINDS: { kind: RowKind; tag?: CategoryId }[] = [
+  { kind: "random" },
+  { kind: "tag", tag: "fiction" },
+  { kind: "tag", tag: "comics" },
+  { kind: "random" },
+  { kind: "tag", tag: "nonfiction" },
+  { kind: "tag", tag: "young" },
+  { kind: "random" },
+  { kind: "tag", tag: "drama" },
+];
 
 /** The student homepage: a wall of book shelves plus the reading game. */
 export default function StudentHome({ email }: { email: string }) {
@@ -36,19 +55,25 @@ export default function StudentHome({ email }: { email: string }) {
       .catch(() => {});
   }, []);
 
-  // Infinite shelves: every time the bottom sentinel shows, add a row.
+  // Truly infinite shelves. Re-arming on every extraRows change is what makes
+  // it endless: an IntersectionObserver only fires on transitions, so once the
+  // sentinel sits inside the root margin it goes quiet. Re-observing forces a
+  // fresh reading each time a row lands, so it keeps topping up until the
+  // sentinel is finally pushed past the margin — then waits for the next
+  // scroll. Unloaded rows reserve height (CSS min-height), so this tops up by
+  // only a few rows, never a storm.
   useEffect(() => {
     const el = sentinel.current;
     if (!el) return;
     const obs = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) setExtraRows((n) => Math.min(n + 1, 12));
+        if (entries[0].isIntersecting) setExtraRows((n) => n + 1);
       },
       { rootMargin: "600px" }
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, []);
+  }, [extraRows]);
 
   const onPoints = (p: number) => {
     setPoints(p);
@@ -144,9 +169,21 @@ export default function StudentHome({ email }: { email: string }) {
         </a>
       </div>
 
-      {Array.from({ length: extraRows }, (_, i) => (
-        <BookRow key={`extra-${i}`} title="Keep exploring" emoji="🧭" kind="random" onPoints={onPoints} />
-      ))}
+      <h2 className="explore-head"><span className="newshelf-spark">🧭</span> Keep exploring</h2>
+      {Array.from({ length: extraRows }, (_, i) => {
+        const pick = EXPLORE_KINDS[i % EXPLORE_KINDS.length];
+        return (
+          <BookRow
+            key={`extra-${i}`}
+            title=""
+            emoji=""
+            hideTitle
+            kind={pick.kind}
+            tag={pick.tag}
+            onPoints={onPoints}
+          />
+        );
+      })}
       <div ref={sentinel} style={{ height: 1 }} />
     </div>
   );
