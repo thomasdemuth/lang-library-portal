@@ -1,10 +1,15 @@
 import { db } from "@/lib/db";
 import { currentAdmin } from "@/lib/server";
 import { canDo } from "@/lib/permissions";
+import { displayName } from "@/lib/play";
 import { Ic } from "@/components/icons";
-import DashboardCards, { type DashKpi, type DashWidget } from "@/components/DashboardCards";
+import DashboardCards, { type DashKpi, type DashPeeks, type DashWidget } from "@/components/DashboardCards";
 
 export const dynamic = "force-dynamic";
+
+function isoDay(t: number): string {
+  return new Date(t).toISOString().slice(0, 10);
+}
 
 async function counts() {
   const client = db();
@@ -30,8 +35,109 @@ async function counts() {
   };
 }
 
+/** Live previews for widgets that are big enough to show one. */
+async function peeks(can: (k: string) => boolean, isChief: boolean): Promise<DashPeeks> {
+  const client = db();
+  const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const out: DashPeeks = {};
+
+  const jobs: PromiseLike<void>[] = [];
+
+  if (can("requests")) {
+    jobs.push(
+      client
+        .from("book_requests")
+        .select("id, title, status, created_at")
+        .order("created_at", { ascending: false })
+        .limit(5)
+        .then((r) => {
+          out.requests = (r.data ?? []).map((b) => ({ title: b.title, status: b.status, at: b.created_at }));
+        })
+    );
+  }
+  if (can("feedback_view")) {
+    jobs.push(
+      client
+        .from("feedback")
+        .select("id, message, audience, created_at")
+        .order("created_at", { ascending: false })
+        .limit(5)
+        .then((r) => {
+          out.feedback = (r.data ?? []).map((f) => ({ text: f.message, audience: f.audience, at: f.created_at }));
+        })
+    );
+  }
+  if (can("analytics")) {
+    // 14 tiny head-counts beats pulling raw rows to bucket in JS
+    const days = Array.from({ length: 14 }, (_, i) => {
+      const start = new Date();
+      start.setUTCHours(0, 0, 0, 0);
+      start.setUTCDate(start.getUTCDate() - (13 - i));
+      return start;
+    });
+    jobs.push(
+      Promise.all(
+        days.map((d) =>
+          client
+            .from("usage_events")
+            .select("id", { count: "exact", head: true })
+            .gte("ts", d.toISOString())
+            .lt("ts", new Date(d.getTime() + 24 * 3600 * 1000).toISOString())
+            .then((r) => r.count ?? 0)
+        )
+      ).then((countsByDay) => {
+        out.usage = days.map((d, i) => ({ day: isoDay(d.getTime()), count: countsByDay[i] }));
+      })
+    );
+  }
+  if (can("users")) {
+    jobs.push(
+      client
+        .from("reading_log")
+        .select("email")
+        .gte("created_at", weekAgo)
+        .limit(3000)
+        .then((r) => {
+          const byEmail = new Map<string, number>();
+          for (const row of r.data ?? []) byEmail.set(row.email, (byEmail.get(row.email) ?? 0) + 1);
+          out.readers = [...byEmail.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([email, count]) => ({ name: displayName(email), count }));
+        })
+    );
+  }
+  if (can("map_edit") || can("map_floorplan")) {
+    jobs.push(
+      client
+        .from("shelves")
+        .select("id", { count: "exact", head: true })
+        .then((r) => {
+          out.shelves = r.count ?? 0;
+        })
+    );
+  }
+  if (isChief) {
+    jobs.push(
+      client
+        .from("admins")
+        .select("id", { count: "exact", head: true })
+        .is("disabled_at", null)
+        .then((r) => {
+          out.admins = r.count ?? 0;
+        })
+    );
+  }
+
+  await Promise.all(jobs);
+  return out;
+}
+
 export default async function AdminDashboard() {
   const admin = await currentAdmin();
+  const isChief = admin?.role === "chief";
+  const can = (k: Parameters<typeof canDo>[1]) => (admin ? canDo(admin, k) : false);
+
   let stats = {
     newRequests: 0,
     newFeedback: 0,
@@ -40,14 +146,12 @@ export default async function AdminDashboard() {
     readsWeek: 0,
     favsWeek: 0,
   };
+  let peekData: DashPeeks = {};
   try {
-    stats = await counts();
+    [stats, peekData] = await Promise.all([counts(), peeks(can as (k: string) => boolean, Boolean(isChief))]);
   } catch {
     /* dashboard should render even if the DB hiccups */
   }
-
-  const isChief = admin?.role === "chief";
-  const can = (k: Parameters<typeof canDo>[1]) => (admin ? canDo(admin, k) : false);
 
   // Every stat this admin could put in the top row (the picker's catalog)
   const kpis: (DashKpi & { show: boolean })[] = [
@@ -72,7 +176,7 @@ export default async function AdminDashboard() {
     { id: "signmaker", show: can("signmaker"), href: "/admin/sign-maker", icon: "sign", badge: 0, title: "Sign Maker", desc: "Print shelf tabs, banners, and wayfinding signs." },
     { id: "analytics", show: can("analytics"), href: "/admin/analytics", icon: "chart", badge: 0, title: "Site Usage", desc: "Visits and activity across both sites." },
     { id: "users", show: can("users"), href: "/admin/users", icon: "users", badge: 0, title: "User Insights", desc: "Student & teacher accounts, activity, and notes." },
-    { id: "admins", show: isChief, href: "/admin/admins", icon: "users", badge: 0, title: "Admins & Invites", desc: "Add admins, set their powers, and manage invites." },
+    { id: "admins", show: Boolean(isChief), href: "/admin/admins", icon: "users", badge: 0, title: "Admins & Invites", desc: "Add admins, set their powers, and manage invites." },
   ];
 
   const availableKpis = kpis.filter((k) => k.show).map(({ show: _s, ...k }) => k);
@@ -100,6 +204,7 @@ export default async function AdminDashboard() {
         <DashboardCards
           kpis={availableKpis}
           widgets={availableWidgets}
+          peeks={peekData}
           defaultStats={["requests", "feedback", "books", "sync"]}
         />
       ) : (

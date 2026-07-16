@@ -234,11 +234,11 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
   const filterParam = (tag: TagFilter) =>
     tag === "untagged" ? "&untagged=1" : tag ? `&tag=${tag}` : "";
 
-  async function search(e?: React.FormEvent, tagOverride?: TagFilter) {
+  async function search(e?: React.FormEvent, tagOverride?: TagFilter, qOverride?: string) {
     e?.preventDefault();
     setTagError(null);
     const tag = tagOverride === undefined ? filter : tagOverride;
-    const res = await fetch(`/api/admin/books?q=${encodeURIComponent(q)}${filterParam(tag)}`);
+    const res = await fetch(`/api/admin/books?q=${encodeURIComponent(qOverride ?? q)}${filterParam(tag)}`);
     const data = await res.json();
     if (res.ok) {
       setResults(data.books);
@@ -396,8 +396,11 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
   }
 
   // Browse without typing: the whole catalog, A→Z, straight away.
+  // Arriving from the dashboard's search widget (?q=) prefills the query.
   useEffect(() => {
-    search();
+    const preset = new URLSearchParams(window.location.search).get("q");
+    if (preset) setQ(preset);
+    search(undefined, undefined, preset ?? undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
