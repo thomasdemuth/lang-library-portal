@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { type CategoryId } from "@/lib/categories";
 import TagPicker from "@/components/TagPicker";
+import CopyStepper, { clampCopies } from "@/components/CopyStepper";
 
 export type EditableBook = {
   id: number;
@@ -39,7 +40,7 @@ export default function BookEditModal({
   const [creators, setCreators] = useState(book.creators ?? "");
   const [isbn13, setIsbn13] = useState(book.isbn13 ?? "");
   const [isbn10, setIsbn10] = useState(book.isbn10 ?? "");
-  const [copies, setCopies] = useState(String(book.copies));
+  const [copies, setCopies] = useState(clampCopies(book.copies));
   const [description, setDescription] = useState(book.description ?? "");
   const [notes, setNotes] = useState(book.notes ?? "");
   const [tag, setTag] = useState<CategoryId | null>(book.tag);
@@ -50,7 +51,7 @@ export default function BookEditModal({
   const coverIsbn = isbn13.trim() || isbn10.trim();
 
   async function save() {
-    const copyNum = Math.max(1, Math.min(999, parseInt(copies, 10) || 1));
+    const copyNum = clampCopies(copies);
     setBusy(true);
     setError(null);
     try {
@@ -158,10 +159,10 @@ export default function BookEditModal({
                 <span className="lbl">ISBN-10</span>
                 <input className="input" value={isbn10} onChange={(e) => setIsbn10(e.target.value)} />
               </label>
-              <label className="field" style={{ flex: 1 }}>
+              <div className="field" style={{ flex: "none" }}>
                 <span className="lbl">Copies</span>
-                <input className="input" value={copies} onChange={(e) => setCopies(e.target.value)} inputMode="numeric" />
-              </label>
+                <CopyStepper value={copies} onChange={setCopies} disabled={busy} />
+              </div>
             </div>
             <div className="field">
               <span className="lbl">Tag</span>

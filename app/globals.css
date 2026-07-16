@@ -329,6 +329,26 @@ html[data-theme="dark"] .modal { background: #161c2b; }
 .bookedit-fields .field { margin: 0; }
 .bookedit-fields .lbl { display: block; margin-bottom: 4px; }
 .bookedit-row { display: flex; gap: 10px; }
+
+/* − / count / + control (book copies) */
+.stepper {
+  display: inline-flex; align-items: stretch; height: 40px;
+  border: 1.5px solid var(--line); border-radius: 9px; overflow: hidden; background: #fff;
+}
+html[data-theme="dark"] .stepper { background: var(--panel-2); }
+.stepper-btn {
+  flex: none; width: 34px; border: 0; background: none; cursor: pointer; color: var(--muted);
+  display: flex; align-items: center; justify-content: center; transition: background .12s, color .12s;
+}
+.stepper-btn svg { width: 15px; height: 15px; }
+.stepper-btn:hover:not(:disabled) { background: rgba(63, 106, 209, .1); color: var(--brand-blue); }
+.stepper-btn:disabled { opacity: .38; cursor: default; }
+.stepper-val {
+  width: 46px; min-width: 0; border: 0; border-left: 1.5px solid var(--line);
+  border-right: 1.5px solid var(--line); background: none; color: var(--ink);
+  font: inherit; font-weight: 800; font-size: 14px; text-align: center; outline: none;
+}
+.stepper-val:focus { background: rgba(63, 106, 209, .07); }
 @media (max-width: 560px) {
   .bookedit-body { flex-direction: column; }
   .bookedit-cover { flex-direction: row; align-items: center; width: auto; }

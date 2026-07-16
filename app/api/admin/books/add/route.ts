@@ -12,20 +12,23 @@ const Body = z.object({
   isbn10: z.string().trim().max(20).nullable().optional(),
   publisher: z.string().trim().max(300).nullable().optional(),
   publish_date: z.string().trim().max(50).nullable().optional(),
+  /** How many copies to add. Omitted = 1, which is what the scan flow wants. */
+  copies: z.number().int().min(1).max(999).optional(),
 });
 
 /**
- * Add a single book to the ACTIVE inventory generation (scan flow).
- * If the same book already exists there (dedupe_key match), adds a copy
- * instead. Note: the weekly Libib import replaces the whole generation,
- * so additions should also be entered in Libib to stick permanently —
- * the scan UI says so.
+ * Add a book to the ACTIVE inventory generation (scan + manual add).
+ * If the same book already exists there (dedupe_key match), its copies
+ * go up by the same amount instead. Note: the weekly Libib import
+ * replaces the whole generation, so additions should also be entered in
+ * Libib to stick permanently — the scan UI says so.
  */
 export const POST = guarded(async (req: NextRequest) => {
   await requirePermission(req, "inventory_import");
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
+  const copies = parsed.data.copies ?? 1;
   const record = rowToBook({
     title: parsed.data.title,
     creators: parsed.data.creators ?? "",
@@ -33,7 +36,7 @@ export const POST = guarded(async (req: NextRequest) => {
     isbn10: parsed.data.isbn10 ?? "",
     publisher: parsed.data.publisher ?? "",
     publish_date: parsed.data.publish_date ?? "",
-    copies: 1,
+    copies,
   });
   if (!record) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
@@ -55,7 +58,8 @@ export const POST = guarded(async (req: NextRequest) => {
 
   let bookId: number;
   if (existing) {
-    const { error } = await db().from("books").update({ copies: existing.copies + 1 }).eq("id", existing.id);
+    const next = Math.min(999, existing.copies + copies);
+    const { error } = await db().from("books").update({ copies: next }).eq("id", existing.id);
     if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
     bookId = existing.id;
   } else {

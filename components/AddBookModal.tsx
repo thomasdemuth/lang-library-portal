@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { type CategoryId } from "@/lib/categories";
 import TagPicker from "@/components/TagPicker";
+import CopyStepper from "@/components/CopyStepper";
 
 /** A freshly-added catalog row (shape the inventory list expects). */
 export type AddedBook = {
@@ -32,6 +33,7 @@ export default function AddBookModal({
   const [creators, setCreators] = useState("");
   const [isbn13, setIsbn13] = useState("");
   const [isbn10, setIsbn10] = useState("");
+  const [copies, setCopies] = useState(1);
   const [tag, setTag] = useState<CategoryId | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +56,7 @@ export default function AddBookModal({
           creators: creators.trim() || null,
           isbn13: isbn13.trim() || null,
           isbn10: isbn10.trim() || null,
+          copies,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -118,6 +121,10 @@ export default function AddBookModal({
                 <span className="lbl">ISBN-10</span>
                 <input className="input" value={isbn10} onChange={(e) => setIsbn10(e.target.value)} />
               </label>
+              <div className="field" style={{ flex: "none" }}>
+                <span className="lbl">Copies</span>
+                <CopyStepper value={copies} onChange={setCopies} disabled={busy} />
+              </div>
             </div>
             <div className="field">
               <span className="lbl">Tag</span>
@@ -128,8 +135,9 @@ export default function AddBookModal({
 
         {error && <div className="error" style={{ margin: "0 18px" }}>{error}</div>}
         <p className="hint" style={{ margin: "0 18px" }}>
-          Adds one copy to the live catalog. If this title's already here, it adds a copy instead.
-          Manual additions last until the next Libib import.
+          Adds {copies === 1 ? "one copy" : `${copies} copies`} to the live catalog. If this title's
+          already here, its copies go up by {copies} instead. Manual additions last until the next
+          Libib import.
         </p>
 
         <div className="modal-actions">

@@ -347,7 +347,12 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
       setTotal((t) => t + 1);
       setBookCount((c) => c + 1);
     }
-    setNotice(wasNew ? `Added “${book.title}” to the catalog.` : `“${book.title}” is already here — added a copy (now ${book.copies}).`);
+    const copyText = `${book.copies} cop${book.copies === 1 ? "y" : "ies"}`;
+    setNotice(
+      wasNew
+        ? `Added “${book.title}” to the catalog — ${copyText}.`
+        : `“${book.title}” was already here — now ${copyText}.`
+    );
     setTimeout(() => setNotice(null), 4000);
   }
 
