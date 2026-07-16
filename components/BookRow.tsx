@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CATEGORIES, type CategoryId } from "@/lib/categories";
 import { TagPill } from "@/components/TagPicker";
 import { Check, Heart, Pin } from "@/components/icons";
+import AddToCollection from "@/components/AddToCollection";
 import { getFavorites, isFavorite, onFavoritesChange, toggleFavorite } from "@/lib/favorites-client";
 import { fetchDetail, findShelf, logRead, type BookDetail } from "@/lib/book-actions-client";
 
@@ -201,6 +202,7 @@ export default function BookRow({
                     <button type="button" className="b-btn b-where" onClick={(e) => where(e, b)}>
                       <Pin /> Where is it?
                     </button>
+                    <AddToCollection book={{ book_key: b.dedupe_key, title: b.title, isbn13: b.isbn13 }} compact />
                   </div>
                 </div>
               )}

@@ -1292,3 +1292,30 @@ html[data-theme="dark"] .friend-tile { background: var(--panel-2); }
 .coll-hit .hint { flex: 1; font-size: 12px; }
 .coll-hit-add { font-size: 12px; font-weight: 800; color: var(--brand-blue); white-space: nowrap; }
 .coll-hit:disabled .coll-hit-add { color: var(--brand-green-deep); }
+
+/* "Add to list" button + modal (book cards → collections) */
+.b-btn.b-collect:hover { color: var(--brand-blue); border-color: var(--brand-blue); }
+.b-btn.b-collect.on { color: var(--brand-blue); border-color: #c3d0f5; background: #eef2fe; }
+html[data-theme="dark"] .b-btn.b-collect.on { background: rgba(46, 80, 200, .22); border-color: rgba(46, 80, 200, .5); color: #b9c6f2; }
+.collect-modal { max-width: 440px; }
+.collect-body { padding: 4px 18px 6px; }
+.collect-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; max-height: 46vh; overflow-y: auto; }
+.collect-opt {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  border: 1.5px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink);
+  font: inherit; cursor: pointer; padding: 10px 12px; transition: border-color .12s, background .12s;
+}
+html[data-theme="dark"] .collect-opt { background: var(--panel-2); }
+.collect-opt:hover:not(:disabled) { border-color: var(--brand-blue); }
+.collect-opt.on { border-color: #c3d0f5; background: #eef2fe; }
+html[data-theme="dark"] .collect-opt.on { background: rgba(46, 80, 200, .18); border-color: rgba(46, 80, 200, .5); }
+.collect-opt:disabled { opacity: .55; cursor: default; }
+.collect-opt b { flex: 1; font-size: 14px; }
+.collect-check {
+  width: 22px; height: 22px; flex: none; border-radius: 7px; border: 1.5px solid var(--line);
+  display: inline-flex; align-items: center; justify-content: center; background: #fff;
+}
+.collect-check.on { border-color: var(--brand-green); background: #e7f6f3; }
+html[data-theme="dark"] .collect-check { background: var(--panel-2); }
+.collect-new { display: flex; gap: 8px; }
+.collect-new .input { flex: 1; }
