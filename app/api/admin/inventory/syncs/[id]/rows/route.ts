@@ -18,6 +18,7 @@ const Row = z.object({
   copies: z.number().int().min(0).max(999),
   title_norm: z.string().min(1).max(500),
   creators_norm: z.string().max(500).nullable(),
+  author_sort: z.string().max(200).nullable().optional(),
   dedupe_key: z.string().min(1).max(600),
 });
 const Body = z.object({ rows: z.array(Row).min(1).max(600) });
@@ -45,12 +46,17 @@ export const POST = guarded(
     }
 
     // ignoreDuplicates makes batch retries safe (client already merged the file)
-    const { error } = await db()
+    const rows = parsed.data.rows.map((r) => ({ ...r, sync_id: syncId }));
+    let { error } = await db()
       .from("books")
-      .upsert(
-        parsed.data.rows.map((r) => ({ ...r, sync_id: syncId })),
-        { onConflict: "sync_id,dedupe_key", ignoreDuplicates: true }
-      );
+      .upsert(rows, { onConflict: "sync_id,dedupe_key", ignoreDuplicates: true });
+    // author_sort arrives with migration 0014 — drop it and retry if missing
+    if (error && /column/i.test(error.message ?? "") && /author_sort/.test(error.message ?? "")) {
+      const bare = rows.map(({ author_sort: _drop, ...rest }) => rest);
+      ({ error } = await db()
+        .from("books")
+        .upsert(bare, { onConflict: "sync_id,dedupe_key", ignoreDuplicates: true }));
+    }
     if (error) {
       if (/column/i.test(error.message ?? "") && /(description|notes)/.test(error.message ?? "")) {
         return NextResponse.json(

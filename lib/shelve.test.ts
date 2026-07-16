@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inRange, parseRange, resolveShelf, surnameKey, type ShelfInfo } from "./shelve";
+import { authorSortKey, inRange, parseRange, resolveShelf, surnameKey, type ShelfInfo } from "./shelve";
 
 describe("surnameKey", () => {
   it("handles Last, First", () => expect(surnameKey("Kinney, Jeff")).toBe("KINNEY"));
@@ -8,6 +8,19 @@ describe("surnameKey", () => {
   it("strips accents and punctuation", () => expect(surnameKey("Mélina O'Mangal")).toBe("OMANGAL"));
   it("skips suffixes", () => expect(surnameKey("Martin Luther King Jr.")).toBe("KING"));
   it("returns null for empty", () => expect(surnameKey(null)).toBeNull());
+});
+
+describe("authorSortKey", () => {
+  it("puts the surname first for both name formats", () => {
+    expect(authorSortKey("Jeff Kinney")).toBe("kinney jeff kinney");
+    expect(authorSortKey("Kinney, Jeff")).toBe("kinney kinney jeff");
+  });
+  it("sorts two authors by the first one's surname", () => {
+    const a = authorSortKey("Beverly Cleary");
+    const b = authorSortKey("Ruth Belov Gross, Emily Arnold McCully");
+    expect(a && b && a < b).toBe(true); // Cleary before Gross
+  });
+  it("returns null when there's no author", () => expect(authorSortKey(null)).toBeNull());
 });
 
 describe("parseRange / inRange", () => {

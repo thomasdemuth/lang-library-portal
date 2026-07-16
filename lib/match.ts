@@ -1,8 +1,10 @@
 /**
  * Inventory normalization + request matching. Pure functions — used by the
  * CSV importer (browser + server) and the book-request matcher (server), and
- * unit-tested in isolation. Keep this dependency-free.
+ * unit-tested in isolation. Keep this dependency-free (lib/shelve is also
+ * pure, so the author-sort key is safe to reuse here).
  */
+import { authorSortKey } from "./shelve";
 
 // ── Normalization ─────────────────────────────────────────────────────────
 
@@ -81,6 +83,7 @@ export type BookRecord = {
   copies: number;
   title_norm: string;
   creators_norm: string | null;
+  author_sort: string | null;
   dedupe_key: string;
 };
 
@@ -130,6 +133,7 @@ export function rowToBook(row: Record<string, unknown>): BookRecord | null {
     copies,
     title_norm,
     creators_norm,
+    author_sort: authorSortKey(creators),
     dedupe_key,
   };
 }

@@ -29,6 +29,7 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const suggestions = useRef<Map<string, Suggestion | "pending" | "none">>(new Map());
+  const descriptions = useRef<Map<number, string | null | "pending">>(new Map());
   const [, bump] = useState(0); // re-render when a prefetch lands
   const pageRef = useRef(0);
 
@@ -47,16 +48,25 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
     loadPage(0).finally(() => setLoading(false));
   }, [loadPage]);
 
-  // Prefetch suggestions for the current card and the next two.
+  // Prefetch suggestions + descriptions for the current card and the next two.
   useEffect(() => {
     for (const book of queue.slice(idx, idx + 3)) {
-      if (suggestions.current.has(book.dedupe_key)) continue;
-      suggestions.current.set(book.dedupe_key, "pending");
-      fetch(`/api/admin/books/suggest?key=${encodeURIComponent(book.dedupe_key)}`)
-        .then((r) => r.json())
-        .then((d) => suggestions.current.set(book.dedupe_key, d.suggestion ?? "none"))
-        .catch(() => suggestions.current.set(book.dedupe_key, "none"))
-        .finally(() => bump((n) => n + 1));
+      if (!suggestions.current.has(book.dedupe_key)) {
+        suggestions.current.set(book.dedupe_key, "pending");
+        fetch(`/api/admin/books/suggest?key=${encodeURIComponent(book.dedupe_key)}`)
+          .then((r) => r.json())
+          .then((d) => suggestions.current.set(book.dedupe_key, d.suggestion ?? "none"))
+          .catch(() => suggestions.current.set(book.dedupe_key, "none"))
+          .finally(() => bump((n) => n + 1));
+      }
+      if (!descriptions.current.has(book.id)) {
+        descriptions.current.set(book.id, "pending");
+        fetch(`/api/admin/books/${book.id}`)
+          .then((r) => r.json())
+          .then((d) => descriptions.current.set(book.id, d.book?.description ?? null))
+          .catch(() => descriptions.current.set(book.id, null))
+          .finally(() => bump((n) => n + 1));
+      }
     }
     // top up the queue near the end
     if (queue.length - idx < 5 && total !== null && queue.length < total) {
@@ -67,6 +77,7 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
 
   const book = queue[idx];
   const suggestion = book ? suggestions.current.get(book.dedupe_key) : undefined;
+  const description = book ? descriptions.current.get(book.id) : undefined;
 
   async function applyTag(tag: CategoryId) {
     if (!book || busy) return;
@@ -174,6 +185,10 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
             >
               ✨ <TagPill tag={suggestion.tag} /> {suggestion.confidence}% — tap to accept
             </button>
+          )}
+
+          {description && description !== "pending" && (
+            <p className="review-desc">{description}</p>
           )}
 
           <TagPicker value={null} onChange={(t) => t && applyTag(t)} disabled={busy} />

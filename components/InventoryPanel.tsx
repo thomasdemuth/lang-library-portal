@@ -86,6 +86,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [details, setDetails] = useState<Record<number, BookDetail>>({});
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [reindex, setReindex] = useState<{ busy: boolean; msg: string | null }>({ busy: false, msg: null });
 
   const [cols, setCols] = useState<ColPref[]>(DEFAULT_COLS);
   useEffect(() => {
@@ -534,6 +535,38 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                   </button>
                 </div>
               ))}
+            </div>
+            <div>
+              <label className="lbl">Sort order</label>
+              <p className="hint" style={{ margin: "2px 0 8px" }}>
+                The catalog lists books by author surname. New imports are sorted
+                automatically; re-index to sort books imported before this feature.
+              </p>
+              <button
+                type="button"
+                className="btn"
+                disabled={reindex.busy}
+                onClick={async () => {
+                  setReindex({ busy: true, msg: null });
+                  try {
+                    const res = await fetch("/api/admin/inventory/reindex-authors", { method: "POST" });
+                    const data = await res.json().catch(() => ({}));
+                    setReindex({
+                      busy: false,
+                      msg: res.ok
+                        ? `Sorted ${(data.updated ?? 0).toLocaleString()} books by author.`
+                        : data.error ?? "Couldn't re-index.",
+                    });
+                  } catch {
+                    setReindex({ busy: false, msg: "Couldn't re-index." });
+                  }
+                }}
+              >
+                {reindex.busy ? "Re-indexing…" : "Re-index by author"}
+              </button>
+              {reindex.msg && (
+                <p className="hint" style={{ margin: "8px 0 0" }}>{reindex.msg}</p>
+              )}
             </div>
           </div>
         )}

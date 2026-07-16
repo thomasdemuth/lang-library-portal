@@ -36,6 +36,24 @@ export function surnameKey(creators: string | null): string | null {
   return key || null;
 }
 
+/**
+ * A sortable "last name, first name" key for a book's author, e.g.
+ * "Jeff Kinney" and "Kinney, Jeff" both → "kinney jeff kinney". Surname
+ * first (from surnameKey), then the whole normalized name as a tiebreak.
+ * Null when there's no author to sort on (those sort last).
+ */
+export function authorSortKey(creators: string | null): string | null {
+  const surname = surnameKey(creators);
+  if (!surname) return null;
+  const rest = (creators ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .toLowerCase();
+  return `${surname.toLowerCase()} ${rest}`.slice(0, 200);
+}
+
 /** Parse "AA–CZ" / "A-Z" / "000–999" into [lo, hi]; null when there's no usable range. */
 export function parseRange(raw: string | null): [string, string] | null {
   if (!raw) return null;

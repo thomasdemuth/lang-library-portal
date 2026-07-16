@@ -677,6 +677,11 @@ html[data-theme="dark"] .review-overlay { background: #0f1420; }
 .review-top .scan-close { background: #00000014; color: var(--ink); }
 html[data-theme="dark"] .review-top .scan-close { background: #ffffff22; color: #fff; }
 .review-card { display: flex; flex-direction: column; gap: 14px; max-width: 520px; margin: 0 auto; }
+.review-desc {
+  margin: -2px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--muted);
+  max-height: 128px; overflow: auto; white-space: pre-line;
+  border-left: 2px solid var(--line); padding-left: 11px;
+}
 
 /* ── Update-available prompt ────────────────────── */
 /* Desktop: quiet card, bottom-right */

@@ -14,6 +14,7 @@ export const GET = guarded(async (req: NextRequest) => {
     page,
     tag: isCategoryId(tagParam) ? tagParam : null,
     untagged: req.nextUrl.searchParams.get("untagged") === "1",
+    sort: "author", // admin inventory + tag-review queue order by author surname
   });
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
   const { ok: _ok, ...body } = result;
