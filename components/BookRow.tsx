@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CATEGORIES, type CategoryId } from "@/lib/categories";
 import { TagPill } from "@/components/TagPicker";
+import { Heart } from "@/components/icons";
 import { getFavorites, isFavorite, onFavoritesChange, toggleFavorite } from "@/lib/favorites-client";
 import { fetchDetail, findShelf, logRead, type BookDetail } from "@/lib/book-actions-client";
 
@@ -151,15 +152,6 @@ export default function BookRow({
                     aria-hidden
                   />
                 )}
-                <button
-                  type="button"
-                  className={`fav-btn${isFavorite(b.dedupe_key) ? " on" : ""}`}
-                  onClick={(e) => heart(e, b)}
-                  title={isFavorite(b.dedupe_key) ? "Remove from favorites" : "Add to favorites"}
-                  aria-label="Favorite"
-                >
-                  {isFavorite(b.dedupe_key) ? "❤️" : "🤍"}
-                </button>
                 <span className="bc-titlebar">
                   <span>{b.title}</span>
                 </span>
@@ -167,6 +159,15 @@ export default function BookRow({
 
               {open && (
                 <div className="bc-body">
+                  <button
+                    type="button"
+                    className={`fav-btn bc-fav${isFavorite(b.dedupe_key) ? " on" : ""}`}
+                    onClick={(e) => heart(e, b)}
+                    title={isFavorite(b.dedupe_key) ? "Remove from favorites" : "Add to favorites"}
+                    aria-label="Favorite"
+                  >
+                    <Heart filled={isFavorite(b.dedupe_key)} />
+                  </button>
                   {b.tag && (
                     <span className="bc-tag">
                       <TagPill tag={b.tag} small />

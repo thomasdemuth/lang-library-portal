@@ -933,10 +933,21 @@ html[data-theme="dark"] .bookcard { background: var(--panel); }
 }
 .bookcard.expanded .bc-titlebar { opacity: 0; }
 .bc-body {
+  position: relative;
   flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px;
   align-items: flex-start; padding: 13px 14px; overflow: hidden;
   animation: bc-slide .28s ease .1s backwards;
 }
+/* Favorite heart lives in the panel's top-right (only in the expanded view) */
+.bc-body .fav-btn.bc-fav {
+  top: 9px; right: 10px; background: none; box-shadow: none; padding: 2px;
+  display: flex; align-items: center; justify-content: center;
+}
+.bc-body .fav-btn.bc-fav svg { display: block; }
+.bc-body .fav-btn.bc-fav:hover { background: none; transform: scale(1.18); }
+/* Heart + label in the search fav pill */
+.b-btn.b-fav { display: inline-flex; align-items: center; gap: 5px; }
+.b-btn.b-fav svg { margin-top: -1px; }
 @keyframes bc-slide {
   from { opacity: 0; transform: translateX(-10px); }
   to { opacity: 1; transform: none; }

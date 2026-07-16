@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CATEGORIES, CATEGORY_IDS, type CategoryId } from "@/lib/categories";
 import { TagPill } from "@/components/TagPicker";
+import { Heart } from "@/components/icons";
 import { getFavorites, isFavorite, onFavoritesChange, toggleFavorite } from "@/lib/favorites-client";
 import { fetchDetail, findShelf, logRead, type BookDetail } from "@/lib/book-actions-client";
 
@@ -211,7 +212,8 @@ export default function CatalogSearch() {
                               className={`b-btn b-fav${isFavorite(b.dedupe_key) ? " on" : ""}`}
                               onClick={() => heart(b)}
                             >
-                              {isFavorite(b.dedupe_key) ? "❤️ Favorited" : "🤍 Favorite"}
+                              <Heart filled={isFavorite(b.dedupe_key)} size={13} />
+                              {isFavorite(b.dedupe_key) ? "Favorited" : "Favorite"}
                             </button>
                             <button
                               type="button"
