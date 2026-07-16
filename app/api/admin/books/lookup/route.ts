@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guarded, requirePermission } from "@/lib/guards";
 import { attachTags } from "@/lib/tags";
+import { gbVolumesByIsbn } from "@/lib/googlebooks";
 
 export type ExternalBook = {
   title: string;
@@ -50,10 +51,7 @@ async function openLibrary(code: string): Promise<ExternalBook | null> {
 /** Google Books fallback — keyless quota is small, so it goes second. */
 async function googleBooks(code: string): Promise<ExternalBook | null> {
   try {
-    const res = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=isbn:${code}&maxResults=1&country=US`,
-      { signal: AbortSignal.timeout(5000) }
-    );
+    const res = await fetch(gbVolumesByIsbn(code), { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return null;
     const data = await res.json();
     const v = data?.items?.[0]?.volumeInfo;

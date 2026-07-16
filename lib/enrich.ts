@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { gbVolumesByIsbn } from "@/lib/googlebooks";
 
 /**
  * Automated catalog enrichment. A nightly cron drips through books that are
@@ -65,9 +66,7 @@ async function olSearch(title: string, creators: string | null): Promise<{ isbn1
 /** Google Books description by ISBN (small keyless quota — used only as a fallback). */
 async function gbDescription(isbn: string): Promise<string | null | "quota"> {
   try {
-    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=1&country=US`, {
-      signal: AbortSignal.timeout(FETCH_MS),
-    });
+    const res = await fetch(gbVolumesByIsbn(isbn), { signal: AbortSignal.timeout(FETCH_MS) });
     if (res.status === 429) return "quota";
     if (!res.ok) return null;
     const v = (await res.json())?.items?.[0]?.volumeInfo;

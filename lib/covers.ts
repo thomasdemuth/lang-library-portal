@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gbVolumesByIsbn } from "@/lib/googlebooks";
 
 /**
  * Stream a book-cover thumbnail by ISBN (Open Library first, Google
@@ -22,10 +23,9 @@ export async function coverResponse(rawIsbn: string): Promise<NextResponse> {
     });
     if (ol.ok && ol.body) return stream(ol);
 
-    const meta = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=1&country=US`,
-      { signal: AbortSignal.timeout(5000) }
-    ).then((r) => (r.ok ? r.json() : null));
+    const meta = await fetch(gbVolumesByIsbn(isbn), { signal: AbortSignal.timeout(5000) }).then((r) =>
+      r.ok ? r.json() : null
+    );
     const url: string | undefined = meta?.items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
     if (!url) return new NextResponse(null, { status: 404 });
 

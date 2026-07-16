@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guarded, requirePermission } from "@/lib/guards";
 import { suggestTag, type Suggestion } from "@/lib/autotag";
+import { gbVolumesByIsbn } from "@/lib/googlebooks";
 import type { CategoryId } from "@/lib/categories";
 
 /** Subject headings for an ISBN: Open Library first, Google Books fallback. */
@@ -21,10 +22,9 @@ async function externalSubjects(isbn: string | null): Promise<string[]> {
     /* fall through */
   }
   try {
-    const gb = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=1&country=US`,
-      { signal: AbortSignal.timeout(5000) }
-    ).then((r) => (r.ok ? r.json() : null));
+    const gb = await fetch(gbVolumesByIsbn(isbn), { signal: AbortSignal.timeout(5000) }).then((r) =>
+      r.ok ? r.json() : null
+    );
     return (gb?.items?.[0]?.volumeInfo?.categories ?? []).slice(0, 40);
   } catch {
     return [];
