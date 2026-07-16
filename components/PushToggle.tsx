@@ -112,7 +112,7 @@ export default function PushToggle() {
         </>
       ) : (
         <button className="btn" disabled={busy || state === "checking"} onClick={enable}>
-          {busy ? "Enabling…" : "🔔 Enable on this device"}
+          {busy ? "Enabling…" : "Enable on this device"}
         </button>
       )}
     </div>

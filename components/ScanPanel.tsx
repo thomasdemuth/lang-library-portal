@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { startScanner, beep, type ScannerHandle } from "@/lib/scan";
 import { CATEGORIES, type CategoryId } from "@/lib/categories";
 import TagPicker, { TagPill } from "@/components/TagPicker";
+import { Ic, Pin } from "@/components/icons";
 
 type Book = {
   id: number;
@@ -363,7 +364,7 @@ export default function ScanPanel({
   if (!open) {
     return (
       <button className="btn brand scan-launch" onClick={() => setOpen(true)}>
-        📷 Scan barcodes
+        <Ic name="camera" size={16} /> Scan barcodes
       </button>
     );
   }
@@ -502,7 +503,7 @@ export default function ScanPanel({
                   <div className="scan-meta ok">✓ In the catalog</div>
                   {shelf && (
                     <a className="scan-shelf" href={`/admin/map?shelf=${shelf.id}`}>
-                      📍 {shelf.shelf_number ? `Shelf ${shelf.shelf_number} · ` : ""}
+                      <Pin size={13} /> {shelf.shelf_number ? `Shelf ${shelf.shelf_number} · ` : ""}
                       {shelf.label}
                       {shelf.letter_range ? ` (${shelf.letter_range})` : ""} →
                     </a>

@@ -960,14 +960,15 @@ html[data-theme="dark"] .play-hero { background: linear-gradient(120deg, #1c2438
 .play-links a:hover { transform: translateY(-1px); border-color: var(--brand-blue); color: var(--brand-blue); }
 html[data-theme="dark"] .play-links a { background: var(--panel); color: var(--ink); }
 
-/* layered emoji avatar */
+/* layered mixed-art avatar (SVG parts + emoji + PNG) */
 .pavatar {
-  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  position: relative; display: inline-block;
   border-radius: 24%; flex: none; box-shadow: 0 3px 10px rgba(16, 24, 40, .18); overflow: visible;
 }
-.pavatar-base { line-height: 1; }
-.pavatar-hat { position: absolute; top: -18%; left: 50%; transform: translateX(-50%) rotate(-8deg); }
-.pavatar-acc { position: absolute; bottom: -6%; right: -8%; }
+.pavatar-layer {
+  position: absolute; display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
 
 /* row toast + read button */
 .row-toast {
@@ -1193,6 +1194,28 @@ html[data-theme="dark"] .uitem { background: var(--panel-2); }
 .ubar { fill: var(--line); }
 .ubar.on { fill: var(--brand-blue); opacity: .82; }
 .uchart-lbl { font-size: 10px; fill: var(--muted); font-weight: 600; }
+
+/* inline svg icons sit on the text baseline */
+.play-stats svg, .usec svg, .upill svg, .urow-stats svg, .hint svg, .play-cta svg,
+.leaderboard h2 svg, .card h2 svg, .suggest-chip svg, .row-toast svg { vertical-align: -0.15em; }
+.usec { display: flex; align-items: center; gap: 6px; }
+.utab { display: inline-flex; align-items: center; gap: 6px; }
+.leader-row > svg { flex: none; }
+.soon-icon { display: flex; justify-content: center; color: var(--brand-blue); margin-bottom: 12px; }
+
+/* avatar studio */
+.studio { display: grid; grid-template-columns: 260px 1fr; gap: 16px; align-items: start; }
+@media (max-width: 720px) { .studio { grid-template-columns: 1fr; } }
+.studio-preview {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  position: sticky; top: 14px; padding: 26px 18px;
+}
+@media (max-width: 720px) { .studio-preview { position: static; flex-direction: row; justify-content: center; flex-wrap: wrap; padding: 16px; } }
+.studio-points { margin: 4px 0 0; font-size: 14px; font-weight: 800; color: var(--ink); display: flex; align-items: center; gap: 6px; }
+.studio-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.shop-part { width: 40px; height: 40px; display: inline-block; }
+.shop-png { width: 40px; height: 40px; object-fit: contain; }
+.shop-price { display: inline-flex; align-items: center; gap: 3px; }
 
 /* avatar shop */
 .me-hero { justify-content: flex-start; }

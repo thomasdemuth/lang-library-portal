@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import AvatarView from "@/components/AvatarView";
 import { DEFAULT_AVATAR, displayNameFull, type Avatar } from "@/lib/play";
 import { STATUS_LABELS } from "@/lib/labels";
+import { Heart, Ic, Star } from "@/components/icons";
 
 type Tab = "students" | "teachers";
 
@@ -183,10 +184,10 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
     <>
       <div className="utabs">
         <button type="button" className={`utab${tab === "students" ? " on" : ""}`} onClick={() => setTab("students")}>
-          🎒 Students
+          <Ic name="backpack" size={15} /> Students
         </button>
         <button type="button" className={`utab${tab === "teachers" ? " on" : ""}`} onClick={() => setTab("teachers")}>
-          🍎 Teachers
+          <Ic name="apple" size={15} /> Teachers
         </button>
         <input
           className="input usearch"
@@ -223,15 +224,15 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
                 <span className="urow-stats">
                   {tab === "students" ? (
                     <>
-                      <span title="Books logged">📖 {r.booksRead}</span>
-                      <span title="Favorites">❤️ {r.favorites}</span>
-                      <span title="Stars">⭐ {r.points}</span>
+                      <span title="Books logged"><Ic name="book" size={13} /> {r.booksRead}</span>
+                      <span title="Favorites"><Heart filled size={13} /> {r.favorites}</span>
+                      <span title="Stars"><Star size={13} /> {r.points}</span>
                       {r.hidden && <span className="upill">hidden</span>}
                     </>
                   ) : (
-                    <span title="Book requests">📚 {r.requests} request{r.requests === 1 ? "" : "s"}</span>
+                    <span title="Book requests"><Ic name="requests" size={13} /> {r.requests} request{r.requests === 1 ? "" : "s"}</span>
                   )}
-                  {r.notes > 0 && <span className="upill note">🗒 {r.notes}</span>}
+                  {r.notes > 0 && <span className="upill note"><Ic name="note" size={11} /> {r.notes}</span>}
                   <span className="urow-seen">{ago(r.lastSeen ?? r.lastRequest ?? null)}</span>
                 </span>
               </button>
@@ -270,7 +271,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
                         </div>
                       )}
 
-                      <h3 className="usec">📈 Interactions — last 30 days</h3>
+                      <h3 className="usec"><Ic name="chart" size={14} /> Interactions — last 30 days</h3>
                       {detail.activityPending && detail.series.every((s) => s.count === 0) ? (
                         <p className="hint">
                           Activity appears here once migration 0013 runs (page views start being linked to accounts).
@@ -281,7 +282,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
 
                       {tab === "teachers" && (
                         <>
-                          <h3 className="usec">📚 Book requests</h3>
+                          <h3 className="usec"><Ic name="requests" size={14} /> Book requests</h3>
                           {detail.requests.length === 0 ? (
                             <p className="hint">No book requests yet.</p>
                           ) : (
@@ -304,7 +305,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
                       {tab === "students" && (
                         <div className="ucols">
                           <div>
-                            <h3 className="usec">📖 Books read ({detail.reads.length})</h3>
+                            <h3 className="usec"><Ic name="book" size={14} /> Books read ({detail.reads.length})</h3>
                             {detail.reads.length === 0 ? (
                               <p className="hint">Nothing logged yet.</p>
                             ) : (
@@ -319,7 +320,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
                             )}
                           </div>
                           <div>
-                            <h3 className="usec">❤️ Favorites ({detail.favorites.length})</h3>
+                            <h3 className="usec"><Heart filled size={14} /> Favorites ({detail.favorites.length})</h3>
                             {detail.favorites.length === 0 ? (
                               <p className="hint">No favorites yet.</p>
                             ) : (
@@ -336,7 +337,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
                         </div>
                       )}
 
-                      <h3 className="usec">🕐 Recent activity</h3>
+                      <h3 className="usec"><Ic name="clock" size={14} /> Recent activity</h3>
                       {detail.activity.length === 0 ? (
                         <p className="hint">No page views recorded for this account yet.</p>
                       ) : (
@@ -350,7 +351,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
                         </div>
                       )}
 
-                      <h3 className="usec">🗒 Internal notes</h3>
+                      <h3 className="usec"><Ic name="note" size={14} /> Internal notes</h3>
                       <div className="unote-add">
                         <input
                           className="input"

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AvatarView from "@/components/AvatarView";
+import { Heart, Ic } from "@/components/icons";
 import { DEFAULT_AVATAR, type Avatar } from "@/lib/play";
 
 type Fav = { book_key: string; title: string; isbn13: string | null };
@@ -44,14 +45,17 @@ export default function StudentProfile({ id }: { id: string }) {
         <div>
           <h1 style={{ margin: 0 }}>{data.name}</h1>
           <p className="play-stats" style={{ marginTop: 6 }}>
-            📖 {data.booksRead} book{data.booksRead === 1 ? "" : "s"} read · ❤️ {data.favorites.length} favorite
+            <Ic name="book" size={13} /> {data.booksRead} book{data.booksRead === 1 ? "" : "s"} read ·{" "}
+            <Heart filled size={13} /> {data.favorites.length} favorite
             {data.favorites.length === 1 ? "" : "s"}
           </p>
         </div>
       </div>
 
       <div className="card">
-        <h2>❤️ {data.name.split(" ")[0]}'s favorite books</h2>
+        <h2>
+          <Heart filled size={16} /> {data.name.split(" ")[0]}'s favorite books
+        </h2>
         {data.favorites.length === 0 ? (
           <p className="hint">No favorites yet — check back soon!</p>
         ) : (
@@ -74,7 +78,7 @@ export default function StudentProfile({ id }: { id: string }) {
             <div className="leader-rows" style={{ marginTop: covers.length > 0 ? 12 : 0 }}>
               {data.favorites.map((f) => (
                 <a key={f.book_key} className="leader-row" href={`/search?q=${encodeURIComponent(f.title)}`}>
-                  <span>❤️</span>
+                  <Heart filled size={14} />
                   <b style={{ flex: 1 }}>{f.title}</b>
                 </a>
               ))}

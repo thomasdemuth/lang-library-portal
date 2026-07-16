@@ -105,13 +105,13 @@ export default function CatalogSearch() {
     const result = await logRead(b);
     if ("error" in result) return say(result.error);
     setLogged((cur) => new Set(cur).add(b.dedupe_key));
-    say(`+${result.earned} ⭐ Nice reading!`);
+    say(`+${result.earned} stars — nice reading!`);
   }
 
   async function heart(b: Book) {
     const result = await toggleFavorite({ book_key: b.dedupe_key, title: b.title, isbn13: b.isbn13 });
     if ("error" in result) say(result.error);
-    else say(result.favorited ? "Added to your favorites ❤️" : "Removed from favorites");
+    else say(result.favorited ? "Added to your favorites!" : "Removed from favorites");
   }
 
   async function where(b: Book) {

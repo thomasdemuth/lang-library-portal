@@ -5,7 +5,7 @@ import { guarded, requireSession } from "@/lib/guards";
 import { allowHit } from "@/lib/ratelimit";
 
 const Body = z.object({
-  message: z.string().trim().min(3, "Say a little more than that 🙂").max(4000),
+  message: z.string().trim().min(3, "Say a little more than that.").max(4000),
   name: z.string().trim().max(120).optional(),
 });
 

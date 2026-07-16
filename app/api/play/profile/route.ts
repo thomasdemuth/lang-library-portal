@@ -67,7 +67,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("buy"), id: z.string().max(40) }),
   z.object({
     action: z.literal("equip"),
-    slot: z.enum(["base", "hat", "accessory", "bg"]),
+    slot: z.enum(["bg", "legs", "body", "outfit", "head", "face", "hat"]),
     id: z.string().max(40).nullable(),
   }),
   z.object({ action: z.literal("privacy"), hidden: z.boolean() }),
@@ -90,7 +90,7 @@ export const POST = guarded(async (req: NextRequest) => {
     if (!item) return NextResponse.json({ error: "No such item" }, { status: 400 });
     if (ownsItem(profile.owned, item)) return NextResponse.json({ error: "Already owned" }, { status: 400 });
     if (profile.points < item.price) {
-      return NextResponse.json({ error: `You need ${item.price - profile.points} more ⭐ for that.` }, { status: 400 });
+      return NextResponse.json({ error: `You need ${item.price - profile.points} more stars for that.` }, { status: 400 });
     }
     const owned = [...profile.owned, item.id];
     const points = profile.points - item.price;
@@ -124,8 +124,11 @@ export const POST = guarded(async (req: NextRequest) => {
     if (!item || item.slot !== slot) return NextResponse.json({ error: "No such item" }, { status: 400 });
     if (!ownsItem(profile.owned, item)) return NextResponse.json({ error: "Not owned yet" }, { status: 400 });
   }
-  if (slot === "base" && id === null) return NextResponse.json({ error: "Pick a base animal" }, { status: 400 });
+  if (id === null && ["bg", "legs", "body", "head"].includes(slot)) {
+    return NextResponse.json({ error: "That part can't come off — pick a different one instead." }, { status: 400 });
+  }
   const avatar: Avatar = { ...profile.avatar, [slot]: id ?? undefined };
+  if (slot === "head") delete avatar.base; // retire the legacy key once a head is chosen
   const { error } = await db().from("student_profiles").update({ avatar }).eq("email", session.email);
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ ok: true, avatar });

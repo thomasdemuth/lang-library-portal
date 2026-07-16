@@ -98,7 +98,7 @@ export default function BookRow({
     const result = await logRead(b);
     if ("error" in result) return say(result.error);
     setLogged((cur) => new Set(cur).add(b.dedupe_key));
-    say(`+${result.earned} ⭐ Nice reading!`);
+    say(`+${result.earned} stars — nice reading!`);
     onPoints?.(result.points);
   }
 
@@ -106,7 +106,7 @@ export default function BookRow({
     e.stopPropagation();
     const result = await toggleFavorite({ book_key: b.dedupe_key, title: b.title, isbn13: b.isbn13 });
     if ("error" in result) say(result.error);
-    else if (result.favorited) say("Added to your favorites ❤️");
+    else if (result.favorited) say("Added to your favorites!");
   }
 
   async function where(e: React.MouseEvent, b: Book) {

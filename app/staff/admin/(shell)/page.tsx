@@ -66,7 +66,7 @@ export default async function AdminDashboard() {
     <>
       <h1>
         {greeting}, {admin?.name?.split(" ")[0] ?? "librarian"}{" "}
-        <span className="wave" aria-hidden>👋</span>
+        <span className="wave" aria-hidden><Ic name="sparkle" size={20} /></span>
       </h1>
       <p className="sub">
         Here&rsquo;s the library at a glance.{" "}

@@ -17,7 +17,7 @@ export default async function InventoryPage() {
         whatever is live here.
       </p>
       <a className="btn brand mobile-only" style={{ width: "100%", textAlign: "center", marginBottom: 14 }} href="/admin/requests">
-        📖 Manage Book Requests
+        Manage Book Requests
       </a>
       <InventoryPanel canImport={canImport} />
     </>

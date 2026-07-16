@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CATEGORIES, type CategoryId } from "@/lib/categories";
 import TagPicker, { TagPill } from "@/components/TagPicker";
+import { Check, Ic } from "@/components/icons";
 
 type Book = {
   id: number;
@@ -148,7 +149,7 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
         <p className="hint" style={{ padding: 20 }}>Loading untagged books…</p>
       ) : !book ? (
         <div className="card" style={{ textAlign: "center", padding: 30 }}>
-          <div style={{ fontSize: 34 }}>🎉</div>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}><Check done size={36} /></div>
           <h2>All done</h2>
           <p className="hint">Every book in the queue has been reviewed.</p>
           <button className="btn primary" onClick={onDone}>Close</button>
@@ -172,7 +173,7 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
           </div>
 
           {suggestion === "pending" || suggestion === undefined ? (
-            <p className="hint" style={{ margin: 0 }}>✨ Looking it up…</p>
+            <p className="hint" style={{ margin: 0 }}><Ic name="sparkle" size={13} /> Looking it up…</p>
           ) : suggestion === "none" ? (
             <p className="hint" style={{ margin: 0 }}>No confident suggestion — pick a tag below, or skip.</p>
           ) : (
@@ -183,7 +184,7 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
               onClick={() => applyTag(suggestion.tag)}
               title={suggestion.reasons.join(", ")}
             >
-              ✨ <TagPill tag={suggestion.tag} /> {suggestion.confidence}% — tap to accept
+              <Ic name="sparkle" size={14} /> <TagPill tag={suggestion.tag} /> {suggestion.confidence}% — tap to accept
             </button>
           )}
 

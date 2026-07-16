@@ -5,11 +5,9 @@ import BookRow, { type RowKind } from "@/components/BookRow";
 import AvatarView from "@/components/AvatarView";
 import { DEFAULT_AVATAR, displayName, type Avatar } from "@/lib/play";
 import { type CategoryId } from "@/lib/categories";
-import { Ic } from "@/components/icons";
+import { Ic, Medal, Star } from "@/components/icons";
 
 type Leader = { rank: number; name: string; books: number; avatar: Avatar; id: string | null };
-
-const MEDALS = ["🥇", "🥈", "🥉"];
 
 /**
  * The rotation the endless "Keep exploring" grid cycles through. Every entry
@@ -83,14 +81,15 @@ export default function StudentHome({ email }: { email: string }) {
   return (
     <div className="wrap student-theme">
       <div className="play-hero">
-        <a className="play-me" href="/me">
+        <a className="play-me" href="/avatar">
           <AvatarView avatar={avatar} size={74} />
           <span>
             <b>Hi, {displayName(email)}!</b>
             <span className="play-stats">
               {points !== null ? (
                 <>
-                  ⭐ {points} stars · 📖 {booksRead} book{booksRead === 1 ? "" : "s"} logged
+                  <Star size={12} /> {points} stars · <Ic name="book" size={12} /> {booksRead} book
+                  {booksRead === 1 ? "" : "s"} logged
                 </>
               ) : (
                 "Read books, earn stars, build your avatar"
@@ -100,6 +99,7 @@ export default function StudentHome({ email }: { email: string }) {
           </span>
         </a>
         <div className="play-links">
+          <a href="/me"><Ic name="smile" size={16} /> My Page</a>
           <a href="/search"><Ic name="search" size={16} /> Find a Book</a>
           <a href="/map"><Ic name="map" size={16} /> Library Map</a>
           <a href="/feedback"><Ic name="feedback" size={16} /> Feedback</a>
@@ -118,12 +118,14 @@ export default function StudentHome({ email }: { email: string }) {
 
       {leaders.length > 0 && (
         <div className="card leaderboard">
-          <h2>🏆 Top readers</h2>
+          <h2><Ic name="trophy" size={17} /> Top readers</h2>
           <div className="leader-rows">
             {leaders.map((l) => {
               const inner = (
                 <>
-                  <span className="leader-rank">{MEDALS[l.rank - 1] ?? `#${l.rank}`}</span>
+                  <span className="leader-rank">
+                    {l.rank <= 3 ? <Medal place={l.rank as 1 | 2 | 3} size={22} /> : `#${l.rank}`}
+                  </span>
                   <AvatarView avatar={l.avatar} size={38} />
                   <b>{l.name}</b>
                   <span className="leader-books">
@@ -141,7 +143,7 @@ export default function StudentHome({ email }: { email: string }) {
             })}
           </div>
           <p className="hint" style={{ marginBottom: 0 }}>
-            Tap ⭐ “I read this” to climb the board — tap a reader to see their favorites.
+            Tap “I read this” to climb the board — tap a reader to see their favorites.
           </p>
         </div>
       )}
@@ -169,7 +171,7 @@ export default function StudentHome({ email }: { email: string }) {
         </a>
       </div>
 
-      <h2 className="explore-head"><span className="newshelf-spark">🧭</span> Keep exploring</h2>
+      <h2 className="explore-head"><span className="newshelf-spark"><Ic name="compass" size={17} /></span> Keep exploring</h2>
       {Array.from({ length: extraRows }, (_, i) => {
         const pick = EXPLORE_KINDS[i % EXPLORE_KINDS.length];
         return (

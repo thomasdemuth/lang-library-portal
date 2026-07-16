@@ -94,7 +94,10 @@ export default function UserMenu({ email, audience }: { email: string; audience:
           {audience === "student" && (
             <>
               <a className="usermenu-item" href="/me">
-                <Ic name="sparkle" size={15} /> My Page
+                <Ic name="smile" size={15} /> My Page
+              </a>
+              <a className="usermenu-item" href="/avatar">
+                <Ic name="sparkle" size={15} /> Avatar Studio
               </a>
               <button type="button" className="usermenu-item" onClick={togglePrivacy}>
                 <Ic name="feedback" size={15} />

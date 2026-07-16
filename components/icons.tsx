@@ -16,6 +16,18 @@ export const ICON_PATHS: Record<string, string> = {
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.5-4.5",
   collapse: "M11 17l-5-5 5-5M18 17l-5-5 5-5",
   expand: "M7 17l5-5-5-5M14 17l5-5-5-5",
+  star: "M12 3l2.7 5.6 6.3.9-4.5 4.3 1 6.2-5.5-3-5.5 3 1-6.2L3 9.5l6.3-.9L12 3z",
+  trophy: "M8 21h8M12 17v4M7 4h10v6a5 5 0 0 1-10 0V4zM7 6H4a3 3 0 0 0 3 5M17 6h3a3 3 0 0 1-3 5",
+  compass: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM15.5 8.5l-2 5-5 2 2-5 5-2z",
+  backpack: "M9 6V5a3 3 0 0 1 6 0v1M7 6h10a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM8 21v-6h8v6M8 11h8",
+  apple: "M12 7c0-2-1.5-3.5-1.5-3.5M12 7c1.5-2.5 4-2 4-2M12 7C8 4.8 4.5 7.6 4.5 11.6c0 4.6 3.1 8.9 7.5 8.9s7.5-4.3 7.5-8.9C19.5 7.6 16 4.8 12 7z",
+  clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3.2 2",
+  note: "M9 3h10v18H5V7l4-4zM9 3v4H5M9.5 12h7M9.5 16h7",
+  bell: "M6 9a6 6 0 0 1 12 0c0 5 2 6.2 2 6.2H4S6 14 6 9M10 19.5a2 2 0 0 0 4 0",
+  headphones: "M4 14a8 8 0 0 1 16 0M4 14v3.5a2 2 0 0 0 2 2h1a1 1 0 0 0 1-1V15a1 1 0 0 0-1-1H4M20 14v3.5a2 2 0 0 1-2 2h-1a1 1 0 0 1-1-1V15a1 1 0 0 1 1-1h3",
+  tablet: "M6 2.5h12a1.5 1.5 0 0 1 1.5 1.5v16a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 20V4A1.5 1.5 0 0 1 6 2.5zM10.5 18.5h3",
+  camera: "M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1zM12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z",
+  smile: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8.5 14s1.2 2 3.5 2 3.5-2 3.5-2M9 9.5h.01M15 9.5h.01",
 };
 
 export function Ic({ name, size = 18, width = 2 }: { name: string; size?: number; width?: number }) {
@@ -90,6 +102,54 @@ export function Pencil({ size = 15 }: { size?: number }) {
     >
       <path d="M12 20h9" />
       <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+    </svg>
+  );
+}
+
+/** Filled amber star — the "stars" currency mark. */
+export function Star({ size = 14 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="#f5b301"
+      stroke="#c98d00"
+      strokeWidth={1.4}
+      strokeLinejoin="round"
+      aria-hidden
+      style={{ verticalAlign: "-0.12em" }}
+    >
+      <path d="M12 3l2.7 5.6 6.3.9-4.5 4.3 1 6.2-5.5-3-5.5 3 1-6.2L3 9.5l6.3-.9L12 3z" />
+    </svg>
+  );
+}
+
+const MEDAL_COLORS: Record<number, [string, string]> = {
+  1: ["#f5c34b", "#c98d00"], // gold
+  2: ["#c8cdd6", "#8f97a3"], // silver
+  3: ["#d99a6c", "#a96a3e"], // bronze
+};
+
+/** Podium medal (1 gold / 2 silver / 3 bronze) with ribbon. */
+export function Medal({ place, size = 20 }: { place: 1 | 2 | 3; size?: number }) {
+  const [fill, edge] = MEDAL_COLORS[place] ?? MEDAL_COLORS[3];
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden style={{ verticalAlign: "-0.15em" }}>
+      <path d="M8 2h3l2 5-3.5 1L8 2z" fill="#3f6ad1" />
+      <path d="M16 2h-3l-2 5 3.5 1L16 2z" fill="#2e50c8" />
+      <circle cx="12" cy="14" r="7" fill={fill} stroke={edge} strokeWidth="1.6" />
+      <text
+        x="12"
+        y="17.4"
+        textAnchor="middle"
+        fontSize="9.5"
+        fontWeight="800"
+        fill={edge}
+        fontFamily="inherit"
+      >
+        {place}
+      </text>
     </svg>
   );
 }

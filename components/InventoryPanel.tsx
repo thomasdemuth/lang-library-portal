@@ -7,7 +7,7 @@ import { CATEGORIES, CATEGORY_IDS, type CategoryId } from "@/lib/categories";
 import TagPicker, { TagPill } from "@/components/TagPicker";
 import TagReviewPanel from "@/components/TagReviewPanel";
 import BookEditModal, { type EditableBook } from "@/components/BookEditModal";
-import { Pencil } from "@/components/icons";
+import { Ic, Pencil, Pin } from "@/components/icons";
 
 type Sync = {
   id: number;
@@ -468,7 +468,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                 aria-label={`Show ${b.title} on the map`}
                 title="Show on the map"
               >
-                {finding === b.id ? "…" : "📍"}
+                {finding === b.id ? "…" : <Pin size={13} />}
               </button>
             )}
           </span>
@@ -500,7 +500,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
           style={{ width: "100%", marginBottom: 14 }}
           onClick={() => setReviewing(true)}
         >
-          ✨ Review suggested tags
+          <Ic name="sparkle" size={15} /> Review suggested tags
         </button>
       )}
 
@@ -735,7 +735,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
           </button>
           {canImport && (
             <button type="button" className="tagchip desk-only" onClick={() => setReviewing(true)}>
-              ✨ Suggested tags
+              <Ic name="sparkle" size={13} /> Suggested tags
             </button>
           )}
         </div>

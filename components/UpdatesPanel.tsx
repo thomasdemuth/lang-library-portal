@@ -85,7 +85,7 @@ export default function UpdatesPanel({ canPublish }: { canPublish: boolean }) {
               Also notify admins who opted out of announcements
             </label>
             <button className="btn brand" disabled={busy} style={{ alignSelf: "flex-start" }}>
-              {busy ? "Publishing…" : "📣 Publish & notify"}
+              {busy ? "Publishing…" : "Publish & notify"}
             </button>
           </form>
         </div>

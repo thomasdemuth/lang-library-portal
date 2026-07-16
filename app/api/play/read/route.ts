@@ -62,7 +62,7 @@ export const POST = guarded(async (req: NextRequest) => {
   });
   if (error) {
     if (/duplicate|unique/i.test(error.message ?? "")) {
-      return NextResponse.json({ error: "You already logged this one 📖" }, { status: 409 });
+      return NextResponse.json({ error: "You already logged this one" }, { status: 409 });
     }
     if (/reading_log|relation|does not exist|schema cache/i.test(error.message ?? "")) {
       return NextResponse.json({ error: "The reading game unlocks after the next library update!" }, { status: 409 });

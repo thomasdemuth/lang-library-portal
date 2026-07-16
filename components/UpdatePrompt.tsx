@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Ic } from "@/components/icons";
 
 const POLL_MS = 5 * 60 * 1000;
 
@@ -64,7 +65,7 @@ export default function UpdatePrompt() {
   return (
     <div className="update-prompt" role="alertdialog" aria-label="Update available">
       <div className="up-card">
-        <div className="up-emoji">✨</div>
+        <div className="up-emoji"><Ic name="sparkle" size={30} /></div>
         <b>The library app has been updated</b>
         <p>Refresh to get the latest version — anything you're mid-way through will reload.</p>
         <div className="up-actions">

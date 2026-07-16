@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CategoryId } from "@/lib/categories";
 import { TagPill } from "@/components/TagPicker";
+import { Ic } from "@/components/icons";
 
 type Book = { id: number; title: string; creators: string | null; isbn13: string | null; tag: CategoryId | null };
 
@@ -41,7 +42,7 @@ export default function NewBooksShelf() {
   return (
     <div className="newshelf">
       <h2>
-        <span className="newshelf-spark">✨</span> New on the shelves
+        <span className="newshelf-spark"><Ic name="sparkle" size={15} /></span> New on the shelves
       </h2>
       <div
         ref={scroller}
