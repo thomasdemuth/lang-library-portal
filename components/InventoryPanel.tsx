@@ -65,6 +65,7 @@ type ColPref = { id: ColId; on: boolean };
 const DEFAULT_COLS: ColPref[] = CATALOG_COLS.map((c) => ({ id: c.id, on: true }));
 const COL_LABEL = Object.fromEntries(CATALOG_COLS.map((c) => [c.id, c.label])) as Record<ColId, string>;
 const COLS_KEY = "ll-catalog-cols";
+const COLW_KEY = "ll-catalog-colw"; // dragged column widths (px), by column id
 
 export default function InventoryPanel({ canImport, canLibib }: { canImport: boolean; canLibib: boolean }) {
   const [active, setActive] = useState<Sync | null>(null);
@@ -122,6 +123,81 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
       localStorage.setItem(COLS_KEY, JSON.stringify(next));
     } catch {}
   }
+  // Drag the header edges to set column widths (px, per device). Any
+  // column can be sized — Title included — and a double-click on the
+  // edge puts that column back on autopilot.
+  const [colW, setColW] = useState<Record<string, number>>({});
+  const colDrag = useRef<{ id: string; startX: number; startW: number } | null>(null);
+  useEffect(() => {
+    try {
+      const raw: unknown = JSON.parse(localStorage.getItem(COLW_KEY) ?? "null");
+      if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+        const clean: Record<string, number> = {};
+        for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+          if (typeof v === "number" && Number.isFinite(v)) clean[k] = v;
+        }
+        setColW(clean);
+      }
+    } catch {}
+  }, []);
+
+  function saveColW(next: Record<string, number>) {
+    try {
+      localStorage.setItem(COLW_KEY, JSON.stringify(next));
+    } catch {}
+  }
+
+  function onColDown(e: React.PointerEvent<HTMLElement>, id: string) {
+    if (e.button !== 0) return;
+    const th = (e.currentTarget as HTMLElement).closest("th");
+    if (!th) return;
+    colDrag.current = { id, startX: e.clientX, startW: th.offsetWidth };
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function onColMove(e: React.PointerEvent<HTMLElement>) {
+    const d = colDrag.current;
+    if (!d) return;
+    const w = Math.max(64, Math.min(720, Math.round(d.startW + e.clientX - d.startX)));
+    setColW((cur) => (cur[d.id] === w ? cur : { ...cur, [d.id]: w }));
+  }
+
+  function onColUp() {
+    if (!colDrag.current) return;
+    colDrag.current = null;
+    setColW((cur) => {
+      saveColW(cur);
+      return cur;
+    });
+  }
+
+  function resetColW(id: string) {
+    setColW((cur) => {
+      const next = { ...cur };
+      delete next[id];
+      saveColW(next);
+      return next;
+    });
+  }
+
+  /** The grab edge on a header cell. */
+  const colResizer = (id: string) => (
+    <span
+      className="col-resizer"
+      title="Drag to resize — double-click to reset"
+      onPointerDown={(e) => onColDown(e, id)}
+      onPointerMove={onColMove}
+      onPointerUp={onColUp}
+      onPointerCancel={onColUp}
+      onDoubleClick={() => resetColW(id)}
+      onClick={(e) => e.stopPropagation()}
+    />
+  );
+
   function toggleCol(id: ColId) {
     updateCols(cols.map((c) => (c.id === id ? { ...c, on: !c.on } : c)));
   }
@@ -738,7 +814,23 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
             <div>
               <label className="lbl">Catalog columns</label>
               <p className="hint" style={{ margin: "2px 0 8px" }}>
-                Title always shows. Reorder with the arrows.
+                Title always shows. Reorder with the arrows — drag a column&rsquo;s edge in the table to
+                resize it.
+                {Object.keys(colW).length > 0 && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      className="linklike"
+                      onClick={() => {
+                        setColW({});
+                        saveColW({});
+                      }}
+                    >
+                      Reset column widths
+                    </button>
+                  </>
+                )}
               </p>
               {cols.map((c, i) => (
                 <div key={c.id} className="colrow">
@@ -888,7 +980,7 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
               {total > results.length ? ` (showing ${results.length.toLocaleString()})` : ""}
             </p>
             <div className="tablewrap">
-              <table className="table books">
+              <table className={`table books${Object.keys(colW).length > 0 ? " fixedcols" : ""}`}>
                 <thead>
                   <tr>
                     {canImport && (
@@ -901,9 +993,15 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
                         />
                       </th>
                     )}
-                    <th>Title</th>
+                    <th style={colW.title ? { width: colW.title } : undefined}>
+                      Title
+                      {colResizer("title")}
+                    </th>
                     {visibleCols.map((c) => (
-                      <th key={c.id}>{COL_LABEL[c.id]}</th>
+                      <th key={c.id} style={colW[c.id] ? { width: colW[c.id] } : undefined}>
+                        {COL_LABEL[c.id]}
+                        {colResizer(c.id)}
+                      </th>
                     ))}
                   </tr>
                 </thead>

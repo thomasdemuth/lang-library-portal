@@ -1442,3 +1442,18 @@ html[data-theme="dark"] .widget-x { background: var(--panel-2); }
 .peek-chart svg { width: 100%; flex: 1; min-height: 34px; }
 .peek-chart rect { fill: var(--brand-blue); opacity: .8; }
 .peek-chart rect:last-of-type { fill: var(--brand-green); opacity: 1; }
+
+/* Drag-resizable catalog columns */
+.table.books th { position: relative; }
+.table.books.fixedcols { table-layout: fixed; width: max-content; min-width: 100%; }
+.table.books.fixedcols th, .table.books.fixedcols td { overflow: hidden; text-overflow: ellipsis; }
+.col-resizer {
+  position: absolute; top: 0; right: -7px; width: 14px; height: 100%;
+  cursor: col-resize; touch-action: none; z-index: 2;
+}
+.col-resizer::after {
+  content: ""; position: absolute; right: 6px; top: 22%; height: 56%; width: 2px;
+  border-radius: 2px; background: var(--line); transition: background .12s, width .12s;
+}
+.col-resizer:hover::after, .col-resizer:active::after { background: var(--brand-blue); width: 3px; }
+@media (max-width: 640px) { .col-resizer { display: none; } }
