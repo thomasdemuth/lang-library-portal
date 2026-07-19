@@ -68,26 +68,25 @@ async function peeks(can: (k: string) => boolean, isChief: boolean): Promise<Das
     );
   }
   if (can("analytics")) {
-    // 14 tiny head-counts beats pulling raw rows to bucket in JS
+    // One RPC (the analytics page's own) returns per-day rows; bucket them
+    // into the 14-day sparkline here — beats firing 14 head-count queries.
     const days = Array.from({ length: 14 }, (_, i) => {
       const start = new Date();
       start.setUTCHours(0, 0, 0, 0);
       start.setUTCDate(start.getUTCDate() - (13 - i));
-      return start;
+      return isoDay(start.getTime());
     });
     jobs.push(
-      Promise.all(
-        days.map((d) =>
-          client
-            .from("usage_events")
-            .select("id", { count: "exact", head: true })
-            .gte("ts", d.toISOString())
-            .lt("ts", new Date(d.getTime() + 24 * 3600 * 1000).toISOString())
-            .then((r) => r.count ?? 0)
-        )
-      ).then((countsByDay) => {
-        out.usage = days.map((d, i) => ({ day: isoDay(d.getTime()), count: countsByDay[i] }));
-      })
+      client
+        .rpc("usage_summary", { p_from: days[0], p_to: days[days.length - 1] })
+        .then((r) => {
+          const byDay = new Map(days.map((d) => [d, 0]));
+          for (const row of (r.data ?? []) as { day: string; views: number }[]) {
+            const key = String(row.day).slice(0, 10);
+            if (byDay.has(key)) byDay.set(key, (byDay.get(key) ?? 0) + Number(row.views));
+          }
+          out.usage = days.map((day) => ({ day, count: byDay.get(day) ?? 0 }));
+        })
     );
   }
   if (can("users")) {
