@@ -20,7 +20,7 @@ import {
  * "new list" creator — so books can be filed straight from search or the
  * discovery shelves, and new collections started right there.
  */
-export default function AddToCollection({ book, compact }: { book: CollectBook; compact?: boolean }) {
+export default function AddToCollection({ book }: { book: CollectBook }) {
   const [open, setOpen] = useState(false);
   const [tick, setTick] = useState(0); // re-render on shared-cache changes
 
@@ -43,7 +43,7 @@ export default function AddToCollection({ book, compact }: { book: CollectBook; 
         title="Add this book to one of your lists"
       >
         <Ic name="folder" size={13} />
-        {compact ? "List" : count > 0 ? `In ${count} list${count === 1 ? "" : "s"}` : "Add to list"}
+        {count > 0 ? `In ${count} list${count === 1 ? "" : "s"}` : "Add to list"}
       </button>
       {open && <CollectModal book={book} onClose={() => setOpen(false)} />}
     </>

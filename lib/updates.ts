@@ -46,7 +46,7 @@ export async function pushUpdateToAdmins(
     recipients.has(s.admin_id)
   );
 
-  const payload = JSON.stringify({ title: title, body, url: "/admin/updates" });
+  const payload = JSON.stringify({ title, body, url: "/admin/updates" });
   let sent = 0;
   await Promise.all(
     targets.map(async (s) => {

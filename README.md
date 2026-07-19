@@ -5,18 +5,21 @@ The Lang School library's web interface: a **student site**, a **staff site**, a
 
 | Audience | Gets in with | Can do |
 |---|---|---|
-| Students | `@students.thelangschool.org` email (student site) | Library map, feedback |
-| Teachers | `@thelangschool.org` email (staff site) | Everything students can + book requests (their own) |
-| Management | username + password (staff site → `/admin`) | Everything: requests queue, inventory, map editor, feedback triage, site usage, sign maker, admin invites |
+| Students | `@students.thelangschool.org` email (student site) | Find-a-book search, library map, the reading game (log reads → earn stars → build an avatar), favorites, custom collections, friends, feedback |
+| Teachers | `@thelangschool.org` email (staff site) | Book requests (their own), library map, feedback |
+| Management | username + password (staff site → `/admin`) | Requests queue, inventory, map editor, feedback triage, user insights, site usage, sign maker, admin invites |
 
 The two sites live on **separate hostnames** (env-driven), sessions are host-only signed
-cookies, and the admin area doesn't exist on the student host.
+cookies, and the admin area doesn't exist on the student host. Management access is
+role-based (Chief Admin vs granular per-power Admin); a few actions — the Libib CSV import
+and publishing app updates — are restricted to the developer account.
 
 ## Ops runbook (for the library team)
 
-- **Sync the catalog from Libib** — Libib → Export CSV → Management → *Inventory* → drop the
-  file → **Import & replace**. The old inventory stays live until the new one finishes, then
-  they swap atomically. Do this with your weekly re-shelving.
+- **Sync the catalog from Libib** *(developer account only)* — Libib → Export CSV →
+  Management → *Inventory* → gear menu → drop the file → **Import & replace**. The old
+  inventory stays live until the new one finishes, then they swap atomically. Everyone else
+  sees the catalog and can search/scan it, but not re-import it.
 - **Scan book barcodes** — Management → *Inventory* → **Scan barcodes** (best on a phone).
   Point the camera at the ISBN barcode: the book comes up instantly with cover, copies, and
   tag. From there: set the category tag, add or remove a copy, or add a book the library
@@ -44,6 +47,14 @@ cookies, and the admin area doesn't exist on the student host.
 - **Invite an admin** — Management → *Admins & Invites* → **Create invite link** → send the
   link privately. It works once and expires in 7 days. Disable an admin there too (kills
   their sessions immediately).
+- **Add a title by hand** — Management → *Inventory* → **+** (next to the gear): title,
+  author, ISBNs, copies, tag. Dedupe adds copies to an existing entry. Like scans, manual
+  edits last until the next Libib import.
+- **Customize the dashboard** — the management home is a snap-to-grid widget board: drag to
+  reorder, drag a corner to resize, and widgets that are big enough show a live peek of their
+  page (recent requests, a usage sparkline, an inventory search box…). Per device.
+- **User insights** — Management → *User Insights*: every student and teacher account with
+  their activity, reading, requests, and admin-only notes; grant a student stars from here.
 - **Feedback** — Management → *Feedback*: mark read / archive.
 - **Site usage** — Management → *Site Usage*: daily views by site, unique visitors, top pages.
 - **Print signs** — Management → *Sign Maker* (the full sign generator, admin-only).
@@ -54,7 +65,7 @@ cookies, and the admin area doesn't exist on the student host.
 ```bash
 npm install
 npm run dev        # http://staff.localhost:4173 and http://student.localhost:4173
-npm test           # matcher/normalizer unit tests
+npm test           # unit tests: matcher/normalizer, shelf resolver, id sampler, safe-redirect
 npm run seed       # seed admins from scripts/seed.local.json (gitignored)
 ```
 
@@ -62,9 +73,11 @@ npm run seed       # seed admins from scripts/seed.local.json (gitignored)
 
 ## Deployment (Vercel + Supabase free tiers)
 
-1. **Supabase**: create a project → SQL Editor → run `supabase/migrations/0001_init.sql`.
-   After switching the app to the `sb_secret_…` key, also run `0002_lockdown.sql`
-   (defense-in-depth RLS; the service key bypasses it).
+1. **Supabase**: create a project → SQL Editor → run the `supabase/migrations/*.sql` files
+   in numeric order (`0001_init.sql` first). After switching the app to the `sb_secret_…`
+   key, run `0002_lockdown.sql` (defense-in-depth RLS; the service key bypasses it). Every
+   later migration is idempotent and the app degrades gracefully if one hasn't run yet, so
+   they can be applied as you roll features out.
 2. **Vercel**: import this GitHub repo. Framework: Next.js, no special build settings.
    Set the env vars below for Production. Add a **second domain** to the project (e.g.
    `lang-library-staff.vercel.app`) so student/staff hosts differ; put those two hostnames
