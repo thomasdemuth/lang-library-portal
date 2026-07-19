@@ -127,7 +127,7 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
   // column can be sized — Title included — and a double-click on the
   // edge puts that column back on autopilot.
   const [colW, setColW] = useState<Record<string, number>>({});
-  const colDrag = useRef<{ id: string; startX: number; startW: number } | null>(null);
+  const colDrag = useRef<{ id: string; startX: number; startW: number; maxW: number } | null>(null);
   useEffect(() => {
     try {
       const raw: unknown = JSON.parse(localStorage.getItem(COLW_KEY) ?? "null");
@@ -151,7 +151,15 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
     if (e.button !== 0) return;
     const th = (e.currentTarget as HTMLElement).closest("th");
     if (!th) return;
-    colDrag.current = { id, startX: e.clientX, startW: th.offsetWidth };
+    // Cap the drag so the column's right edge can't be pulled past the
+    // visible right edge of the table area (i.e. off the screen). Max
+    // width = distance from this column's left edge to the container's
+    // right edge, minus a small gutter.
+    const thLeft = th.getBoundingClientRect().left;
+    const wrapRight =
+      th.closest(".tablewrap")?.getBoundingClientRect().right ?? window.innerWidth;
+    const maxW = Math.max(64, Math.floor(wrapRight - thLeft - 8));
+    colDrag.current = { id, startX: e.clientX, startW: th.offsetWidth, maxW };
     try {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     } catch {}
@@ -162,7 +170,7 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
   function onColMove(e: React.PointerEvent<HTMLElement>) {
     const d = colDrag.current;
     if (!d) return;
-    const w = Math.max(64, Math.min(720, Math.round(d.startW + e.clientX - d.startX)));
+    const w = Math.max(64, Math.min(d.maxW, Math.round(d.startW + e.clientX - d.startX)));
     setColW((cur) => (cur[d.id] === w ? cur : { ...cur, [d.id]: w }));
   }
 
@@ -640,7 +648,7 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
         </button>
       )}
 
-      <div className="card" style={{ marginBottom: 20 }}>
+      <div className="card inv-panel" style={{ marginBottom: 20 }}>
         {reviewing && (
           <TagReviewPanel
             onDone={() => {

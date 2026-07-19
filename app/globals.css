@@ -192,6 +192,11 @@ textarea.input { font-weight: 500; resize: vertical; min-height: 110px; line-hei
   html[data-sidenav="collapsed"] .side:not(:hover) > .side-collapse + .side-label::after { display: none; }
 }
 .admin-main { padding: 26px; max-width: 1060px; }
+/* The inventory catalog fills the whole width (the 26px page padding gives
+   equal left/right margins); its long table gets the room it needs.
+   min-width:0 lets the table's own overflow-x scroller clip a too-wide
+   table instead of the grid item blowing the whole page out sideways. */
+.admin-main:has(.inv-panel) { max-width: none; min-width: 0; }
 @media (max-width: 860px) {
   .admin-grid { grid-template-columns: 1fr; }
   .side {
