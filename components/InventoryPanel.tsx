@@ -127,7 +127,13 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
   // column can be sized — Title included — and a double-click on the
   // edge puts that column back on autopilot.
   const [colW, setColW] = useState<Record<string, number>>({});
-  const colDrag = useRef<{ id: string; startX: number; startW: number; maxW: number } | null>(null);
+  const colDrag = useRef<{
+    id: string;
+    nextId: string;
+    startX: number;
+    startW: number;
+    startWNext: number;
+  } | null>(null);
   useEffect(() => {
     try {
       const raw: unknown = JSON.parse(localStorage.getItem(COLW_KEY) ?? "null");
@@ -147,31 +153,48 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
     } catch {}
   }
 
+  const MIN_COL_W = 64;
+
   function onColDown(e: React.PointerEvent<HTMLElement>, id: string) {
     if (e.button !== 0) return;
     const th = (e.currentTarget as HTMLElement).closest("th");
     const table = th?.closest("table");
     if (!th || !table) return;
 
-    // Freeze EVERY resizable column to its current rendered width first, so
-    // switching from auto to fixed table layout doesn't reflow the others.
-    // Without this, grabbing one column made them all jump — the drag then
-    // only moves the column you actually grabbed.
+    // A resize adjusts the boundary between this column and the next one:
+    // one grows, the next shrinks by the same amount. The total table width
+    // never changes, so nothing can ever be pushed past the screen edge.
+    const order = ["title", ...visibleCols.map((c) => c.id)];
+    const nextId = order[order.indexOf(id) + 1];
+    if (!nextId) return; // last column has no handle (nothing to give/take)
+
+    // Freeze every resizable column to its current width, so switching to
+    // fixed table layout doesn't reflow the columns you're not dragging.
     const snapshot: Record<string, number> = {};
     table.querySelectorAll<HTMLElement>("thead th[data-colid]").forEach((cell) => {
       const cid = cell.dataset.colid;
       if (cid) snapshot[cid] = Math.round(cell.getBoundingClientRect().width);
     });
-    const startW = snapshot[id] ?? Math.round(th.getBoundingClientRect().width);
+    // Normalize the frozen widths so they sum to exactly the space the
+    // columns share (container minus the checkbox column). The table then
+    // fills the width precisely, and since a resize only trades width
+    // between two columns, the total stays put — nothing can spill off screen.
+    const wrap = th.closest(".tablewrap");
+    const selW = table.querySelector<HTMLElement>("thead th.selcol")?.getBoundingClientRect().width ?? 0;
+    const target = (wrap?.clientWidth ?? window.innerWidth) - selW;
+    const sum = Object.values(snapshot).reduce((a, b) => a + b, 0);
+    if (sum > 0 && target > 0) {
+      const k = target / sum;
+      for (const key in snapshot) snapshot[key] = Math.max(MIN_COL_W, Math.round(snapshot[key] * k));
+    }
 
-    // Cap growth so the column's right edge can't be dragged past the visible
-    // right edge of the table area (off screen). Never smaller than where it
-    // started, so grabbing a column never snaps it narrower.
-    const thLeft = th.getBoundingClientRect().left;
-    const wrapRight = th.closest(".tablewrap")?.getBoundingClientRect().right ?? window.innerWidth;
-    const maxW = Math.max(startW, Math.floor(wrapRight - thLeft - 8));
-
-    colDrag.current = { id, startX: e.clientX, startW, maxW };
+    colDrag.current = {
+      id,
+      nextId,
+      startX: e.clientX,
+      startW: snapshot[id],
+      startWNext: snapshot[nextId],
+    };
     setColW(snapshot); // establish explicit widths on all columns up front
     try {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -183,8 +206,13 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
   function onColMove(e: React.PointerEvent<HTMLElement>) {
     const d = colDrag.current;
     if (!d) return;
-    const w = Math.max(64, Math.min(d.maxW, Math.round(d.startW + e.clientX - d.startX)));
-    setColW((cur) => (cur[d.id] === w ? cur : { ...cur, [d.id]: w }));
+    // Move the shared boundary: this column and its neighbour trade width,
+    // each staying at least MIN_COL_W, and their sum stays constant.
+    const pair = d.startW + d.startWNext;
+    const newW = Math.max(MIN_COL_W, Math.min(pair - MIN_COL_W, Math.round(d.startW + e.clientX - d.startX)));
+    setColW((cur) =>
+      cur[d.id] === newW ? cur : { ...cur, [d.id]: newW, [d.nextId]: pair - newW }
+    );
   }
 
   function onColUp() {
@@ -1013,12 +1041,14 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
                     )}
                     <th data-colid="title" style={colW.title ? { width: colW.title } : undefined}>
                       Title
-                      {colResizer("title")}
+                      {visibleCols.length > 0 && colResizer("title")}
                     </th>
-                    {visibleCols.map((c) => (
+                    {visibleCols.map((c, i) => (
                       <th key={c.id} data-colid={c.id} style={colW[c.id] ? { width: colW[c.id] } : undefined}>
                         {COL_LABEL[c.id]}
-                        {colResizer(c.id)}
+                        {/* No handle on the last column — a resize trades width
+                            with the next column, and the last has none. */}
+                        {i < visibleCols.length - 1 && colResizer(c.id)}
                       </th>
                     ))}
                   </tr>

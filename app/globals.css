@@ -1450,7 +1450,10 @@ html[data-theme="dark"] .widget-x { background: var(--panel-2); }
 
 /* Drag-resizable catalog columns */
 .table.books th { position: relative; }
-.table.books.fixedcols { table-layout: fixed; width: max-content; }
+/* Fixed layout at exactly the container width: column widths (which the
+   resize logic keeps summing to this width) are honoured precisely and the
+   table can never extend past the screen. */
+.table.books.fixedcols { table-layout: fixed; width: 100%; }
 .table.books.fixedcols th, .table.books.fixedcols td { overflow: hidden; text-overflow: ellipsis; }
 .col-resizer {
   position: absolute; top: 0; right: -7px; width: 14px; height: 100%;
