@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/db";
 import { notifyChiefEmails, sendEmail, weeklyDigestEmails } from "@/lib/email";
 import { staffUrl } from "@/lib/hosts";
@@ -132,9 +133,16 @@ function isoWeek(nyDate: string): number {
   firstThursday.setUTCDate(firstThursday.getUTCDate() - ftDay + 3);
   return 1 + Math.round((d.getTime() - firstThursday.getTime()) / (7 * 24 * 3600 * 1000));
 }
+/** Constant-time bearer check, so response timing can't leak the secret. */
+function authorized(header: string | null, secret: string | undefined): boolean {
+  if (!secret || !header) return false;
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const got = Buffer.from(header);
+  return expected.length === got.length && timingSafeEqual(expected, got);
+}
+
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!authorized(req.headers.get("authorization"), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

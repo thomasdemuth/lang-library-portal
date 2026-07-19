@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { safeNextPath } from "@/lib/safe-next";
 
 export default function GateForm({ placeholder }: { placeholder: string }) {
   const [email, setEmail] = useState("");
@@ -44,7 +45,7 @@ export default function GateForm({ placeholder }: { placeholder: string }) {
         return;
       }
       const next = new URLSearchParams(window.location.search).get("next");
-      window.location.href = next && next.startsWith("/") ? next : "/";
+      window.location.href = safeNextPath(next, "/");
     } catch {
       setError("Couldn't reach the server — try again.");
     } finally {

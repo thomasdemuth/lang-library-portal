@@ -31,13 +31,19 @@ export const POST = guarded(async (req: NextRequest) => {
     );
   }
 
-  // Username or email both work
-  const { data: admin, error } = await db()
-    .from("admins")
-    .select("id, username, email, name, password_hash, session_v, disabled_at")
-    .or(`username.eq.${body.username},email.eq.${body.username}`)
-    .maybeSingle();
-  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
+  // Username or email both work. Use two exact-match lookups rather than a
+  // PostgREST .or() filter string: the identifier is user-controlled and
+  // .or() has structural syntax (',' and '.' are operators), so interpolating
+  // it there would let a crafted value inject extra filter conditions.
+  const cols = "id, username, email, name, password_hash, session_v, disabled_at";
+  const [byUsername, byEmail] = await Promise.all([
+    db().from("admins").select(cols).eq("username", body.username).maybeSingle(),
+    db().from("admins").select(cols).eq("email", body.username).maybeSingle(),
+  ]);
+  if (byUsername.error || byEmail.error) {
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
+  const admin = byUsername.data ?? byEmail.data;
 
   if (!admin || admin.disabled_at) {
     await burnDummyVerify(); // constant-time-ish response for unknown users
