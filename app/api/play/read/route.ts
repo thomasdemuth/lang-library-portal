@@ -74,13 +74,28 @@ export const POST = guarded(async (req: NextRequest) => {
   await db()
     .from("student_profiles")
     .upsert({ email: session.email }, { onConflict: "email", ignoreDuplicates: true });
-  const { data: prof } = await db()
-    .from("student_profiles")
-    .select("points")
-    .eq("email", session.email)
-    .single();
-  const points = (prof?.points ?? 0) + POINTS_PER_READ;
-  await db().from("student_profiles").update({ points }).eq("email", session.email);
+
+  // Optimistic-lock the award so two quick logs can't lose one increment:
+  // read points, write points+10 only if points still holds, retry if it
+  // moved under us (same guard the shop's buy path uses).
+  let points = POINTS_PER_READ;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data: prof } = await db()
+      .from("student_profiles")
+      .select("points")
+      .eq("email", session.email)
+      .single();
+    const current = prof?.points ?? 0;
+    points = current + POINTS_PER_READ;
+    const { data: updated } = await db()
+      .from("student_profiles")
+      .update({ points })
+      .eq("email", session.email)
+      .eq("points", current)
+      .select("email")
+      .maybeSingle();
+    if (updated) break; // won the race
+  }
 
   return NextResponse.json({ ok: true, earned: POINTS_PER_READ, points });
 });

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { guarded, requireSession } from "@/lib/guards";
 import { attachTags, isCategoryId } from "@/lib/tags";
 import { surnameKey } from "@/lib/shelve";
+import { sampleIds } from "@/lib/sample";
 
 const ROW_SIZE = 14;
 const COLS = "id, title, creators, isbn13, dedupe_key";
@@ -169,14 +170,13 @@ export const GET = guarded(async (req: NextRequest) => {
     db().from("books").select("id").eq("sync_id", active.id).order("id", { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (!lo || !hi) return NextResponse.json({ books: [] });
-  const ids = new Set<number>();
-  while (ids.size < 60) ids.add(lo.id + Math.floor(Math.random() * (hi.id - lo.id + 1)));
+  const ids = sampleIds(lo.id, hi.id, 60);
   const { data } = await db()
     .from("books")
     .select(COLS)
     .eq("sync_id", active.id)
     .not("isbn13", "is", null)
-    .in("id", [...ids])
+    .in("id", ids)
     .limit(ROW_SIZE);
   return NextResponse.json({ books: await attachTags(data ?? []) });
 });
