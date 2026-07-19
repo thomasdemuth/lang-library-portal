@@ -150,16 +150,29 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
   function onColDown(e: React.PointerEvent<HTMLElement>, id: string) {
     if (e.button !== 0) return;
     const th = (e.currentTarget as HTMLElement).closest("th");
-    if (!th) return;
-    // Cap the drag so the column's right edge can't be pulled past the
-    // visible right edge of the table area (i.e. off the screen). Max
-    // width = distance from this column's left edge to the container's
-    // right edge, minus a small gutter.
+    const table = th?.closest("table");
+    if (!th || !table) return;
+
+    // Freeze EVERY resizable column to its current rendered width first, so
+    // switching from auto to fixed table layout doesn't reflow the others.
+    // Without this, grabbing one column made them all jump — the drag then
+    // only moves the column you actually grabbed.
+    const snapshot: Record<string, number> = {};
+    table.querySelectorAll<HTMLElement>("thead th[data-colid]").forEach((cell) => {
+      const cid = cell.dataset.colid;
+      if (cid) snapshot[cid] = Math.round(cell.getBoundingClientRect().width);
+    });
+    const startW = snapshot[id] ?? Math.round(th.getBoundingClientRect().width);
+
+    // Cap growth so the column's right edge can't be dragged past the visible
+    // right edge of the table area (off screen). Never smaller than where it
+    // started, so grabbing a column never snaps it narrower.
     const thLeft = th.getBoundingClientRect().left;
-    const wrapRight =
-      th.closest(".tablewrap")?.getBoundingClientRect().right ?? window.innerWidth;
-    const maxW = Math.max(64, Math.floor(wrapRight - thLeft - 8));
-    colDrag.current = { id, startX: e.clientX, startW: th.offsetWidth, maxW };
+    const wrapRight = th.closest(".tablewrap")?.getBoundingClientRect().right ?? window.innerWidth;
+    const maxW = Math.max(startW, Math.floor(wrapRight - thLeft - 8));
+
+    colDrag.current = { id, startX: e.clientX, startW, maxW };
+    setColW(snapshot); // establish explicit widths on all columns up front
     try {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     } catch {}
@@ -183,25 +196,22 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
     });
   }
 
-  function resetColW(id: string) {
-    setColW((cur) => {
-      const next = { ...cur };
-      delete next[id];
-      saveColW(next);
-      return next;
-    });
+  /** Double-clicking any edge clears custom widths — back to auto-fit. */
+  function resetColW() {
+    setColW({});
+    saveColW({});
   }
 
   /** The grab edge on a header cell. */
   const colResizer = (id: string) => (
     <span
       className="col-resizer"
-      title="Drag to resize — double-click to reset"
+      title="Drag to resize — double-click to auto-fit"
       onPointerDown={(e) => onColDown(e, id)}
       onPointerMove={onColMove}
       onPointerUp={onColUp}
       onPointerCancel={onColUp}
-      onDoubleClick={() => resetColW(id)}
+      onDoubleClick={resetColW}
       onClick={(e) => e.stopPropagation()}
     />
   );
@@ -1001,12 +1011,12 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
                         />
                       </th>
                     )}
-                    <th style={colW.title ? { width: colW.title } : undefined}>
+                    <th data-colid="title" style={colW.title ? { width: colW.title } : undefined}>
                       Title
                       {colResizer("title")}
                     </th>
                     {visibleCols.map((c) => (
-                      <th key={c.id} style={colW[c.id] ? { width: colW[c.id] } : undefined}>
+                      <th key={c.id} data-colid={c.id} style={colW[c.id] ? { width: colW[c.id] } : undefined}>
                         {COL_LABEL[c.id]}
                         {colResizer(c.id)}
                       </th>

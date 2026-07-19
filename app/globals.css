@@ -1450,7 +1450,7 @@ html[data-theme="dark"] .widget-x { background: var(--panel-2); }
 
 /* Drag-resizable catalog columns */
 .table.books th { position: relative; }
-.table.books.fixedcols { table-layout: fixed; width: max-content; min-width: 100%; }
+.table.books.fixedcols { table-layout: fixed; width: max-content; }
 .table.books.fixedcols th, .table.books.fixedcols td { overflow: hidden; text-overflow: ellipsis; }
 .col-resizer {
   position: absolute; top: 0; right: -7px; width: 14px; height: 100%;
