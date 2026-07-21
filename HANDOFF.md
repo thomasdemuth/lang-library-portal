@@ -48,7 +48,15 @@ Create one record on `thelangschool.org`:
 |---|---|---|
 | CNAME | `library` | `cname.vercel-dns.com` |
 
-(When you add `library.thelangschool.org` under Vercel → Project → Settings → Domains, Vercel shows this exact target and verifies the record for you. Nothing else — no A record, no wildcard.)
+(When you add `library.thelangschool.org` under Vercel → Project → Settings → Domains, Vercel shows this exact target and verifies the record for you. Nothing else — no A record, no wildcard, no nameserver change.)
+
+**If the domain is managed at GoDaddy:**
+
+1. In Vercel first: Project → Settings → **Domains** → add `library.thelangschool.org`. It shows the exact CNAME value it expects — keep the tab open.
+2. godaddy.com → sign in → **My Products** / Domain Portfolio → **thelangschool.org** → **DNS** (Manage DNS).
+3. **Add New Record**: Type `CNAME` · Name `library` (GoDaddy appends the domain itself) · Value `cname.vercel-dns.com` (or exactly what Vercel showed) · TTL default (1 hour) → **Save**. If a `library` record already exists, edit it — never keep two.
+4. Wait for Vercel's domain check to turn **Valid Configuration** (minutes, up to an hour). Vercel then issues the certificate automatically — no TLS setup on GoDaddy.
+5. Do **not** change nameservers; this is a single record on the existing zone and doesn't affect mail, `www`, or anything else.
 
 ## 4. Hosting & deployment (Vercel)
 
