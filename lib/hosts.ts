@@ -8,6 +8,22 @@ export const STAFF_EMAIL_DOMAIN = "thelangschool.org";
 
 export type HostAudience = "student" | "staff";
 
+/**
+ * Single-subdomain mode (library.thelangschool.org): when UNIFIED_HOST is
+ * set and the request arrives on it, the middleware routes by path + session
+ * instead of by host. The dual-host mode keeps working alongside it, so a
+ * deployment can serve the old *.vercel.app hosts and the school subdomain
+ * at the same time during a transition.
+ */
+export function unifiedHost(): string | null {
+  return process.env.UNIFIED_HOST || null;
+}
+
+export function isUnifiedHost(host: string | null): boolean {
+  const u = unifiedHost();
+  return Boolean(u && host && host.toLowerCase() === u.toLowerCase());
+}
+
 export function studentHost(): string {
   return process.env.STUDENT_HOST ?? "student.localhost:4173";
 }
@@ -29,12 +45,12 @@ function proto(host: string): "http" | "https" {
 }
 
 export function studentUrl(): string {
-  const h = studentHost();
+  const h = unifiedHost() ?? studentHost();
   return `${proto(h)}://${h}`;
 }
 
 export function staffUrl(): string {
-  const h = staffHost();
+  const h = unifiedHost() ?? staffHost();
   return `${proto(h)}://${h}`;
 }
 
