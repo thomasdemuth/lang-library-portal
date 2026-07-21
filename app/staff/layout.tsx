@@ -9,6 +9,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
     ? [
         { href: "/", label: "Home" },
         { href: "/search", label: "Find a Book" },
+        { href: "/games", label: "Games" },
         { href: "/requests", label: "Book Requests" },
         { href: "/map", label: "Library Map" },
         { href: "/feedback", label: "Feedback" },

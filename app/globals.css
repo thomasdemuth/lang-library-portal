@@ -1465,3 +1465,14 @@ html[data-theme="dark"] .widget-x { background: var(--panel-2); }
 }
 .col-resizer:hover::after, .col-resizer:active::after { background: var(--brand-blue); width: 3px; }
 @media (max-width: 640px) { .col-resizer { display: none; } }
+
+/* Games cards — reuse the book-shelf card look, but the cover stays a fixed
+   tile (games have no page-count aspect ratio) and can fall back to a
+   grass-green placeholder when there's no image. */
+.gamecard.expanded { width: min(392px, 86vw); }
+.gamecard .bc-cover, .gamecard.expanded .bc-cover { width: 156px; flex: none; }
+.gamecard.expanded .bc-cover img { width: 100%; object-fit: cover; }
+.game-cover-fallback {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: rgba(255, 255, 255, .92);
+}
