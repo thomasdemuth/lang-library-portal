@@ -8,6 +8,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
   const links = session
     ? [
         { href: "/", label: "Home" },
+        { href: "/search", label: "Find a Book" },
         { href: "/requests", label: "Book Requests" },
         { href: "/map", label: "Library Map" },
         { href: "/feedback", label: "Feedback" },

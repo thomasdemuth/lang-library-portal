@@ -18,9 +18,15 @@ type Book = {
   tag: CategoryId | null;
 };
 
-/** Read-only catalog search for students & teachers. Tap a book to open its
- *  cover, description, and actions (favorite / I read this / where is it). */
-export default function CatalogSearch() {
+/**
+ * Catalog search, shared by the student and staff portals. Tap a book to
+ * open its cover, description, and location. The `role` prop gates the
+ * student-only play features — favorite hearts, "I read this" stars, and
+ * add-to-collection — which need a student game profile; staff get search,
+ * results, and "Where is it?" only. Everything else is identical.
+ */
+export default function CatalogSearch({ role = "student" }: { role?: "student" | "staff" }) {
+  const isStudent = role === "student";
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<CategoryId | null>(null);
   const [results, setResults] = useState<Book[] | null>(null);
@@ -48,9 +54,10 @@ export default function CatalogSearch() {
   }
 
   useEffect(() => {
+    if (!isStudent) return; // favorites are a student-only feature
     getFavorites().then(() => setFavTick((n) => n + 1));
     return onFavoritesChange(() => setFavTick((n) => n + 1));
-  }, []);
+  }, [isStudent]);
 
   useEffect(() => {
     // arriving from a discovery card prefills the query
@@ -208,25 +215,31 @@ export default function CatalogSearch() {
                             <p className="hint" style={{ marginTop: 0 }}>No description on file yet.</p>
                           )}
                           <div className="bookact">
-                            <button
-                              type="button"
-                              className={`b-btn b-fav${isFavorite(b.dedupe_key) ? " on" : ""}`}
-                              onClick={() => heart(b)}
-                            >
-                              <Heart filled={isFavorite(b.dedupe_key)} size={13} />
-                              {isFavorite(b.dedupe_key) ? "Favorited" : "Favorite"}
-                            </button>
-                            <button
-                              type="button"
-                              className={`b-btn b-read${logged.has(b.dedupe_key) ? " done" : ""}`}
-                              onClick={() => markRead(b)}
-                            >
-                              <Check done={logged.has(b.dedupe_key)} /> {logged.has(b.dedupe_key) ? "Logged" : "I read this"}
-                            </button>
+                            {isStudent && (
+                              <button
+                                type="button"
+                                className={`b-btn b-fav${isFavorite(b.dedupe_key) ? " on" : ""}`}
+                                onClick={() => heart(b)}
+                              >
+                                <Heart filled={isFavorite(b.dedupe_key)} size={13} />
+                                {isFavorite(b.dedupe_key) ? "Favorited" : "Favorite"}
+                              </button>
+                            )}
+                            {isStudent && (
+                              <button
+                                type="button"
+                                className={`b-btn b-read${logged.has(b.dedupe_key) ? " done" : ""}`}
+                                onClick={() => markRead(b)}
+                              >
+                                <Check done={logged.has(b.dedupe_key)} /> {logged.has(b.dedupe_key) ? "Logged" : "I read this"}
+                              </button>
+                            )}
                             <button type="button" className="b-btn b-where" onClick={() => where(b)}>
                               <Pin /> Where is it?
                             </button>
-                            <AddToCollection book={{ book_key: b.dedupe_key, title: b.title, isbn13: b.isbn13 }} />
+                            {isStudent && (
+                              <AddToCollection book={{ book_key: b.dedupe_key, title: b.title, isbn13: b.isbn13 }} />
+                            )}
                           </div>
                         </div>
                       </div>
