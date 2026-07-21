@@ -1,7 +1,14 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CATEGORIES, CATEGORY_IDS, type CategoryId } from "@/lib/categories";
+// The map uses the full set of area types — the book categories plus the
+// map-only grass-green "games" area. (Book tag pickers keep the 6-category
+// CATEGORIES; only the map shows games.)
+import {
+  MAP_CATEGORIES as CATEGORIES,
+  MAP_CATEGORY_IDS as CATEGORY_IDS,
+  type MapCategoryId as CategoryId,
+} from "@/lib/categories";
 
 export type Shelf = {
   id: string;

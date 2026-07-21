@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guarded, requirePermission } from "@/lib/guards";
-import { CATEGORY_IDS } from "@/lib/categories";
+import { MAP_CATEGORY_IDS } from "@/lib/categories";
 
 const Shelf = z.object({
   id: z.string().uuid(),
   label: z.string().trim().min(1).max(80),
-  category: z.enum(CATEGORY_IDS as [string, ...string[]]),
+  category: z.enum(MAP_CATEGORY_IDS as [string, ...string[]]),
   letter_range: z.string().trim().max(40).nullable(),
   shelf_number: z.string().trim().max(40).nullable(),
   details_public: z.string().trim().max(1000).nullable(),

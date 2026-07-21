@@ -1,4 +1,4 @@
-import type { CategoryId } from "@/lib/categories";
+import type { CategoryId, MapCategoryId } from "@/lib/categories";
 
 /**
  * Book → shelf resolution. A shelf on the map carries the organization
@@ -12,7 +12,8 @@ import type { CategoryId } from "@/lib/categories";
 export type ShelfInfo = {
   id: string;
   label: string;
-  category: CategoryId;
+  /** May be a book category or the map-only "games" area. */
+  category: MapCategoryId;
   letter_range: string | null;
   shelf_number: string | null;
 };
