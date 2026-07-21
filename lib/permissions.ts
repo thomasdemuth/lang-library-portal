@@ -14,6 +14,7 @@ export const PERMISSIONS = [
   { key: "feedback_manage", label: "Manage feedback status", group: "Feedback", desc: "Mark feedback read / archived." },
   { key: "inventory_view", label: "Inventory (search)", group: "Inventory", desc: "Search the catalog & see sync history." },
   { key: "inventory_import", label: "Manage inventory imports", group: "Inventory", desc: "Replace the catalog via Libib CSV." },
+  { key: "games", label: "Games inventory", group: "Games", desc: "Add, edit, categorize, and remove games." },
   { key: "signmaker", label: "Sign maker", group: "Tools", desc: "Use the sign generator." },
   { key: "analytics", label: "Site usage", group: "Tools", desc: "View the analytics dashboard." },
   { key: "users", label: "User insights", group: "Tools", desc: "See student & teacher accounts, activity, and notes." },
