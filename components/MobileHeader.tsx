@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 const TITLES: [string, string][] = [
   ["/admin/scan", "Scan"],
   ["/admin/inventory", "Inventory"],
+  ["/admin/games", "Games"],
   ["/admin/map", "Library Map"],
   ["/admin/account", "Settings"],
   ["/admin/admins", "Admins & Invites"],

@@ -23,6 +23,7 @@ export default async function AdminShell({ children }: { children: React.ReactNo
       icon: "book",
       show: canDo(admin, "inventory_view") || canDo(admin, "inventory_import"),
     },
+    { href: "/admin/games", label: "Games", icon: "dice", show: canDo(admin, "games") },
     {
       href: "/admin/map",
       label: "Map Editor",
