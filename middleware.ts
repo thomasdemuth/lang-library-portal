@@ -1,6 +1,6 @@
 import { NextFetchEvent, NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken, type Session } from "@/lib/session";
-import { audienceForHost, isUnifiedHost, staffHost, studentHost, studentUrl, unifiedHost, type HostAudience } from "@/lib/hosts";
+import { audienceForHost, isUnifiedHost, staffHost, studentHost, unifiedHost, type HostAudience } from "@/lib/hosts";
 import { homePathFor, portalIdForEmail, splitPortalPath, treeFor } from "@/lib/unified";
 
 /**
@@ -193,13 +193,25 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
 
   // ── 1. Host header → routing mode ─────────────────────────────────────
   const unified = isUnifiedHost(host);
+
+  // In production the app lives ONLY at the unified domain. Every other host
+  // — the retired *.vercel.app aliases and per-deployment URLs — permanently
+  // funnels there, preserving the path + query so old deep links still land.
+  // (Skipped when UNIFIED_HOST isn't configured, so there's never a redirect
+  // to nowhere; dev and Vercel previews keep their dual-host behavior.)
+  const uHost = unifiedHost();
+  if (!unified && uHost && process.env.VERCEL_ENV === "production") {
+    const target = req.nextUrl.clone();
+    target.protocol = "https:";
+    target.host = uHost;
+    target.port = "";
+    return applyHeaders(NextResponse.redirect(target));
+  }
+
+  // Dev + Vercel previews fall back to dual-host mode (student/staff by host).
   let audience: HostAudience | null = unified ? null : audienceForHost(host);
   if (!unified && !audience) {
-    if (process.env.VERCEL_ENV === "production") {
-      // Unknown host in production: send to the main site
-      return applyHeaders(NextResponse.redirect(studentUrl()));
-    }
-    // Dev servers and Vercel preview URLs behave as the staff site (most testable)
+    // Unknown dev/preview host behaves as the staff site (most testable).
     audience = "staff";
   }
 

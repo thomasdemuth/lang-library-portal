@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   audienceForHost,
   emailAllowedFor,
+  isManagementExemptEmail,
   isUnifiedHost,
   staffUrl,
   studentUrl,
@@ -36,13 +37,12 @@ function withSession(token: string, aud: Session["aud"], body: Record<string, un
  * issued, so the form can reveal the password field inline.
  */
 async function unifiedGate(email: string, password: string | undefined, req: NextRequest) {
-  if (emailAllowedFor("student", email)) {
-    const session: Session = { aud: "student", email };
-    const token = await signSession(session);
-    return withSession(token, "student", { redirect: homePathFor(session) });
-  }
+  const isStudentEmail = emailAllowedFor("student", email);
+  const isStaffEmail = emailAllowedFor("staff", email);
+  const exempt = isManagementExemptEmail(email);
 
-  if (!emailAllowedFor("staff", email)) {
+  // Off-domain (and not specially exempted) → friendly rejection.
+  if (!isStudentEmail && !isStaffEmail && !exempt) {
     return NextResponse.json(
       {
         error: `Please use your school email (@${STUDENT_EMAIL_DOMAIN} for students, @${STAFF_EMAIL_DOMAIN} for staff).`,
@@ -51,7 +51,10 @@ async function unifiedGate(email: string, password: string | undefined, req: Nex
     );
   }
 
-  // Staff domain: is this a registered management account?
+  // Look up a management account only when this email is eligible for one:
+  // any staff-domain email, plus the special student-domain exemptions. A
+  // normal student email never touches the admins table (no password path).
+  const canBeAdmin = isStaffEmail || exempt;
   let admin: {
     id: string;
     email: string;
@@ -60,21 +63,23 @@ async function unifiedGate(email: string, password: string | undefined, req: Nex
     session_v: number;
     disabled_at: string | null;
   } | null = null;
-  if (dbConfigured()) {
+  if (canBeAdmin && dbConfigured()) {
     const { data } = await db()
       .from("admins")
       .select("id, email, name, password_hash, session_v, disabled_at")
       .eq("email", email)
       .maybeSingle();
-    // On a lookup failure we fall through to a plain staff session: the
+    // On a lookup failure we fall through to a plain portal session: the
     // portal keeps working, and management needs the database anyway.
     admin = data ?? null;
   }
 
+  // Not a registered management account → a plain portal session by domain.
   if (!admin || admin.disabled_at) {
-    const session: Session = { aud: "staff", email };
+    const aud: Session["aud"] = isStaffEmail ? "staff" : "student";
+    const session: Session = { aud, email };
     const token = await signSession(session);
-    return withSession(token, "staff", { redirect: homePathFor(session) });
+    return withSession(token, aud, { redirect: homePathFor(session) });
   }
 
   // Registered account, no password yet → tell the form to ask for one.
