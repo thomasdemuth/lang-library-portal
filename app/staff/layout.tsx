@@ -1,13 +1,21 @@
+import { headers } from "next/headers";
 import SiteHeader from "@/components/SiteHeader";
 import LaunchRedirect from "@/components/LaunchRedirect";
 import { currentSession } from "@/lib/server";
+import { isUnifiedHost } from "@/lib/hosts";
+import { portalHomeFor } from "@/lib/unified";
 
 export default async function StaffLayout({ children }: { children: React.ReactNode }) {
   const session = await currentSession();
   const isAdmin = session?.aud === "admin";
+  // On the unified host "/" is the session's home — and an admin's home is
+  // management, so link the portal home explicitly or admins can never get
+  // back here. Dual-host mode has no /staff/<id> form: "/" is this portal.
+  const unified = isUnifiedHost((await headers()).get("host"));
+  const home = session && unified ? portalHomeFor(session) : "/";
   const links = session
     ? [
-        { href: "/", label: "Home" },
+        { href: home, label: "Home" },
         { href: "/search", label: "Find a Book" },
         { href: "/games", label: "Games" },
         { href: "/requests", label: "Book Requests" },
@@ -19,7 +27,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
   return (
     <>
       {isAdmin && <LaunchRedirect />}
-      <SiteHeader tagline="staff portal" email={session?.email} links={links} />
+      <SiteHeader tagline="staff portal" email={session?.email} links={links} home={home} />
       {children}
     </>
   );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { homePathFor, portalIdForEmail, splitPortalPath, treeFor } from "./unified";
+import { homePathFor, portalHomeFor, portalIdForEmail, splitPortalPath, treeFor } from "./unified";
 
 describe("portalIdForEmail", () => {
   it("slugs the email local part", () => {
@@ -24,9 +24,23 @@ describe("homePathFor", () => {
       "/student/kid-tester"
     );
   });
-  it("routes staff and admins to /staff/<id>", () => {
+  it("routes staff to /staff/<id>", () => {
     expect(homePathFor({ aud: "staff", email: "jane.doe@thelangschool.org" })).toBe("/staff/jane-doe");
-    expect(homePathFor({ aud: "admin", email: "lib.rarian@thelangschool.org" })).toBe("/staff/lib-rarian");
+  });
+  it("routes admins to management, not the staff portal", () => {
+    expect(homePathFor({ aud: "admin", email: "lib.rarian@thelangschool.org" })).toBe("/admin");
+  });
+});
+
+describe("portalHomeFor", () => {
+  it("keeps an admin's staff-portal home reachable", () => {
+    expect(portalHomeFor({ aud: "admin", email: "lib.rarian@thelangschool.org" })).toBe("/staff/lib-rarian");
+  });
+  it("matches homePathFor for everyone else", () => {
+    const staff = { aud: "staff", email: "jane.doe@thelangschool.org" } as const;
+    const student = { aud: "student", email: "kid.tester@students.thelangschool.org" } as const;
+    expect(portalHomeFor(staff)).toBe(homePathFor(staff));
+    expect(portalHomeFor(student)).toBe(homePathFor(student));
   });
 });
 

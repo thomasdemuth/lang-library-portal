@@ -1365,6 +1365,44 @@ kbd {
 html[data-theme="dark"] kbd { background: #232b3d; border-color: #39435a; }
 .kbd-hint { display: inline-flex; align-items: center; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
 .kbd-hint kbd { margin-right: 3px; }
+/* No keyboard on a phone — the floating Undo pill says it instead */
+@media (max-width: 640px) { .kbd-hint { display: none; } }
+
+/* ── Mobile undo: the tap-sized replacement for ⌘Z ── */
+.undo-bar { display: none; }
+@media (max-width: 640px) {
+  .undo-bar {
+    position: fixed; right: 14px; z-index: 80;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+    pointer-events: none; /* only the controls take taps */
+  }
+  .undo-bar > * { pointer-events: auto; }
+  .undo-fab {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 0; border-radius: 999px; padding: 11px 18px;
+    background: var(--brand-gradient); color: #fff;
+    font: inherit; font-size: 14px; font-weight: 800; letter-spacing: .2px;
+    box-shadow: 0 8px 22px rgba(20, 32, 70, .3);
+    animation: toast-pop .16s ease; -webkit-tap-highlight-color: transparent;
+  }
+  .undo-fab:disabled { opacity: .6; }
+  .undo-fab:active { transform: scale(.97); }
+  .undo-fab svg { width: 17px; height: 17px; }
+  .undo-toast {
+    display: flex; align-items: center; gap: 12px; max-width: min(88vw, 340px);
+    background: rgba(23, 30, 45, .95); color: #fff; border-radius: 14px;
+    padding: 10px 14px; font-size: 13px; font-weight: 700;
+    box-shadow: 0 10px 30px rgba(16, 24, 40, .32); animation: toast-pop .16s ease;
+  }
+  .undo-toast-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .undo-toast-action {
+    flex: none; border: 0; background: transparent; padding: 2px 2px;
+    font: inherit; font-size: 13px; font-weight: 800; color: #9db1ee;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .undo-toast-action:disabled { opacity: .6; }
+}
 .kbd-table { margin-top: 14px; transition: opacity .15s; }
 .kbd-table.off { opacity: .45; }
 .kbd-group {

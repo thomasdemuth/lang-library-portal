@@ -32,7 +32,7 @@ function withSession(token: string, aud: Session["aud"], body: Record<string, un
  *   student email                    → student session → /student/<id>
  *   staff email, not registered     → staff session   → /staff/<id>
  *   staff email, registered account → { requiresPassword: true } until the
- *     password arrives; correct password → admin session → /staff/<id>
+ *     password arrives; correct password → admin session → /admin
  * The email is checked against the admins table BEFORE any session is
  * issued, so the form can reveal the password field inline.
  */

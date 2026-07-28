@@ -3,6 +3,7 @@ import { currentAdmin } from "@/lib/server";
 import { canDo } from "@/lib/permissions";
 import MobileTabBar from "@/components/MobileTabBar";
 import MobileHeader from "@/components/MobileHeader";
+import MobileUndo from "@/components/MobileUndo";
 import SideNav from "@/components/SideNav";
 import Shortcuts from "@/components/Shortcuts";
 import { navShortcutsFor } from "@/lib/shortcuts";
@@ -45,6 +46,7 @@ export default async function AdminShell({ children }: { children: React.ReactNo
   return (
     <div className="admin-grid">
       <Shortcuts links={navShortcutsFor(admin)} />
+      <MobileUndo />
       <SideNav library={libraryLinks} tools={toolLinks} account={accountLinks} />
       <main className="admin-main">
         <MobileHeader />

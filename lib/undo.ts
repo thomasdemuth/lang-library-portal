@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * A tiny app-wide undo/redo stack, driven by ⌘Z / ⌘⇧Z (see
- * components/Shortcuts.tsx). Panels register an entry when they do
+ * A tiny app-wide undo/redo stack, driven by ⌘Z / ⌘⇧Z on desktop (see
+ * components/Shortcuts.tsx) and by the floating Undo pill on phones (see
+ * components/MobileUndo.tsx). Panels register an entry when they do
  * something reversible; the entry carries both directions so a step can
  * be replayed after it's undone.
  *
@@ -42,6 +43,11 @@ export function pushUndo(entry: UndoEntry): void {
 
 export function canUndo(): boolean {
   return undoStack.length > 0;
+}
+
+/** The label of the action ⌘Z (or the mobile Undo button) would reverse. */
+export function peekUndo(): string | null {
+  return undoStack[undoStack.length - 1]?.label ?? null;
 }
 
 export function canRedo(): boolean {

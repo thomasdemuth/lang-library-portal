@@ -5,15 +5,18 @@ export default function SiteHeader({
   links,
   email,
   audience = "staff",
+  home = "/",
 }: {
   tagline: string;
   links: { href: string; label: string }[];
   email?: string | null;
   audience?: "student" | "staff";
+  /** Where the wordmark goes — this portal's home, not always "/" (see StaffLayout). */
+  home?: string;
 }) {
   return (
     <header className="topbar">
-      <a className="brand" href="/">
+      <a className="brand" href={home}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="brand-mark" src="/icon-192.png" alt="" width={38} height={38} />
         <span className="brand-tag">{tagline}</span>

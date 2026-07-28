@@ -20,8 +20,21 @@ export function portalIdForEmail(email: string): string {
   return slug || "me";
 }
 
-/** The signed-in user's canonical portal home path. */
+/**
+ * The signed-in user's canonical home path — where "/" and sign-in land them.
+ *
+ * Management accounts go to /admin, not to the staff portal: management is
+ * the surface they signed in for, and on phones it's the one with the app
+ * shell (tab bar, app bar, launch screen). Their staff-portal pages are still
+ * theirs at /staff/<id> — see staffHomeFor.
+ */
 export function homePathFor(session: SessionLike): string {
+  if (session.aud === "admin") return "/admin";
+  return portalHomeFor(session);
+}
+
+/** The portal-tree home for a session, ignoring the management surface. */
+export function portalHomeFor(session: SessionLike): string {
   const id = portalIdForEmail(session.email);
   return session.aud === "student" ? `/student/${id}` : `/staff/${id}`;
 }
