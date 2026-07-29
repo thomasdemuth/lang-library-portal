@@ -21,13 +21,12 @@ export default function SignInPage() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="gate-logo" src="/icon-192.png" alt="Lang Library" width={76} height={76} />
         <h1>Lang Library</h1>
-        <p className="sub">Sign in with your school Google account.</p>
       </div>
       <div className="card">
         <SignInForm google={google} devLogin={devLogin} />
       </div>
-      <p className="hint" style={{ textAlign: "center", marginTop: 12 }}>
-        Library staff &amp; management: <a href="/admin/login">sign in here →</a>
+      <p className="hint" style={{ textAlign: "center", marginTop: 14 }}>
+        use your google account to access all features
       </p>
     </div>
   );

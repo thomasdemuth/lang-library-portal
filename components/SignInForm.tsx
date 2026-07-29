@@ -22,13 +22,26 @@ const ERROR_TEXT: Record<string, string> = {
   google_unconfigured: "Google sign-in isn't set up yet — ask the library team.",
 };
 
-const BLOCK: React.CSSProperties = {
+const BOX: React.CSSProperties = {
   width: "100%",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: 8,
+  gap: 10,
   textDecoration: "none",
+  borderRadius: 12,
+  padding: "13px 16px",
+  fontWeight: 700,
+  fontSize: 16,
+  boxSizing: "border-box",
+};
+// Outlined buttons use a transparent fill + border so they read correctly on
+// the card in both light and dark themes.
+const OUTLINE: React.CSSProperties = {
+  ...BOX,
+  background: "transparent",
+  border: "1px solid var(--line, #dfe3ea)",
+  marginTop: 10,
 };
 
 export default function SignInForm({ google, devLogin }: { google: boolean; devLogin: boolean }) {
@@ -48,17 +61,18 @@ export default function SignInForm({ google, devLogin }: { google: boolean; devL
       {error && <div className="error">{error}</div>}
 
       {google && (
-        <a className="btn brand" href={`/api/auth/google/start${nextQS}`} style={BLOCK}>
+        <a className="btn brand" href={`/api/auth/google/start${nextQS}`} style={BOX}>
           <GoogleG /> Sign in with Google
         </a>
       )}
 
-      <a className="btn ghost" href="/api/auth/guest" style={{ ...BLOCK, marginTop: 10 }}>
-        Continue as a guest
+      <a href="/api/auth/guest" style={{ ...OUTLINE, color: "var(--brand-blue, #2e50c8)" }}>
+        continue as a guest
       </a>
-      <p className="hint" style={{ textAlign: "center", marginTop: 8 }}>
-        Guests can use Find a Book and the Library Map.
-      </p>
+
+      <a href="/admin/login" style={{ ...OUTLINE, color: "var(--muted, #8a93a6)" }}>
+        management sign-in
+      </a>
 
       {devLogin && <DevEmailForm />}
     </>
