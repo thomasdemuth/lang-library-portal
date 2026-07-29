@@ -2,12 +2,13 @@ import { SignJWT, jwtVerify } from "jose";
 
 /**
  * One signed httpOnly cookie per host carries the whole session.
- * aud: "student" | "staff" (email-gated visitors) | "admin" (password login).
+ * aud: "student" | "staff" (Google sign-in) | "admin" (password login) |
+ * "guest" (no account — a restricted lookup+map-only visitor).
  * Host-only cookies mean the student and staff subdomains never share sessions.
  */
 export const SESSION_COOKIE = "lang_session";
 
-export type Audience = "student" | "staff" | "admin";
+export type Audience = "student" | "staff" | "admin" | "guest";
 
 export type Session = {
   aud: Audience;
@@ -32,6 +33,7 @@ export const SESSION_MAX_AGE: Record<Audience, number> = {
   student: 180 * 24 * 3600,
   staff: 180 * 24 * 3600,
   admin: 14 * 24 * 3600,
+  guest: 12 * 3600, // ephemeral: no account, expires same day
 };
 
 export async function signSession(session: Session): Promise<string> {
@@ -47,7 +49,7 @@ export async function verifySessionToken(token: string | undefined): Promise<Ses
   try {
     const { payload } = await jwtVerify(token, secret());
     const aud = payload.aud;
-    if (aud !== "student" && aud !== "staff" && aud !== "admin") return null;
+    if (aud !== "student" && aud !== "staff" && aud !== "admin" && aud !== "guest") return null;
     if (typeof payload.email !== "string") return null;
     return {
       aud,

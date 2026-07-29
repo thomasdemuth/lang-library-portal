@@ -11,7 +11,10 @@
  * signed-in user and bounces mismatches to their own portal home.
  */
 
-export type SessionLike = { aud: "student" | "staff" | "admin"; email: string };
+export type SessionLike = { aud: "student" | "staff" | "admin" | "guest"; email: string };
+
+/** Guests have no account: they live only on Find a Book + the Library Map. */
+export const GUEST_HOME = "/search";
 
 /** "Kid.Tester@students.thelangschool.org" → "kid-tester" (stable, human-readable). */
 export function portalIdForEmail(email: string): string {
@@ -30,6 +33,7 @@ export function portalIdForEmail(email: string): string {
  */
 export function homePathFor(session: SessionLike): string {
   if (session.aud === "admin") return "/admin";
+  if (session.aud === "guest") return GUEST_HOME;
   return portalHomeFor(session);
 }
 
@@ -53,5 +57,6 @@ export function splitPortalPath(pathname: string): PortalPath | null {
 
 /** Which internal tree a session's bare paths (/games, /search…) belong to. */
 export function treeFor(session: SessionLike): "student" | "staff" {
-  return session.aud === "student" ? "student" : "staff";
+  // Guests render inside the student tree (their pages live there).
+  return session.aud === "student" || session.aud === "guest" ? "student" : "staff";
 }

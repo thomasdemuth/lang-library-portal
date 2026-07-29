@@ -3,23 +3,17 @@ import { z } from "zod";
 import {
   audienceForHost,
   emailAllowedFor,
-  isManagementExemptEmail,
   isUnifiedHost,
   staffUrl,
   studentUrl,
   STAFF_EMAIL_DOMAIN,
   STUDENT_EMAIL_DOMAIN,
 } from "@/lib/hosts";
+import { classifyEmail } from "@/lib/gate";
 import { homePathFor } from "@/lib/unified";
-import { db, dbConfigured } from "@/lib/db";
-import { verifyPassword } from "@/lib/passwords";
-import { allowHit, clientIp } from "@/lib/ratelimit";
 import { SESSION_COOKIE, sessionCookieOptions, signSession, type Session } from "@/lib/session";
 
-const Body = z.object({
-  email: z.string().trim().toLowerCase().email().max(200),
-  password: z.string().min(1).max(500).optional(),
-});
+const Body = z.object({ email: z.string().trim().toLowerCase().email().max(200) });
 
 function withSession(token: string, aud: Session["aud"], body: Record<string, unknown>): NextResponse {
   const res = NextResponse.json({ ok: true, ...body });
@@ -28,108 +22,36 @@ function withSession(token: string, aud: Session["aud"], body: Record<string, un
 }
 
 /**
- * Unified host (library.thelangschool.org): one sign-in for everyone.
- *   student email                    → student session → /student/<id>
- *   staff email, not registered     → staff session   → /staff/<id>
- *   staff email, registered account → { requiresPassword: true } until the
- *     password arrives; correct password → admin session → /admin
- * The email is checked against the admins table BEFORE any session is
- * issued, so the form can reveal the password field inline.
+ * Dev/fallback email login (unified host). Production forces "Sign in with
+ * Google" (see the lockout in POST); this path stays alive only for local
+ * testing without Google credentials. It issues a portal session by domain —
+ * management still lives on the separate /admin/login page, never here.
  */
-async function unifiedGate(email: string, password: string | undefined, req: NextRequest) {
-  const isStudentEmail = emailAllowedFor("student", email);
-  const isStaffEmail = emailAllowedFor("staff", email);
-  const exempt = isManagementExemptEmail(email);
-
-  // Off-domain (and not specially exempted) → friendly rejection.
-  if (!isStudentEmail && !isStaffEmail && !exempt) {
-    return NextResponse.json(
-      {
-        error: `Please use your school email (@${STUDENT_EMAIL_DOMAIN} for students, @${STAFF_EMAIL_DOMAIN} for staff).`,
-      },
-      { status: 403 }
-    );
-  }
-
-  // Look up a management account only when this email is eligible for one:
-  // any staff-domain email, plus the special student-domain exemptions. A
-  // normal student email never touches the admins table (no password path).
-  const canBeAdmin = isStaffEmail || exempt;
-  let admin: {
-    id: string;
-    email: string;
-    name: string;
-    password_hash: string;
-    session_v: number;
-    disabled_at: string | null;
-  } | null = null;
-  if (canBeAdmin && dbConfigured()) {
-    const { data } = await db()
-      .from("admins")
-      .select("id, email, name, password_hash, session_v, disabled_at")
-      .eq("email", email)
-      .maybeSingle();
-    // On a lookup failure we fall through to a plain portal session: the
-    // portal keeps working, and management needs the database anyway.
-    admin = data ?? null;
-  }
-
-  // Not a registered management account → a plain portal session by domain.
-  if (!admin || admin.disabled_at) {
-    const aud: Session["aud"] = isStaffEmail ? "staff" : "student";
-    const session: Session = { aud, email };
-    const token = await signSession(session);
-    return withSession(token, aud, { redirect: homePathFor(session) });
-  }
-
-  // Registered account, no password yet → tell the form to ask for one.
-  if (!password) {
-    return NextResponse.json({ requiresPassword: true });
-  }
-
-  const ip = clientIp(req);
-  const [ipOk, userOk] = await Promise.all([
-    allowHit("admin_login", `ip:${ip}`, 10, 15 * 60),
-    allowHit("admin_login", `user:${email}`, 10, 15 * 60),
-  ]);
-  if (!ipOk || !userOk) {
-    return NextResponse.json(
-      { error: "Too many attempts — wait 15 minutes and try again.", requiresPassword: true },
-      { status: 429 }
-    );
-  }
-
-  const ok = await verifyPassword(password, admin.password_hash);
-  if (!ok) {
-    return NextResponse.json(
-      { error: "Wrong password — try again.", requiresPassword: true },
-      { status: 401 }
-    );
-  }
-
-  const session: Session = {
-    aud: "admin",
-    email: admin.email,
-    sub: admin.id,
-    name: admin.name,
-    v: admin.session_v,
-  };
+async function unifiedGate(email: string) {
+  const c = classifyEmail(email);
+  if (c.kind === "reject") return NextResponse.json({ error: c.message }, { status: 403 });
+  const session: Session = { aud: c.aud, email: c.email };
   const token = await signSession(session);
-  await db().from("admins").update({ last_login_at: new Date().toISOString() }).eq("id", admin.id);
-  return withSession(token, "admin", { redirect: homePathFor(session), name: admin.name });
+  return withSession(token, c.aud, { redirect: homePathFor(session) });
 }
 
 export async function POST(req: NextRequest) {
+  // Production: the passwordless email form is disabled — students and staff
+  // sign in with Google, admins on /admin/login. ALLOW_EMAIL_LOGIN=1 is a
+  // dev/break-glass escape hatch only.
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_EMAIL_LOGIN !== "1") {
+    return NextResponse.json({ error: "Please sign in with Google." }, { status: 403 });
+  }
+
   let email: string;
-  let password: string | undefined;
   try {
-    ({ email, password } = Body.parse(await req.json()));
+    ({ email } = Body.parse(await req.json()));
   } catch {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
   }
 
   if (isUnifiedHost(req.headers.get("host"))) {
-    return unifiedGate(email, password, req);
+    return unifiedGate(email);
   }
 
   // Unknown hosts (dev, previews) behave as the staff site, mirroring the middleware.

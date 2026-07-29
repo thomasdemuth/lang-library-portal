@@ -55,6 +55,17 @@ export function staffUrl(): string {
 }
 
 /**
+ * Absolute origin of the unified host — used to build the Google OAuth
+ * redirect URI so it needs no hardcoding: http://localhost:4173 in dev,
+ * https://library.thelangschool.org in prod. Falls back to the staff host
+ * when UNIFIED_HOST is unset (dual-host dev).
+ */
+export function unifiedUrl(): string {
+  const h = unifiedHost() ?? staffHost();
+  return `${proto(h)}://${h}`;
+}
+
+/**
  * Student-domain emails specifically exempted to ALSO sign in as management
  * (they must still be a registered admin account and enter its password).
  * This is the personal account the librarian-developer uses on the student

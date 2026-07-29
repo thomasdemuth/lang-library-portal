@@ -18,8 +18,10 @@ import { homePathFor, portalIdForEmail, splitPortalPath, treeFor } from "@/lib/u
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+// Sign-in entry points reachable while signed out (Google OAuth + guest).
+const AUTH_OPEN = ["/api/auth/google/start", "/api/auth/google/callback", "/api/auth/guest"];
 // Paths open on both hosts (external form)
-const COMMON_OPEN = new Set(["/gate", "/api/gate", "/api/logout", "/api/version"]);
+const COMMON_OPEN = new Set(["/gate", "/api/gate", "/api/logout", "/api/version", ...AUTH_OPEN]);
 // Additional open paths on the staff host
 const STAFF_OPEN = new Set(["/admin/login", "/api/admin/login", "/api/invite/claim", "/api/cron/daily"]);
 const STAFF_OPEN_PREFIXES = ["/admin/invite/"];
@@ -31,7 +33,11 @@ const UNIFIED_OPEN_API = new Set([
   "/api/cron/daily",
   "/api/invite/claim",
   "/api/admin/login",
+  ...AUTH_OPEN,
 ]);
+// Pages/APIs a guest (no account) may reach: Find a Book + the Library Map.
+const GUEST_PAGES = new Set(["/search", "/map"]);
+const GUEST_API_PREFIXES = ["/api/catalog", "/api/map"];
 
 function hard404(): NextResponse {
   return applyHeaders(new NextResponse("Not Found", { status: 404 }));
@@ -120,6 +126,11 @@ function routeUnified(
   // session, everything non-open needs some session. Handlers re-check.
   if (pathname.startsWith("/api/")) {
     if (UNIFIED_OPEN_API.has(pathname)) return applyHeaders(NextResponse.next());
+    if (session?.aud === "guest") {
+      // Guests reach only the read APIs behind Find a Book + the Map.
+      const ok = GUEST_API_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+      return ok ? applyHeaders(NextResponse.next()) : json401();
+    }
     if (pathname.startsWith("/api/admin/")) {
       if (session?.aud !== "admin") return json401();
     } else if (!session) {
@@ -153,6 +164,13 @@ function routeUnified(
     url.search = "";
     return applyHeaders(NextResponse.redirect(url));
   };
+
+  // Guests (no account) are confined to Find a Book + the Library Map; the
+  // "Sign in with Google" upsell links straight to /api/auth/google/start.
+  if (session.aud === "guest") {
+    if (GUEST_PAGES.has(pathname)) return { rewrite: `/student${pathname}`, logAudience: "guest" };
+    return goHome(); // home = /search
+  }
 
   // Signed-in visits to the sign-in page go straight to the portal home.
   if (pathname === "/" || pathname === "/signin" || pathname === "/gate") return goHome();

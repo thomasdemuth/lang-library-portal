@@ -28,6 +28,9 @@ Lang Library is the school library's web portal: students browse and search the 
 |---|---|---|---|
 | `AUTH_SECRET` | yes | 32+ random characters; signs every session cookie. Rotating it signs everyone out. | `openssl rand -base64 48` output |
 | `UNIFIED_HOST` | yes | The one public hostname, no protocol. Turns on single-domain routing. | `library.thelangschool.org` |
+| `GOOGLE_CLIENT_ID` | yes | Google OAuth 2.0 Web client ID — students & teachers sign in with Google. See "Google sign-in setup" below. | `1234-abc.apps.googleusercontent.com` |
+| `GOOGLE_CLIENT_SECRET` | yes | Secret for that OAuth client. Server-side only. | `GOCSPX-…` |
+| `ALLOW_EMAIL_LOGIN` | no | **Leave unset in production.** Dev/break-glass only — re-enables the old passwordless email login. | `1` (dev only) |
 | `STUDENT_HOST` / `STAFF_HOST` | no | Legacy two-hostname mode; still works alongside `UNIFIED_HOST` during a transition. Omit for a fresh deployment. | `student-lang.vercel.app` |
 | `SUPABASE_URL` | yes | Supabase project URL. | `https://abcd1234.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Supabase service-role key. Server-side only; never exposed to browsers. | `eyJhbGciOi…` |
@@ -82,12 +85,13 @@ Vercel provisions and renews the certificate for `library.thelangschool.org` aut
    - run `npm ci && npm run seed`;
    - delete the password from `seed.local.json` afterwards (the file is gitignored). Re-running the seed updates the same account — this is also the password-reset path of last resort.
    Further admins are invited from inside the app (Management → Admins & Invites), so the seed is normally needed once.
-3. **Smoke test** at `https://library.thelangschool.org`:
-   - [ ] Any `@students.thelangschool.org` email → lands on `/student/<id>`, student portal, no staff nav.
-   - [ ] Any `@thelangschool.org` email that is *not* the seeded account → lands on `/staff/<id>`, staff portal **without** a "Management" link.
-   - [ ] The seeded email → a password field appears inline → correct password lands on `/staff/<id>` **with** the "Management" link, and `/admin` opens.
-   - [ ] Negative checks: a student visiting `/staff/anything` or `/admin` is bounced to their own portal; a non-admin staff member visiting `/admin` is bounced; a wrong password is rejected (and rate-limited after ~10 tries); a non-school email gets "Please use your school email".
-   - [ ] Sign out (top-right account menu on the portals, My Account in management) returns to the sign-in page at `/`.
+3. **Smoke test** at `https://library.thelangschool.org` (needs the Google client configured, §"Google sign-in setup"):
+   - [ ] "Sign in with Google" + a `@students.thelangschool.org` account → lands on `/student/<id>`, student portal.
+   - [ ] "Sign in with Google" + a `@thelangschool.org` account → lands on `/staff/<id>`, staff portal.
+   - [ ] "Continue as a guest" → `/search`; nav shows only Find a Book + Library Map; visiting `/games` or `/me` bounces back to `/search`.
+   - [ ] `/admin/login` + the seeded admin username/password → `/admin` (management). Google is **not** involved.
+   - [ ] Negative checks: a student visiting `/staff/anything` or `/admin` is bounced to their own portal; a non-school Google account is rejected with a friendly message + guest offer; `POST /api/gate` returns 403 (email login disabled in prod).
+   - [ ] Sign out returns to the sign-in page at `/`.
 
 ## 7. Maintenance
 
@@ -97,5 +101,18 @@ Vercel provisions and renews the certificate for `library.thelangschool.org` aut
 
 **Known limitations (accepted for now):**
 
-- **Email-only sign-in for students and teachers.** There is no password or proof of mailbox ownership for the `student`/`staff` roles: anyone who knows the school's email format can enter as that person. This is a deliberate, accepted tradeoff to keep friction near zero for children; nothing sensitive is reachable without a management password. **Upgrade path:** the school's Google Workspace makes "Sign in with Google" natural — add Google OAuth (restricted to the two school domains), verify the token server-side, and keep the exact same session/role logic; only the sign-in step changes. Not implemented yet.
+- **Sign-in is Google Workspace SSO** for students and teachers — they authenticate with their school Google account, so identity is proven (no more typing someone else's email). Anyone may also **continue as a guest**: an account-less session limited to Find a Book and the Library Map. **Management** signs in separately at `/admin/login` with a username + password (Google never grants admin). The old passwordless email form is disabled in production (dev-only, behind `ALLOW_EMAIL_LOGIN`). See "Google sign-in setup" below.
+- The `/admin/login` page reveals whether a username exists via timing only (it runs a dummy password hash for unknown users), and admin login is rate-limited (10 attempts / 15 min per IP and per account).
+
+## Google sign-in setup (one-time, in Google Cloud Console)
+
+Students and teachers sign in with Google; you need one OAuth client. No Google Workspace-admin rights are required (the app enforces the school domains server-side).
+
+1. **APIs & Services → OAuth consent screen**: User type **External**; app name "Lang Library"; support + developer email = a `@thelangschool.org` address; scopes are the default non-sensitive `openid`, `email`, `profile` (no Google verification review needed). **Publish** the app.
+2. **APIs & Services → Credentials → Create credentials → OAuth client ID → Web application.** Authorized redirect URIs (add both):
+   - `https://library.thelangschool.org/api/auth/google/callback` (production)
+   - `http://localhost:4173/api/auth/google/callback` (local dev — Google allows `http` for `localhost`)
+3. Copy the **Client ID** and **Client secret** into `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in Vercel (Production) and `.env.local` (dev).
+
+Non-school Google accounts are rejected at the callback with a friendly message and offered the guest option. Because it's an "External" app, anyone can *reach* the Google button, but only `@thelangschool.org` / `@students.thelangschool.org` accounts are let in.
 - Related, by design of the inline password prompt: the sign-in page reveals whether a given `@thelangschool.org` email is a registered management account. Password attempts are rate-limited (10 per 15 minutes per address and per IP).
