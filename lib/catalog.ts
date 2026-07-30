@@ -20,12 +20,40 @@ export async function searchCatalog({ q, tag, untagged = false, page, sort = "ti
     .maybeSingle();
   if (!active) return { ok: true, books: [], total: 0, page, pageSize: PAGE_SIZE };
 
-  // Tag filtering (and the untagged review queue) go through the
-  // books_tagged view (books ⋈ book_tags); plain browsing keeps hitting
-  // the base table so it works pre-0008. Rebuilt fresh for each attempt
-  // since a PostgREST query can't be re-run after it executes.
-  const cols = "id, title, creators, isbn13, copies, group_name, dedupe_key";
   const norm = normalizeTitle(q);
+
+  // Non-empty query → the fuzzy + full-text RPC (migration 0018): tolerates
+  // typos, out-of-order words, author+title mixed, partials, and stems. Falls
+  // through to the legacy substring search if 0018 hasn't run yet.
+  if (norm) {
+    const { data, error } = await db().rpc("search_books", {
+      p_q: q,
+      p_qnorm: norm,
+      p_sync_id: active.id,
+      p_tag: tag ?? null,
+      p_untagged: untagged,
+      p_limit: PAGE_SIZE,
+      p_offset: page * PAGE_SIZE,
+    });
+    if (!error) {
+      const rows = (data ?? []) as Array<Record<string, unknown> & { total_count?: number | string }>;
+      const total = rows.length ? Number(rows[0].total_count ?? 0) : 0;
+      const books = rows.map(({ total_count: _drop, ...b }) => b);
+      return { ok: true, books, total, page, pageSize: PAGE_SIZE };
+    }
+    const missing =
+      error.code === "PGRST202" ||
+      /could not find the function|schema cache|does not exist|search_books/i.test(error.message ?? "");
+    if (!missing) return { ok: false, status: 500, error: "Database error" };
+    // else: 0018 not applied yet — fall through to the legacy search below.
+  }
+
+  // Legacy path: plain browsing (empty query) and the pre-0018 substring
+  // search. Tag filtering (and the untagged review queue) go through the
+  // books_tagged view (books ⋈ book_tags); plain browsing keeps hitting the
+  // base table so it works pre-0008. Rebuilt fresh for each attempt since a
+  // PostgREST query can't be re-run after it executes.
+  const cols = "id, title, creators, isbn13, copies, group_name, dedupe_key";
   const build = (orderBy: "title" | "author_sort") => {
     let query =
       tag || untagged

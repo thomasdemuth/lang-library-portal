@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { guarded, requirePermission } from "@/lib/guards";
 import { GAME_SUBCATEGORY_IDS, normalizeGameTitle } from "@/lib/games";
+import { searchGames } from "@/lib/games-search";
 
 const COLS = "id, title, subcategory, description, image_url, copies, condition, location, available";
 const SUBCATS = GAME_SUBCATEGORY_IDS as [string, ...string[]];
@@ -13,23 +14,20 @@ function missingTable(message: string | undefined): boolean {
 const migrationError = () =>
   NextResponse.json({ error: "Games need migration 0017 — run it in the Supabase SQL editor." }, { status: 409 });
 
-/** Management list: search + filter by sub-category. */
+/** Management list: fuzzy search + filter by sub-category. */
 export const GET = guarded(async (req: NextRequest) => {
   await requirePermission(req, "games");
   const q = (req.nextUrl.searchParams.get("q") ?? "").slice(0, 200);
   const sub = req.nextUrl.searchParams.get("subcategory");
 
-  let query = db().from("games").select(COLS).order("title");
-  const norm = normalizeGameTitle(q);
-  if (norm) query = query.ilike("title_norm", `%${norm}%`);
-  if (sub && (SUBCATS as string[]).includes(sub)) query = query.eq("subcategory", sub);
-
-  const { data, error } = await query;
-  if (error) {
-    if (missingTable(error.message)) return NextResponse.json({ games: [], migrationPending: true });
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
-  }
-  return NextResponse.json({ games: data ?? [] });
+  const result = await searchGames({
+    q,
+    subcategory: sub && (SUBCATS as string[]).includes(sub) ? sub : null,
+    order: "title",
+  });
+  if (result.ok) return NextResponse.json({ games: result.games });
+  if ("migrationPending" in result) return NextResponse.json({ games: [], migrationPending: true });
+  return NextResponse.json({ error: result.error }, { status: result.status });
 });
 
 const nz = (max: number) =>
