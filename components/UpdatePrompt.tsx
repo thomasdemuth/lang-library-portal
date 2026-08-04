@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { announce } from "@/components/Announcer";
 import { Ic } from "@/components/icons";
 
 const POLL_MS = 5 * 60 * 1000;
+// Tab switches can come in bursts — one version check a minute is plenty.
+const VISIBLE_MIN_GAP_MS = 60 * 1000;
 
 /**
  * Watches the deployment id and offers a refresh when the site has been
@@ -18,11 +21,13 @@ export default function UpdatePrompt() {
 
   useEffect(() => {
     let stop = false;
+    let lastCheck = 0;
 
     // manual QA: append ?show-update-prompt to preview the dialog
     if (window.location.search.includes("show-update-prompt")) setShow(true);
 
     async function check() {
+      lastCheck = Date.now();
       try {
         const { v } = await fetch("/api/version", { cache: "no-store" }).then((r) => r.json());
         if (stop || !v || v === "dev") return;
@@ -43,7 +48,9 @@ export default function UpdatePrompt() {
     check();
     const timer = setInterval(check, POLL_MS);
     const onVisible = () => {
-      if (document.visibilityState === "visible") check();
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastCheck < VISIBLE_MIN_GAP_MS) return;
+      check();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
@@ -52,6 +59,16 @@ export default function UpdatePrompt() {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
+
+  // role="alertdialog" only speaks when something moves focus into it, and
+  // this banner deliberately doesn't steal focus mid-task — so say it out
+  // loud instead. Polite: it's news, not an error, and it can wait for
+  // whatever the reader is in the middle of.
+  useEffect(() => {
+    if (show) {
+      announce("The library app has been updated. Refresh to get the latest version, or choose Not now.");
+    }
+  }, [show]);
 
   if (!show) return null;
 

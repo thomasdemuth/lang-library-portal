@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import GameFormModal from "@/components/GameFormModal";
-import { GAMES_COLOR } from "@/lib/categories";
+import { GAMES_COLOR, pillTextClass } from "@/lib/categories";
 import { GAME_SUBCATEGORIES, GAME_SUBCATEGORY_IDS, type Game, type GameSubcategory } from "@/lib/games";
 import { Ic } from "@/components/icons";
 
@@ -135,7 +135,7 @@ export default function GamesPanel() {
           {GAME_SUBCATEGORY_IDS.map((id) => {
             const active = filter === id;
             return (
-              <button key={id} type="button" className={`tagchip${active ? " active" : ""}`}
+              <button key={id} type="button" className={`tagchip${active ? ` active ${pillTextClass("games")}` : ""}`}
                 style={active ? { background: GAMES_COLOR, borderColor: GAMES_COLOR, color: "#fff" } : undefined}
                 onClick={() => setFilterAnd(active ? null : id)}>
                 {!active && <span className="dot" style={{ background: GAMES_COLOR }} />}
@@ -191,7 +191,7 @@ export default function GamesPanel() {
                         <button type="button" className="linklike" style={{ fontWeight: 600 }} onClick={() => setEditing(g)}>{g.title}</button>
                       </td>
                       <td data-th="Sub-category">
-                        <span className="tagpill" style={{ background: GAMES_COLOR, fontSize: 10.5, padding: "2px 8px" }}>
+                        <span className={`tagpill ${pillTextClass("games")}`} style={{ background: GAMES_COLOR, fontSize: 10.5, padding: "2px 8px" }}>
                           {GAME_SUBCATEGORIES[g.subcategory].label}
                         </span>
                       </td>

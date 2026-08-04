@@ -45,11 +45,23 @@ export const POST = guarded(async (req: NextRequest) => {
 
 export const GET = guarded(async (req: NextRequest) => {
   await requireChief(req);
-  const { data, error } = await db()
+  const cols = "id, label, created_at, expires_at, used_at, revoked_at, created_by";
+  // Password-reset links ride the same table (kind='reset') but belong to the
+  // roster flow, not this list.
+  let { data, error } = await db()
     .from("invite_tokens")
-    .select("id, label, created_at, expires_at, used_at, revoked_at, created_by")
+    .select(cols)
+    .eq("kind", "invite")
     .order("created_at", { ascending: false })
     .limit(50);
+  // Resilience: before migration 0023, the kind column doesn't exist.
+  if (error && /kind|column/i.test(error.message ?? "")) {
+    ({ data, error } = await db()
+      .from("invite_tokens")
+      .select(cols)
+      .order("created_at", { ascending: false })
+      .limit(50));
+  }
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ invites: data });
 });

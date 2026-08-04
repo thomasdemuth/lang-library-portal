@@ -25,13 +25,20 @@ export const GET = guarded(async (req: NextRequest) => {
   {
     let { data, error } = await db()
       .from("student_profiles")
-      .select("avatar, points, public_id, hidden, created_at")
+      .select("public_id, hidden, created_at, photo_url")
       .eq("email", email)
       .maybeSingle();
+    if (error && /photo_url/i.test(error.message ?? "")) {
+      ({ data, error } = await db()
+        .from("student_profiles")
+        .select("public_id, hidden, created_at")
+        .eq("email", email)
+        .maybeSingle());
+    }
     if (error && /public_id|hidden/i.test(error.message ?? "")) {
       ({ data, error } = await db()
         .from("student_profiles")
-        .select("avatar, points, created_at")
+        .select("created_at")
         .eq("email", email)
         .maybeSingle());
     }

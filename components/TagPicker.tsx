@@ -1,13 +1,23 @@
 "use client";
 
-import { CATEGORIES, CATEGORY_IDS, type CategoryId } from "@/lib/categories";
+import { CATEGORIES, CATEGORY_IDS, pillTextClass, type CategoryId } from "@/lib/categories";
 
-/** Colored category pill — how a book's tag appears everywhere. */
-export function TagPill({ tag, small }: { tag: CategoryId; small?: boolean }) {
+/** Colored category pill — how a book's tag appears everywhere.
+ *  The three light category colors (Comics, Games, Drama) can't carry white
+ *  text, so the pill picks its own ink from the tag via pillTextClass — every
+ *  caller, admin and student alike, gets a legible label without asking.
+ *  `className` stays additive on top of that. */
+export function TagPill({ tag, small, className }: { tag: CategoryId; small?: boolean; className?: string }) {
   const c = CATEGORIES[tag];
+  // Deduped, so a caller that also passes pill-dk (the student surfaces did,
+  // before the rule moved in here) doesn't emit the class twice.
+  const classes = ["tagpill", pillTextClass(tag), className ?? ""]
+    .flatMap((s) => s.split(" "))
+    .filter((s, i, all) => s && all.indexOf(s) === i)
+    .join(" ");
   return (
     <span
-      className="tagpill"
+      className={classes}
       style={{
         background: c.color,
         fontSize: small ? 10.5 : 12,
@@ -85,7 +95,9 @@ export default function TagPicker({
             role="radio"
             aria-checked={active}
             disabled={disabled}
-            className={`tagchip${active ? " active" : ""}${isSuggested ? " suggested" : ""}`}
+            // An active chip is painted with the category color, so it needs
+            // the same dark-ink treatment the pills get on the light three.
+            className={`tagchip${active ? ` active ${pillTextClass(id)}` : ""}${isSuggested ? " suggested" : ""}`}
             style={
               active
                 ? { background: c.color, borderColor: c.color, color: "#fff" }

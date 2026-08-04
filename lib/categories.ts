@@ -27,3 +27,25 @@ export const MAP_CATEGORIES = {
 
 export type MapCategoryId = keyof typeof MAP_CATEGORIES;
 export const MAP_CATEGORY_IDS = Object.keys(MAP_CATEGORIES) as MapCategoryId[];
+
+/**
+ * The category colors that are too light to carry white text: Comics
+ * (#29AC9C), Games (#4CAF50) and Drama (#A67C00) all fall short of 4.5:1
+ * against #fff. Anything painted with one of these needs dark ink instead.
+ */
+export const LIGHT_CATEGORY_IDS: readonly MapCategoryId[] = ["comics", "games", "drama"];
+
+/**
+ * The text-color class for a pill/chip/dot painted with a category's own
+ * color: `"pill-dk"` (dark ink) on the three light categories, `""`
+ * otherwise. Safe to interpolate straight into a className — the empty
+ * string adds nothing.
+ *
+ *   <span className={`tagpill ${pillTextClass(tag)}`} style={{ background: color }}>
+ *
+ * `.pill-dk` is declared `!important` so it beats both `.tagpill`'s default
+ * white and the inline `color: "#fff"` the active chips set.
+ */
+export function pillTextClass(category: MapCategoryId | null | undefined): string {
+  return category && LIGHT_CATEGORY_IDS.includes(category) ? "pill-dk" : "";
+}

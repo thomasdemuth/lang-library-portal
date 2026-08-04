@@ -149,6 +149,30 @@ export function mergeBooks(records: BookRecord[]): BookRecord[] {
   return [...map.values()];
 }
 
+/** A group of ISBN-less rows that mergeBooks fused into one catalog entry. */
+export type MergeCollision = { title: string; creators: string | null; count: number };
+
+/**
+ * Which merges rested on nothing but a matching title and author.
+ *
+ * Rows with an ISBN merge on that ISBN, which is an identity. Rows without one
+ * fall back to `ta:<title>|<creators>`, so sixteen unrelated books called
+ * "Life" with no author collapse into a single entry with 16 copies — and the
+ * catalog then shows one book where the shelves hold sixteen. This reports
+ * those groups (largest first) so a librarian can eyeball them; it does not
+ * change what mergeBooks does.
+ */
+export function mergeCollisions(records: BookRecord[]): MergeCollision[] {
+  const groups = new Map<string, MergeCollision>();
+  for (const r of records) {
+    if (r.isbn13 || r.isbn10) continue;
+    const g = groups.get(r.dedupe_key);
+    if (g) g.count++;
+    else groups.set(r.dedupe_key, { title: r.title, creators: r.creators, count: 1 });
+  }
+  return [...groups.values()].filter((g) => g.count > 1).sort((a, b) => b.count - a.count);
+}
+
 // ── Request matching ──────────────────────────────────────────────────────
 
 export type Candidate = {
@@ -251,8 +275,17 @@ export function chooseMatch(
   return { status: "not_found", matched: null, candidates: top3 };
 }
 
-/** The human-readable tag line shown on the request. */
-export function matchMessage(result: MatchResult, copiesRequested: number): string {
+/**
+ * The human-readable tag line shown on the request.
+ *
+ * `null` means the shelf lookup itself failed (the RPC errored), which is NOT
+ * the same as "we don't own it" — saying "not in inventory" there would file a
+ * false result against the library. Callers must keep the two apart.
+ */
+export function matchMessage(result: MatchResult | null, copiesRequested: number): string {
+  if (!result) {
+    return "Inventory check unavailable: the shelf lookup failed, so this request hasn't been matched against the catalogue yet.";
+  }
   if (result.status === "found") {
     return `Found: “${result.matched!.title}” — ${result.matched!.copies} ${
       result.matched!.copies === 1 ? "copy" : "copies"

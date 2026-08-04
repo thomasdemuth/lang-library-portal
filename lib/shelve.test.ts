@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authorSortKey, inRange, parseRange, resolveShelf, surnameKey, type ShelfInfo } from "./shelve";
+import { authorSortKey, inRange, parseRange, resolveShelf, surnameKey, surnameOf, type ShelfInfo } from "./shelve";
 
 describe("surnameKey", () => {
   it("handles Last, First", () => expect(surnameKey("Kinney, Jeff")).toBe("KINNEY"));
@@ -8,6 +8,23 @@ describe("surnameKey", () => {
   it("strips accents and punctuation", () => expect(surnameKey("Mélina O'Mangal")).toBe("OMANGAL"));
   it("skips suffixes", () => expect(surnameKey("Martin Luther King Jr.")).toBe("KING"));
   it("returns null for empty", () => expect(surnameKey(null)).toBeNull());
+});
+
+describe("surnameOf", () => {
+  it("keeps the surname as written", () => {
+    expect(surnameOf("O'Dell, Scott")).toBe("O'Dell");
+    expect(surnameOf("Scott O'Dell")).toBe("O'Dell");
+    expect(surnameOf("Muñoz Ryan, Pam")).toBe("Muñoz Ryan");
+    expect(surnameOf("Gabriel García Márquez")).toBe("Márquez");
+  });
+  it("uses the first author and skips suffixes", () => {
+    expect(surnameOf("Gross, Ruth Belov; McCully, Emily Arnold")).toBe("Gross");
+    expect(surnameOf("Martin Luther King Jr.")).toBe("King");
+  });
+  it("returns null for empty", () => {
+    expect(surnameOf(null)).toBeNull();
+    expect(surnameOf("   ")).toBeNull();
+  });
 });
 
 describe("authorSortKey", () => {
@@ -26,7 +43,20 @@ describe("authorSortKey", () => {
 describe("parseRange / inRange", () => {
   it("parses en-dash letter ranges", () => expect(parseRange("AA–CZ")).toEqual(["AA", "CZ"]));
   it("parses hyphen and spaces", () => expect(parseRange(" a - z ")).toEqual(["A", "Z"]));
+  it("parses mixed-case two-letter spans", () => expect(parseRange("Aa-Mz")).toEqual(["AA", "MZ"]));
+  it("parses numeric spans", () => {
+    expect(parseRange("000–999")).toEqual(["000", "999"]);
+    expect(parseRange("500-599")).toEqual(["500", "599"]);
+  });
   it("rejects rangeless text", () => expect(parseRange("Picture books")).toBeNull());
+  it("rejects hyphenated names that aren't ranges", () => {
+    // "Easy-Readers" used to parse as EASY→READERS, a span wide enough to
+    // swallow most surnames (KINNEY sits inside it).
+    expect(parseRange("Easy-Readers")).toBeNull();
+    expect(parseRange("Non-Fiction")).toBeNull();
+    expect(parseRange("Picture-Books")).toBeNull();
+  });
+  it("rejects half-letter/half-number spans", () => expect(parseRange("A-999")).toBeNull());
   it("matches inside", () => expect(inRange("KINNEY", "KA", "LZ")).toBe(true));
   it("matches single-letter spans", () => expect(inRange("KINNEY", "A", "Z")).toBe(true));
   it("rejects outside", () => expect(inRange("KINNEY", "MA", "ZZ")).toBe(false));
@@ -63,6 +93,22 @@ describe("resolveShelf", () => {
   });
   it("empty when the category has no shelves", () => {
     expect(resolveShelf("drama", "Anyone", shelves).shelves).toHaveLength(0);
+  });
+  it("does not read a hyphenated shelf name as a letter range", () => {
+    const young: ShelfInfo[] = [
+      { id: "e", label: "Easy-Readers", category: "young", letter_range: null, shelf_number: "01" },
+      { id: "f", label: "Chapter Books", category: "young", letter_range: null, shelf_number: "02" },
+    ];
+    const m = resolveShelf("young", "Kinney, Jeff", young);
+    expect(m.ranged).toBe(false); // EASY→READERS is not a range
+    expect(m.shelves.map((s) => s.id)).toEqual(["e", "f"]);
+  });
+  it("keeps a reverse-ordered name like Non-Fiction out of the ranges", () => {
+    const m = resolveShelf("nonfiction", "Adams, Ansel", [
+      { id: "n", label: "Non-Fiction", category: "nonfiction", letter_range: null, shelf_number: "04" },
+    ]);
+    expect(m.ranged).toBe(false);
+    expect(m.shelves.map((s) => s.id)).toEqual(["n"]);
   });
   it("reads ranges out of shelf labels when the range field is empty", () => {
     const young: ShelfInfo[] = [

@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getActiveSyncId } from "@/lib/active-sync";
 import { normalizeTitle } from "@/lib/match";
 import { attachTags } from "@/lib/tags";
 import { resolveShelf, type ShelfInfo } from "@/lib/shelve";
@@ -13,12 +14,8 @@ type SearchResult =
 
 /** Search the active generation — shared by the admin and student catalogs. */
 export async function searchCatalog({ q, tag, untagged = false, page, sort = "title" }: SearchOpts): Promise<SearchResult> {
-  const { data: active } = await db()
-    .from("inventory_syncs")
-    .select("id")
-    .eq("status", "active")
-    .maybeSingle();
-  if (!active) return { ok: true, books: [], total: 0, page, pageSize: PAGE_SIZE };
+  const activeId = await getActiveSyncId();
+  if (!activeId) return { ok: true, books: [], total: 0, page, pageSize: PAGE_SIZE };
 
   const norm = normalizeTitle(q);
 
@@ -29,7 +26,7 @@ export async function searchCatalog({ q, tag, untagged = false, page, sort = "ti
     const { data, error } = await db().rpc("search_books", {
       p_q: q,
       p_qnorm: norm,
-      p_sync_id: active.id,
+      p_sync_id: activeId,
       p_tag: tag ?? null,
       p_untagged: untagged,
       p_limit: PAGE_SIZE,
@@ -61,7 +58,7 @@ export async function searchCatalog({ q, tag, untagged = false, page, sort = "ti
         : db().from("books").select(cols, { count: "exact" });
     if (tag) query = query.eq("tag", tag);
     else if (untagged) query = query.is("tag", null);
-    query = query.eq("sync_id", active.id);
+    query = query.eq("sync_id", activeId);
     // normalized text is [a-z0-9 ] only, safe to embed in the or() filter
     if (norm) query = query.or(`title_norm.ilike.%${norm}%,creators_norm.ilike.%${norm}%`);
     if (orderBy === "author_sort") query = query.order("author_sort", { ascending: true, nullsFirst: false });
@@ -95,17 +92,13 @@ export type WhereResult =
 
 /** Which shelf a book lives on (via its tag + the map's ranges). */
 export async function whereIsBook(key: string): Promise<WhereResult | { error: string }> {
-  const { data: active } = await db()
-    .from("inventory_syncs")
-    .select("id")
-    .eq("status", "active")
-    .maybeSingle();
-  if (!active) return { found: false, reason: "no-inventory" };
+  const activeId = await getActiveSyncId();
+  if (!activeId) return { found: false, reason: "no-inventory" };
 
   const { data: book } = await db()
     .from("books")
     .select("id, title, creators, dedupe_key")
-    .eq("sync_id", active.id)
+    .eq("sync_id", activeId)
     .eq("dedupe_key", key)
     .maybeSingle();
   if (!book) return { found: false, reason: "no-book" };
@@ -113,9 +106,16 @@ export async function whereIsBook(key: string): Promise<WhereResult | { error: s
   const [tagged] = await attachTags([book]);
   if (!tagged.tag) return { found: false, reason: "untagged" };
 
+  // Ordered, because the answer is presented to a student as a place to walk
+  // to: when the book resolves to several candidate shelves (no letter range
+  // narrowed it down) the first one is the one we name, and an unordered read
+  // would name a different shelf on every tap.
   const { data: shelves, error } = await db()
     .from("shelves")
-    .select("id, label, category, letter_range, shelf_number");
+    .select("id, label, category, letter_range, shelf_number")
+    .order("sort", { ascending: true })
+    .order("shelf_number", { ascending: true, nullsFirst: false })
+    .order("label", { ascending: true });
   if (error) return { error: "Database error" };
 
   const match = resolveShelf(tagged.tag, book.creators, (shelves ?? []) as ShelfInfo[]);

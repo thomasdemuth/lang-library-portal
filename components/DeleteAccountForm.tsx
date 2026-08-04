@@ -49,8 +49,9 @@ export default function DeleteAccountForm() {
       <form onSubmit={submit} style={{ maxWidth: 420 }}>
         {error && <div className="error">{error}</div>}
         <div className="field">
-          <label className="lbl">Password</label>
+          <label className="lbl" htmlFor="delete-account-password">Password</label>
           <input
+            id="delete-account-password"
             className="input"
             type="password"
             required

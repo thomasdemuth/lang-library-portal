@@ -56,12 +56,20 @@ export default function MobileTabBar({
 
   return (
     <nav className="tabbar" aria-label="App navigation">
-      {TABS.filter((t) => t.need === null || allowed[t.need]).map((t) => (
-        <a key={t.href} href={t.href} className={path.startsWith(t.href) ? "active" : undefined}>
-          {ICONS[t.icon]}
-          {t.label}
-        </a>
-      ))}
+      {TABS.filter((t) => t.need === null || allowed[t.need]).map((t) => {
+        const current = path.startsWith(t.href);
+        return (
+          <a
+            key={t.href}
+            href={t.href}
+            className={current ? "active" : undefined}
+            aria-current={current ? "page" : undefined}
+          >
+            {ICONS[t.icon]}
+            {t.label}
+          </a>
+        );
+      })}
     </nav>
   );
 }

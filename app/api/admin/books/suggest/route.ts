@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guarded, requirePermission } from "@/lib/guards";
+import { getActiveSyncId } from "@/lib/active-sync";
 import { suggestTag, type Suggestion } from "@/lib/autotag";
 import { gbVolumesByIsbn } from "@/lib/googlebooks";
 import type { CategoryId } from "@/lib/categories";
@@ -61,17 +62,13 @@ export const GET = guarded(async (req: NextRequest) => {
   const key = (req.nextUrl.searchParams.get("key") ?? "").slice(0, 600);
   if (!key) return NextResponse.json({ error: "Missing book key" }, { status: 400 });
 
-  const { data: active } = await db()
-    .from("inventory_syncs")
-    .select("id")
-    .eq("status", "active")
-    .maybeSingle();
-  if (!active) return NextResponse.json({ suggestion: null });
+  const activeId = await getActiveSyncId();
+  if (!activeId) return NextResponse.json({ suggestion: null });
 
   const { data: book } = await db()
     .from("books")
     .select("title, creators, creators_norm, isbn13, isbn10, dedupe_key")
-    .eq("sync_id", active.id)
+    .eq("sync_id", activeId)
     .eq("dedupe_key", key)
     .maybeSingle();
   if (!book) return NextResponse.json({ suggestion: null });

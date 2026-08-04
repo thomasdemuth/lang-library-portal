@@ -25,8 +25,9 @@ export const PERM_KEYS = PERMISSIONS.map((p) => p.key) as PermKey[];
 
 /**
  * The developer account(s). A few tools are theirs alone regardless of
- * role or granted powers — the Libib CSV import and publishing app
- * updates. Both spellings of Thomas's address are accepted (the admin
+ * role or granted powers — currently just publishing app updates. (The
+ * Libib CSV import is a grantable power, `inventory_import`, like the
+ * rest.) Both spellings of Thomas's address are accepted (the admin
  * account currently uses the students-domain one).
  */
 export const DEVELOPER_EMAILS = new Set([

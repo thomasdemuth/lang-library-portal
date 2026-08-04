@@ -1,5 +1,7 @@
 import LibraryMap from "@/components/map/LibraryMap";
 
+export const metadata = { title: "Library Map — Lang Library" };
+
 export default function StaffMap() {
   return (
     <div className="wrap" style={{ maxWidth: 1280 }}>

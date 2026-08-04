@@ -35,14 +35,6 @@ const BOX: React.CSSProperties = {
   fontSize: 16,
   boxSizing: "border-box",
 };
-// Outlined buttons use a transparent fill + border so they read correctly on
-// the card in both light and dark themes.
-const OUTLINE: React.CSSProperties = {
-  ...BOX,
-  background: "transparent",
-  border: "1px solid var(--line, #dfe3ea)",
-  marginTop: 10,
-};
 
 export default function SignInForm({ google, devLogin }: { google: boolean; devLogin: boolean }) {
   const [nextQS, setNextQS] = useState("");
@@ -56,6 +48,9 @@ export default function SignInForm({ google, devLogin }: { google: boolean; devL
     if (err) setError(ERROR_TEXT[err] ?? "Something went wrong — please try again.");
   }, []);
 
+  // v8 (calm): the Google button is the one action; one caption under it;
+  // guest access is a quiet text link, not a competing button. Auth hrefs
+  // and params are untouched — presentation only.
   return (
     <>
       {error && <div className="error">{error}</div>}
@@ -66,13 +61,17 @@ export default function SignInForm({ google, devLogin }: { google: boolean; devL
         </a>
       )}
 
-      <a href="/api/auth/guest" style={{ ...OUTLINE, color: "var(--brand-blue, #2e50c8)" }}>
-        continue as a guest
-      </a>
+      <p className="hint signin-caption">Use your school Google account</p>
 
-      <a href="/admin/login" style={{ ...OUTLINE, color: "var(--muted, #8a93a6)" }}>
-        management sign-in
-      </a>
+      <p className="signin-guestrow">
+        <a className="signin-guest" href="/api/auth/guest">
+          Browse as a guest
+        </a>
+      </p>
+
+      <p className="signin-alt">
+        <a href="/admin/login">Library management sign-in</a>
+      </p>
 
       {devLogin && <DevEmailForm />}
     </>

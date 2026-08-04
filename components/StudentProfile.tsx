@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import AvatarView from "@/components/AvatarView";
+import LetterAvatar from "@/components/LetterAvatar";
 import { Heart, Ic } from "@/components/icons";
-import { DEFAULT_AVATAR, type Avatar } from "@/lib/play";
+import { announce } from "@/components/Announcer";
 
 type Fav = { book_key: string; title: string; isbn13: string | null };
 type Collection = { id: number; name: string; books: Fav[] };
 type Data = {
   name: string;
-  avatar: Avatar;
+  photoUrl?: string | null;
   booksRead: number;
   favorites: Fav[];
   collections?: Collection[];
@@ -17,7 +17,7 @@ type Data = {
   isMe?: boolean;
 };
 
-/** Another student's public page: avatar, reading count, favorites, and collections. */
+/** Another student's public page: reading count, favorites, and collections. */
 export default function StudentProfile({ id }: { id: string }) {
   const [data, setData] = useState<Data | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "missing">("loading");
@@ -29,7 +29,7 @@ export default function StudentProfile({ id }: { id: string }) {
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => {
         if (d.name) {
-          setData({ ...d, avatar: { ...DEFAULT_AVATAR, ...d.avatar } });
+          setData(d);
           setState("ok");
         } else setState("missing");
       })
@@ -46,7 +46,9 @@ export default function StudentProfile({ id }: { id: string }) {
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setFriendMsg(d.error ?? "Couldn't do that.");
+      const text = d.error ?? "Couldn't do that.";
+      setFriendMsg(text);
+      announce(text, true); // errors interrupt for screen readers
       setTimeout(() => setFriendMsg(null), 3200);
       return;
     }
@@ -68,7 +70,7 @@ export default function StudentProfile({ id }: { id: string }) {
   return (
     <div className="wrap student-theme">
       <div className="play-hero me-hero">
-        <AvatarView avatar={data.avatar} size={104} />
+        <LetterAvatar name={data.name} size={104} src={data.photoUrl ?? undefined} />
         <div>
           <h1 style={{ margin: 0 }}>{data.name}</h1>
           <p className="play-stats" style={{ marginTop: 6 }}>

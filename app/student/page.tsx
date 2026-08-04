@@ -1,6 +1,8 @@
 import { currentSession } from "@/lib/server";
 import StudentHome from "@/components/StudentHome";
 
+export const metadata = { title: "Home — Lang Library" };
+
 export const dynamic = "force-dynamic";
 
 export default async function StudentHomePage() {

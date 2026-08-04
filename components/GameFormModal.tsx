@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Modal from "@/components/Modal";
 import CopyStepper, { clampCopies } from "@/components/CopyStepper";
 import { GAME_SUBCATEGORIES, GAME_SUBCATEGORY_IDS, type Game, type GameSubcategory } from "@/lib/games";
 
@@ -31,6 +32,19 @@ export default function GameFormModal({
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Arms Modal's discard guard: compared against the game being edited (or
+  // the blank defaults when adding), so an edit that's been typed back out
+  // doesn't count as unsaved work.
+  const dirty =
+    title !== (game?.title ?? "") ||
+    subcategory !== (game?.subcategory ?? "other") ||
+    description !== (game?.description ?? "") ||
+    imageUrl !== (game?.image_url ?? "") ||
+    copies !== clampCopies(game?.copies ?? 1) ||
+    condition !== (game?.condition ?? "") ||
+    location !== (game?.location ?? "") ||
+    available !== (game?.available ?? true);
 
   async function save() {
     if (!title.trim()) return setError("Enter a title.");
@@ -74,75 +88,74 @@ export default function GameFormModal({
   }
 
   return (
-    <div className="modal-scrim" onClick={onClose}>
-      <div className="modal bookedit" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <b>{isNew ? "Add a game" : "Edit game"}</b>
-          <button className="scan-close" onClick={onClose} aria-label="Close">✕</button>
-        </div>
-
-        <div className="bookedit-fields" style={{ padding: "0 18px" }}>
-          <label className="field">
-            <span className="lbl">Title</span>
-            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Uno" />
+    <Modal
+      open
+      onClose={onClose}
+      title={isNew ? "Add a game" : "Edit game"}
+      className="bookedit"
+      dirty={dirty}
+    >
+      <div className="bookedit-fields" style={{ padding: "0 18px" }}>
+        <label className="field">
+          <span className="lbl">Title</span>
+          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Uno" />
+        </label>
+        <div className="bookedit-row">
+          <label className="field" style={{ flex: 2 }}>
+            <span className="lbl">Sub-category</span>
+            <select className="input" value={subcategory} onChange={(e) => setSubcategory(e.target.value as GameSubcategory)}>
+              {GAME_SUBCATEGORY_IDS.map((id) => (
+                <option key={id} value={id}>{GAME_SUBCATEGORIES[id].label}</option>
+              ))}
+            </select>
           </label>
-          <div className="bookedit-row">
-            <label className="field" style={{ flex: 2 }}>
-              <span className="lbl">Sub-category</span>
-              <select className="input" value={subcategory} onChange={(e) => setSubcategory(e.target.value as GameSubcategory)}>
-                {GAME_SUBCATEGORY_IDS.map((id) => (
-                  <option key={id} value={id}>{GAME_SUBCATEGORIES[id].label}</option>
-                ))}
-              </select>
-            </label>
-            <div className="field" style={{ flex: "none" }}>
-              <span className="lbl">Copies</span>
-              <CopyStepper value={copies} onChange={setCopies} disabled={busy} />
-            </div>
+          <div className="field" style={{ flex: "none" }}>
+            <span className="lbl">Copies</span>
+            <CopyStepper value={copies} onChange={setCopies} disabled={busy} />
           </div>
-          <div className="bookedit-row">
-            <label className="field" style={{ flex: 1 }}>
-              <span className="lbl">Condition</span>
-              <input className="input" value={condition} onChange={(e) => setCondition(e.target.value)} placeholder="e.g. Good" />
-            </label>
-            <label className="field" style={{ flex: 1 }}>
-              <span className="lbl">Location</span>
-              <input className="input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Games shelf" />
-            </label>
-          </div>
-          <label className="field">
-            <span className="lbl">Image URL</span>
-            <input className="input" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://…" inputMode="url" />
+        </div>
+        <div className="bookedit-row">
+          <label className="field" style={{ flex: 1 }}>
+            <span className="lbl">Condition</span>
+            <input className="input" value={condition} onChange={(e) => setCondition(e.target.value)} placeholder="e.g. Good" />
           </label>
-          <label className="check">
-            <input type="checkbox" checked={available} onChange={(e) => setAvailable(e.target.checked)} />
-            Available to borrow
-          </label>
-          <label className="field">
-            <span className="lbl">Description</span>
-            <textarea className="input" style={{ minHeight: 90 }} value={description} onChange={(e) => setDescription(e.target.value)} />
+          <label className="field" style={{ flex: 1 }}>
+            <span className="lbl">Location</span>
+            <input className="input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Games shelf" />
           </label>
         </div>
-
-        {error && <div className="error" style={{ margin: "0 18px" }}>{error}</div>}
-
-        <div className="modal-actions">
-          {!isNew && (
-            confirmDelete ? (
-              <span className="modal-confirm">
-                <span className="hint" style={{ margin: 0 }}>Delete this game?</span>
-                <button className="btn danger" onClick={remove} disabled={busy}>{busy ? "Deleting…" : "Yes, delete"}</button>
-                <button className="btn ghost" onClick={() => setConfirmDelete(false)} disabled={busy}>No</button>
-              </span>
-            ) : (
-              <button className="btn ghost modal-delete" onClick={() => setConfirmDelete(true)} disabled={busy}>Delete game</button>
-            )
-          )}
-          <span style={{ flex: 1 }} />
-          <button className="btn ghost" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn brand" onClick={save} disabled={busy}>{busy ? "Saving…" : isNew ? "Add game" : "Save changes"}</button>
-        </div>
+        <label className="field">
+          <span className="lbl">Image URL</span>
+          <input className="input" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://…" inputMode="url" />
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={available} onChange={(e) => setAvailable(e.target.checked)} />
+          Available to borrow
+        </label>
+        <label className="field">
+          <span className="lbl">Description</span>
+          <textarea className="input" style={{ minHeight: 90 }} value={description} onChange={(e) => setDescription(e.target.value)} />
+        </label>
       </div>
-    </div>
+
+      {error && <div className="error" style={{ margin: "0 18px" }}>{error}</div>}
+
+      <div className="modal-actions">
+        {!isNew && (
+          confirmDelete ? (
+            <span className="modal-confirm">
+              <span className="hint" style={{ margin: 0 }}>Delete this game?</span>
+              <button className="btn danger" onClick={remove} disabled={busy}>{busy ? "Deleting…" : "Yes, delete"}</button>
+              <button className="btn ghost" onClick={() => setConfirmDelete(false)} disabled={busy}>No</button>
+            </span>
+          ) : (
+            <button className="btn ghost modal-delete" onClick={() => setConfirmDelete(true)} disabled={busy}>Delete game</button>
+          )
+        )}
+        <span style={{ flex: 1 }} />
+        <button className="btn ghost" onClick={onClose} disabled={busy}>Cancel</button>
+        <button className="btn brand" onClick={save} disabled={busy}>{busy ? "Saving…" : isNew ? "Add game" : "Save changes"}</button>
+      </div>
+    </Modal>
   );
 }

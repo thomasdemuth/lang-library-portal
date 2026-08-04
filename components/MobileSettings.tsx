@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PERMISSIONS, type PermKey } from "@/lib/permissions";
+import { CopyOnceBox } from "@/components/AdminsPanel";
 import NotificationPrefs from "@/components/NotificationPrefs";
 import PasswordForm from "@/components/PasswordForm";
 import ProfileForm from "@/components/ProfileForm";
@@ -383,6 +384,10 @@ function ManageAdmins({ selfId }: { selfId: string }) {
   const [admins, setAdmins] = useState<AdminRow[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Two-step confirms for the destructive actions
+  const [pendingRole, setPendingRole] = useState<{ id: string; role: "chief" | "admin" } | null>(null);
+  const [confirmDisable, setConfirmDisable] = useState<string | null>(null);
+  const [resetLink, setResetLink] = useState<{ id: string; url: string } | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/admins");
@@ -404,6 +409,22 @@ function ManageAdmins({ selfId }: { selfId: string }) {
     load();
   }
 
+  async function resetPassword(a: AdminRow) {
+    setError(null);
+    setResetLink(null);
+    try {
+      const res = await fetch(`/api/admin/admins/${a.id}/reset`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Couldn't create the reset link.");
+        return;
+      }
+      setResetLink({ id: a.id, url: data.url });
+    } catch {
+      setError("Couldn't reach the server — try again.");
+    }
+  }
+
   return (
     <>
       <p className="settings-title" style={{ margin: "0 4px 10px" }}>Manage admins</p>
@@ -411,6 +432,7 @@ function ManageAdmins({ selfId }: { selfId: string }) {
       {admins.map((a) => {
         const isOpen = open === a.id;
         const isSelf = a.id === selfId;
+        const roleChange = pendingRole?.id === a.id ? pendingRole : null;
         return (
           <div key={a.id} className="madmin" style={a.disabled_at ? { opacity: 0.6 } : undefined}>
             <button
@@ -434,9 +456,43 @@ function ManageAdmins({ selfId }: { selfId: string }) {
               <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
                 <Seg
                   options={[["admin", "Admin"], ["chief", "Chief Admin"]] as const}
-                  value={a.role}
-                  onChange={(role) => patch(a.id, { role })}
+                  value={roleChange?.role ?? a.role}
+                  onChange={(role) => {
+                    if (role === a.role) setPendingRole(null);
+                    else setPendingRole({ id: a.id, role });
+                  }}
                 />
+                {roleChange && (
+                  <div className="notice warn" role="group" aria-label="Confirm role change" style={{ margin: 0 }}>
+                    <p style={{ margin: "0 0 8px" }}>
+                      {roleChange.role === "chief" ? (
+                        <>
+                          Make <b>{a.name}</b> a <b>Chief Admin</b>? Chiefs hold every power,
+                          including managing admins, invites, and deletions.
+                        </>
+                      ) : (
+                        <>
+                          Change <b>{a.name}</b> to <b>Admin</b>? Chief powers are removed — they
+                          keep only the powers you grant.
+                        </>
+                      )}
+                    </p>
+                    <span className="modal-confirm">
+                      <button
+                        className="btn brand"
+                        onClick={() => {
+                          setPendingRole(null);
+                          patch(a.id, { role: roleChange.role });
+                        }}
+                      >
+                        Yes, change role
+                      </button>
+                      <button className="btn ghost" onClick={() => setPendingRole(null)}>
+                        Cancel
+                      </button>
+                    </span>
+                  </div>
+                )}
                 {a.role === "admin" && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
                     {PERMISSIONS.map((p) => (
@@ -455,9 +511,53 @@ function ManageAdmins({ selfId }: { selfId: string }) {
                     ))}
                   </div>
                 )}
-                <button className="btn" onClick={() => patch(a.id, { disabled: !a.disabled_at })}>
-                  {a.disabled_at ? "Re-enable account" : "Disable account"}
-                </button>
+                {!a.disabled_at && (
+                  <button className="btn" onClick={() => resetPassword(a)}>
+                    Reset password…
+                  </button>
+                )}
+                {resetLink?.id === a.id && (
+                  <div>
+                    <div className="notice" style={{ marginBottom: 8 }}>
+                      One-time reset link — shown <b>once</b>. Share it directly; their other
+                      sessions end when they set the new password. Expires in 7 days.
+                    </div>
+                    <CopyOnceBox url={resetLink.url} />
+                    <button className="btn ghost" style={{ marginTop: 8 }} onClick={() => setResetLink(null)}>
+                      Done
+                    </button>
+                  </div>
+                )}
+                {confirmDisable === a.id ? (
+                  <div className="notice warn" role="group" aria-label="Confirm disable" style={{ margin: 0 }}>
+                    <p style={{ margin: "0 0 8px" }}>
+                      Disable <b>{a.name}</b>? They&rsquo;re signed out immediately.
+                    </p>
+                    <span className="modal-confirm">
+                      <button
+                        className="btn danger"
+                        onClick={() => {
+                          setConfirmDisable(null);
+                          patch(a.id, { disabled: true });
+                        }}
+                      >
+                        Yes, disable
+                      </button>
+                      <button className="btn ghost" onClick={() => setConfirmDisable(null)}>
+                        No
+                      </button>
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    className="btn"
+                    onClick={() =>
+                      a.disabled_at ? patch(a.id, { disabled: false }) : setConfirmDisable(a.id)
+                    }
+                  >
+                    {a.disabled_at ? "Re-enable account" : "Disable account"}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -477,6 +577,7 @@ function InviteAdmin() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   async function create() {
     setBusy(true);
@@ -512,8 +613,15 @@ function InviteAdmin() {
         /* user closed the share sheet — fall through to copy */
       }
     }
-    await navigator.clipboard.writeText(link);
-    setCopied(true);
+    // Clipboard access can be denied silently — never let that look like success.
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setCopyFailed(false);
+    } catch {
+      setCopied(false);
+      setCopyFailed(true);
+    }
   }
 
   return (
@@ -570,6 +678,21 @@ function InviteAdmin() {
           <button className="btn brand" onClick={share}>
             {copied ? "Copied ✓" : "Share invite…"}
           </button>
+          {copyFailed && (
+            <div>
+              <p className="hint" style={{ margin: "0 0 4px" }}>
+                Copy didn&rsquo;t work — select and copy:
+              </p>
+              <input
+                className="input"
+                readOnly
+                value={link}
+                aria-label="Invite link to copy manually"
+                onFocus={(e) => e.currentTarget.select()}
+                onClick={(e) => e.currentTarget.select()}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

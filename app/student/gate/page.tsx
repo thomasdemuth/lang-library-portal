@@ -1,4 +1,5 @@
 import GateForm from "@/components/GateForm";
+import { staffUrl } from "@/lib/hosts";
 
 export default function StudentGate() {
   return (
@@ -12,7 +13,7 @@ export default function StudentGate() {
       <div className="card">
         <GateForm placeholder="you@students.thelangschool.org" />
         <p className="hint" style={{ marginTop: 12 }}>
-          Teachers &amp; staff: this is the student site — use the staff site instead.
+          Teachers &amp; staff: this is the student site — <a href={staffUrl()}>go to the staff site</a>.
         </p>
       </div>
     </div>

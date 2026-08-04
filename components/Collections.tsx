@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Ic, Pencil } from "@/components/icons";
+import { announce } from "@/components/Announcer";
+import { OFFLINE_MESSAGE, sessionExpired } from "@/lib/book-actions-client";
 
 type CollectionBook = { book_key: string; title: string; isbn13: string | null };
 type Collection = { id: number; name: string; books: CollectionBook[] };
@@ -22,7 +24,7 @@ export default function Collections() {
   const [renameDraft, setRenameDraft] = useState("");
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ text: string; kind: "warn" | "err" } | null>(null);
   const [hiddenCovers, setHiddenCovers] = useState<Set<string>>(new Set());
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -37,20 +39,28 @@ export default function Collections() {
       .catch(() => setLoaded(true));
   }, []);
 
-  function say(text: string) {
-    setMsg(text);
+  function say(text: string, kind: "warn" | "err" = "err") {
+    setMsg({ text, kind });
+    announce(text, kind === "err"); // screen readers hear every notice; errors interrupt
     setTimeout(() => setMsg(null), 3200);
   }
 
   async function post(body: Record<string, unknown>): Promise<Record<string, unknown> | null> {
-    const res = await fetch("/api/play/collections", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/play/collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      say(OFFLINE_MESSAGE);
+      return null;
+    }
+    if (sessionExpired(res)) return null;
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      say((data as { error?: string }).error ?? "Couldn't save that.");
+      say((data as { error?: string }).error ?? "Couldn't save that.", res.status === 409 ? "warn" : "err");
       return null;
     }
     return data;
@@ -87,7 +97,7 @@ export default function Collections() {
   }
 
   async function addBook(col: Collection, hit: SearchHit) {
-    if (col.books.some((b) => b.book_key === hit.dedupe_key)) return say("That book's already in this collection.");
+    if (col.books.some((b) => b.book_key === hit.dedupe_key)) return say("That book's already in this collection.", "warn");
     const book = { book_key: hit.dedupe_key, title: hit.title, isbn13: hit.isbn13 };
     if (await post({ action: "add", id: col.id, book })) {
       setCollections((cur) => cur.map((c) => (c.id === col.id ? { ...c, books: [...c.books, book] } : c)));
@@ -130,7 +140,7 @@ export default function Collections() {
         <p className="hint">Collections unlock after the next library update — check back soon!</p>
       ) : (
         <>
-          {msg && <div className="error">{msg}</div>}
+          {msg && <div className={msg.kind === "warn" ? "notice warn" : "error"}>{msg.text}</div>}
 
           <div className="coll-new">
             <input

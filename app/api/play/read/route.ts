@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guarded, requireSession } from "@/lib/guards";
-import { DAILY_READ_LIMIT, POINTS_PER_READ } from "@/lib/play";
 
 const Body = z.object({
   book_key: z.string().min(1).max(600),
@@ -14,7 +13,7 @@ export const GET = guarded(async (req: NextRequest) => {
   const session = await requireSession(req);
   const { data, error } = await db()
     .from("reading_log")
-    .select("id, title, created_at")
+    .select("id, book_key, title, created_at")
     .eq("email", session.email)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -27,75 +26,50 @@ export const GET = guarded(async (req: NextRequest) => {
   return NextResponse.json({ log: data ?? [] });
 });
 
-/**
- * "I read this!" — log a book once, earn stars. A small daily cap keeps
- * the leaderboard about reading, not tapping.
- */
+/** "I read this" — add a book to my personal reading log (once per book). */
 export const POST = guarded(async (req: NextRequest) => {
   const session = await requireSession(req);
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const { count: today, error: capErr } = await db()
+  const { data, error } = await db()
     .from("reading_log")
-    .select("id", { count: "exact", head: true })
-    .eq("email", session.email)
-    .gte("created_at", dayAgo);
-  if (capErr) {
-    if (/reading_log|relation|does not exist|schema cache/i.test(capErr.message ?? "")) {
-      return NextResponse.json({ error: "The reading game unlocks after the next library update!" }, { status: 409 });
-    }
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
-  }
-  if ((today ?? 0) >= DAILY_READ_LIMIT) {
-    return NextResponse.json(
-      { error: `That's ${DAILY_READ_LIMIT} books today — amazing! Log the next one tomorrow.` },
-      { status: 429 }
-    );
-  }
-
-  const { error } = await db().from("reading_log").insert({
-    email: session.email,
-    book_key: parsed.data.book_key,
-    title: parsed.data.title,
-  });
+    .insert({
+      email: session.email,
+      book_key: parsed.data.book_key,
+      title: parsed.data.title,
+    })
+    .select("id")
+    .single();
   if (error) {
     if (/duplicate|unique/i.test(error.message ?? "")) {
       return NextResponse.json({ error: "You already logged this one" }, { status: 409 });
     }
     if (/reading_log|relation|does not exist|schema cache/i.test(error.message ?? "")) {
-      return NextResponse.json({ error: "The reading game unlocks after the next library update!" }, { status: 409 });
+      return NextResponse.json({ error: "The reading log unlocks after the next library update!" }, { status: 409 });
     }
     return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
-  // Award stars (make sure a profile row exists first)
-  await db()
-    .from("student_profiles")
-    .upsert({ email: session.email }, { onConflict: "email", ignoreDuplicates: true });
+  return NextResponse.json({ ok: true, id: data?.id ?? null, message: "Added to your reading log" });
+});
 
-  // Optimistic-lock the award so two quick logs can't lose one increment:
-  // read points, write points+10 only if points still holds, retry if it
-  // moved under us (same guard the shop's buy path uses).
-  let points = POINTS_PER_READ;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const { data: prof } = await db()
-      .from("student_profiles")
-      .select("points")
-      .eq("email", session.email)
-      .single();
-    const current = prof?.points ?? 0;
-    points = current + POINTS_PER_READ;
-    const { data: updated } = await db()
-      .from("student_profiles")
-      .update({ points })
-      .eq("email", session.email)
-      .eq("points", current)
-      .select("email")
-      .maybeSingle();
-    if (updated) break; // won the race
+/** Remove one of MY log rows (?id=…) — ownership enforced by session email. */
+export const DELETE = guarded(async (req: NextRequest) => {
+  const session = await requireSession(req);
+  const id = Number(req.nextUrl.searchParams.get("id"));
+  if (!Number.isInteger(id) || id <= 0) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true, earned: POINTS_PER_READ, points });
+  const { data, error } = await db()
+    .from("reading_log")
+    .delete()
+    .eq("id", id)
+    .eq("email", session.email)
+    .select("id")
+    .maybeSingle();
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
+  if (!data) return NextResponse.json({ error: "That log entry is already gone." }, { status: 404 });
+  return NextResponse.json({ ok: true });
 });

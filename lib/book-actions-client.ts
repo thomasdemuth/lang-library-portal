@@ -5,46 +5,129 @@
  * finder, and on-demand detail (description). Favorites live in
  * lib/favorites-client (they carry their own shared cache).
  */
+import { CATEGORIES, type CategoryId } from "./categories";
 
 export type ActionBook = { title: string; dedupe_key: string; isbn13: string | null };
 
-/** "I read this" — log a book, earn stars. */
-export async function logRead(
-  b: ActionBook
-): Promise<{ earned: number; points: number } | { error: string }> {
-  const res = await fetch("/api/play/read", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ book_key: b.dedupe_key, title: b.title }),
-  });
-  const data = await res.json().catch(() => ({}));
-  return res.ok ? { earned: data.earned, points: data.points } : { error: data.error ?? "Couldn't log that one." };
+/** How a toast/notice should look: green success, amber heads-up, red failure, blue info. */
+export type NoteKind = "ok" | "warn" | "err" | "info";
+
+export const OFFLINE_MESSAGE = "Can't reach the library right now — check the Wi-Fi and try again.";
+
+/** A 401 means the session expired — send the visitor back to sign-in. */
+export function sessionExpired(res: Response): boolean {
+  if (res.status !== 401) return false;
+  window.location.href = "/";
+  return true;
 }
 
-export type ShelfResult = { shelfId: string } | { message: string };
+/** "I read this" — add a book to the personal reading log. */
+export async function logRead(
+  b: ActionBook
+): Promise<{ id: number | null; message: string } | { error: string; kind: "warn" | "err" }> {
+  try {
+    const res = await fetch("/api/play/read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ book_key: b.dedupe_key, title: b.title }),
+    });
+    if (sessionExpired(res)) return { error: "Signed out — sign in again.", kind: "err" };
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) return { id: data.id ?? null, message: data.message ?? "Added to your reading log" };
+    if (res.status === 409) return { error: data.error ?? "You already logged this one", kind: "warn" };
+    return { error: data.error ?? "Couldn't log that one.", kind: "err" };
+  } catch {
+    return { error: OFFLINE_MESSAGE, kind: "err" };
+  }
+}
 
-/** Which shelf a book lives on — the shelf id to fly to, or a friendly note. */
+/** Remove one of my reading-log rows (the undo/removal half of logRead). */
+export async function removeRead(id: number): Promise<{ ok: true } | { error: string; kind: "warn" | "err" }> {
+  try {
+    const res = await fetch(`/api/play/read?id=${id}`, { method: "DELETE" });
+    if (sessionExpired(res)) return { error: "Signed out — sign in again.", kind: "err" };
+    if (res.ok) return { ok: true };
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 404) return { error: data.error ?? "That log entry is already gone.", kind: "warn" };
+    return { error: data.error ?? "Couldn't remove that one.", kind: "err" };
+  } catch {
+    return { error: OFFLINE_MESSAGE, kind: "err" };
+  }
+}
+
+/**
+ * A located book. `shelfId` is where the map should fly to; `message` is
+ * non-null exactly when we are NOT sure which of `shelfIds` it is — the
+ * lookup only matched the category, not a letter range, and more than one
+ * shelf carries that category. Callers must show that sentence before
+ * sending anyone to the map: naming one arbitrary shelf as "the" shelf is
+ * how a student ends up staring at the wrong bay.
+ */
+export type ShelfHit = {
+  shelfId: string;
+  shelfIds: string[];
+  area: CategoryId | null;
+  certain: boolean;
+  message: string | null;
+};
+export type ShelfResult = ShelfHit | { message: string; kind: "info" | "err" };
+
+/** The honest one-liner for a book we've only narrowed to a category. */
+export function shelfAreaMessage(area: CategoryId | null): string {
+  if (!area) return "It's on one of several shelves — the map shows which ones.";
+  const label = CATEGORIES[area].label;
+  return `Somewhere in ${label} — check the ${label} shelves.`;
+}
+
+/** Which shelf a book lives on — where to fly to (and how sure we are), or a note. */
 export async function findShelf(b: ActionBook): Promise<ShelfResult> {
   try {
     const res = await fetch(`/api/catalog/where?key=${encodeURIComponent(b.dedupe_key)}`);
+    if (sessionExpired(res)) return { message: "Signed out — sign in again.", kind: "err" };
+    if (!res.ok) return { message: OFFLINE_MESSAGE, kind: "err" };
     const data = await res.json().catch(() => ({}));
-    if (data.found && data.shelves?.length) return { shelfId: data.shelves[0].id };
+    if (data.found && data.shelves?.length) {
+      const shelfIds = (data.shelves as { id: string }[]).map((s) => s.id);
+      const area: CategoryId | null = data.tag && data.tag in CATEGORIES ? (data.tag as CategoryId) : null;
+      // ranged === false means "this is just the category's shelves"; with
+      // one shelf in the category that's still a definite answer.
+      const certain = data.ranged === true || shelfIds.length === 1;
+      return {
+        shelfId: shelfIds[0],
+        shelfIds,
+        area,
+        certain,
+        message: certain ? null : shelfAreaMessage(area),
+      };
+    }
+    return { message: `“${b.title}” doesn't have a shelf on the map yet.`, kind: "info" };
   } catch {
-    /* fall through to the friendly note */
+    return { message: OFFLINE_MESSAGE, kind: "err" };
   }
-  return { message: `“${b.title}” doesn't have a shelf on the map yet — ask at the library desk.` };
+}
+
+/**
+ * The map deep-link for a hit. The map reads a single `?shelf=<id>` and
+ * selects + zooms to it, so an uncertain hit can only point at the first
+ * shelf of the right category — which is why the wording above has to carry
+ * the uncertainty instead of the link.
+ */
+export function shelfMapHref(hit: ShelfHit): string {
+  return `/map?shelf=${encodeURIComponent(hit.shelfId)}`;
 }
 
 export type BookDetail = { isbn13: string | null; isbn10: string | null; description: string | null };
+export type DetailResult = { book: BookDetail | null } | { error: string };
 
 /** Fetch a book's cover ISBNs + description on demand (for expanded cards). */
-export async function fetchDetail(key: string): Promise<BookDetail | null> {
+export async function fetchDetail(key: string): Promise<DetailResult> {
   try {
     const res = await fetch(`/api/catalog/detail?key=${encodeURIComponent(key)}`);
-    if (!res.ok) return null;
+    if (sessionExpired(res)) return { error: "Signed out — sign in again." };
+    if (!res.ok) return { error: "Couldn't load the description — check the Wi-Fi." };
     const data = await res.json();
-    return data.book ?? null;
+    return { book: data.book ?? null };
   } catch {
-    return null;
+    return { error: "Couldn't load the description — check the Wi-Fi." };
   }
 }

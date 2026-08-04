@@ -1,5 +1,7 @@
 import GamesBrowser from "@/components/GamesBrowser";
 
+export const metadata = { title: "Games — Lang Library" };
+
 /** Staff: browse the games collection by sub-category. */
 export default function StaffGamesPage() {
   return (

@@ -1,12 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CATEGORIES, CATEGORY_IDS, type CategoryId } from "@/lib/categories";
+import { useEffect, useId, useRef, useState } from "react";
+import { CATEGORIES, CATEGORY_IDS, pillTextClass, type CategoryId } from "@/lib/categories";
 import { TagPill } from "@/components/TagPicker";
 import { Check, Heart, Pin } from "@/components/icons";
 import AddToCollection from "@/components/AddToCollection";
+import LibraryMap from "@/components/map/LibraryMap";
+import { announce } from "@/components/Announcer";
 import { getFavorites, isFavorite, onFavoritesChange, toggleFavorite } from "@/lib/favorites-client";
-import { fetchDetail, findShelf, logRead, type BookDetail } from "@/lib/book-actions-client";
+import {
+  fetchDetail,
+  findShelf,
+  logRead,
+  removeRead,
+  shelfMapHref,
+  type DetailResult,
+  type NoteKind,
+  type ShelfResult,
+} from "@/lib/book-actions-client";
 
 type Book = {
   id: number;
@@ -21,12 +32,17 @@ type Book = {
 /**
  * Catalog search, shared by the student and staff portals. Tap a book to
  * open its cover, description, and location. The `role` prop gates the
- * student-only play features — favorite hearts, "I read this" stars, and
- * add-to-collection — which need a student game profile; staff get search,
- * results, and "Where is it?" only. Everything else is identical.
+ * student-only features — favorite hearts, the "I read this" reading log,
+ * and add-to-collection; staff get search, results, and "Show me where"
+ * only, and guests (no account) get the same plus a quiet sign-in nudge.
+ * Everything else is identical.
  */
-export default function CatalogSearch({ role = "student" }: { role?: "student" | "staff" }) {
+export default function CatalogSearch({ role = "student" }: { role?: "student" | "staff" | "guest" }) {
   const isStudent = role === "student";
+  // aria-expanded on its own leaves a screen reader to guess which region the
+  // row controls — namespaced per instance so the id is unique even when two
+  // catalogs render on one page.
+  const uid = useId();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<CategoryId | null>(null);
   const [results, setResults] = useState<Book[] | null>(null);
@@ -34,10 +50,41 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
   const [page, setPage] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [details, setDetails] = useState<Record<number, BookDetail | null>>({});
+  const [details, setDetails] = useState<Record<number, DetailResult>>({});
   const [logged, setLogged] = useState<Set<string>>(new Set());
   const [favTick, setFavTick] = useState(0);
-  const [note, setNote] = useState<string | null>(null);
+  // `undo` is the notice's one action; `undoLabel` renames it when the action
+  // isn't an undo (the "Show me where" answer offers the map instead).
+  const [note, setNote] = useState<{ text: string; kind: NoteKind; undo?: () => void; undoLabel?: string } | null>(null);
+
+  // ── Find-a-Book split view (W4-C2, student surface, ≥900px) ────────────
+  // Desktop puts the results beside a compact read-only library map; a
+  // book's shelf lights up there instead of navigating away. Staff keep
+  // the plain list (their pages aren't part of this pass). Shelf lookups
+  // are cached per book and fired only when a result is expanded (the
+  // moment the detail fetch already runs) — never per hover.
+  const [splitView, setSplitView] = useState(false);
+  const [mapShelf, setMapShelf] = useState<string | null>(null);
+  const mapPanelRef = useRef<HTMLDivElement>(null);
+  const shelfCache = useRef<Map<string, ShelfResult>>(new Map());
+
+  useEffect(() => {
+    if (role === "staff") return;
+    const mq = window.matchMedia("(min-width: 900px)");
+    const apply = () => setSplitView(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [role]);
+
+  /** One where-lookup per book, remembered (failures stay retryable). */
+  async function lookupShelf(b: Book): Promise<ShelfResult> {
+    const cached = shelfCache.current.get(b.dedupe_key);
+    if (cached) return cached;
+    const result = await findShelf(b);
+    if ("shelfId" in result || result.kind === "info") shelfCache.current.set(b.dedupe_key, result);
+    return result;
+  }
 
   async function search(e?: React.FormEvent, tagOverride?: CategoryId | null) {
     e?.preventDefault();
@@ -94,9 +141,11 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
     }
   }
 
-  function say(text: string) {
-    setNote(text);
-    setTimeout(() => setNote((cur) => (cur === text ? null : cur)), 3200);
+  function say(text: string, kind: NoteKind = "ok", undo?: () => void, undoLabel?: string) {
+    const next = { text, kind, undo, undoLabel };
+    setNote(next);
+    announce(text, kind === "err"); // screen readers hear every notice; errors interrupt
+    setTimeout(() => setNote((cur) => (cur === next ? null : cur)), undo ? 5000 : 3200);
   }
 
   function toggle(b: Book) {
@@ -105,35 +154,77 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
       if (next !== null && details[b.id] === undefined) {
         fetchDetail(b.dedupe_key).then((d) => setDetails((cur2) => ({ ...cur2, [b.id]: d })));
       }
+      // Split view: expanding is the moment we already pay for a detail
+      // fetch, so piggyback the one shelf lookup and light up the mini-map
+      // — but only when the answer is certain. An uncertain area match
+      // waits for "Show me where", which explains itself honestly first.
+      if (next !== null && splitView) {
+        lookupShelf(b).then((r) => {
+          if ("shelfId" in r && r.certain) setMapShelf(r.shelfId);
+        });
+      }
       return next;
     });
   }
 
   async function markRead(b: Book) {
     const result = await logRead(b);
-    if ("error" in result) return say(result.error);
+    if ("error" in result) return say(result.error, result.kind);
     setLogged((cur) => new Set(cur).add(b.dedupe_key));
-    say(`+${result.earned} stars — nice reading!`);
+    const { id } = result;
+    say(result.message, "ok", id === null ? undefined : () => undoRead(b, id));
+  }
+
+  async function undoRead(b: Book, id: number) {
+    const result = await removeRead(id);
+    if ("error" in result) return say(result.error, result.kind);
+    setLogged((cur) => {
+      const next = new Set(cur);
+      next.delete(b.dedupe_key);
+      return next;
+    });
+    say("Removed from your log", "info");
   }
 
   async function heart(b: Book) {
     const result = await toggleFavorite({ book_key: b.dedupe_key, title: b.title, isbn13: b.isbn13 });
-    if ("error" in result) say(result.error);
+    if ("error" in result) say(result.error, result.kind);
     else say(result.favorited ? "Added to your favorites!" : "Removed from favorites");
   }
 
   async function where(b: Book) {
     setNote(null);
-    const result = await findShelf(b);
-    if ("shelfId" in result) window.location.href = `/map?shelf=${result.shelfId}`;
-    else say(result.message);
+    const result = await lookupShelf(b);
+    if (!("shelfId" in result)) return say(result.message, result.kind);
+    // Split view visible → light the shelf up on the mini-map right here
+    // (and make sure the map is on screen) instead of navigating away.
+    if (splitView) {
+      const show = () => {
+        setMapShelf(result.shelfId);
+        mapPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      };
+      if (result.message) say(result.message, "info", show, "Show me the shelves");
+      else show();
+      return;
+    }
+    const go = () => {
+      window.location.href = shelfMapHref(result);
+    };
+    // Sure of the shelf → straight to it. Only narrowed to a category → say
+    // so first, and let the reader choose to walk the section on the map.
+    if (result.message) say(result.message, "info", go, "Show me the shelves");
+    else go();
   }
 
   return (
+    <div className={splitView ? "findbook-split" : undefined}>
     <div className="card" data-favtick={favTick}>
       <form onSubmit={search} className="searchrow">
         <input
           className="input"
+          type="search"
+          enterKeyHint="search"
+          aria-label="Search the library"
           placeholder="Title or author…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -152,7 +243,7 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
             <button
               key={id}
               type="button"
-              className={`tagchip${active ? " active" : ""}`}
+              className={`tagchip${active ? ` active ${pillTextClass(id)}` : ""}`}
               style={active ? { background: CATEGORIES[id].color, borderColor: CATEGORIES[id].color, color: "#fff" } : undefined}
               onClick={() => {
                 setFilter(active ? null : id);
@@ -166,7 +257,16 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
         })}
       </div>
 
-      {note && <div className="notice" style={{ marginTop: 12 }}>{note}</div>}
+      {note && (
+        <div className={`notice${note.kind === "ok" ? "" : ` ${note.kind}`}`} style={{ marginTop: 12 }}>
+          {note.text}
+          {note.undo && (
+            <button type="button" className="toast-undo" onClick={note.undo}>
+              {note.undoLabel ?? "Undo"}
+            </button>
+          )}
+        </div>
+      )}
 
       {results && (
         <>
@@ -178,24 +278,31 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
             {results.map((b) => {
               const open = expandedId === b.id;
               const d = details[b.id];
-              const coverIsbn = d?.isbn13 ?? b.isbn13;
+              const book = d && "book" in d ? d.book : null;
+              const coverIsbn = book?.isbn13 ?? b.isbn13;
               return (
                 <div key={b.id} className={`catrow${open ? " open" : ""}`}>
-                  <button type="button" className="catrow-head" onClick={() => toggle(b)} aria-expanded={open}>
+                  <button
+                    type="button"
+                    className="catrow-head"
+                    onClick={() => toggle(b)}
+                    aria-expanded={open}
+                    aria-controls={`${uid}-detail-${b.id}`}
+                  >
                     <span className="catrow-main">
                       <span className="catrow-title">{b.title}</span>
                       <span className="catrow-meta">
                         {b.creators ?? "Unknown author"} · {b.copies} in the library
                       </span>
                     </span>
-                    {b.tag && <TagPill tag={b.tag} small />}
+                    {b.tag && <TagPill tag={b.tag} small className={pillTextClass(b.tag)} />}
                     <span className={`catrow-chev${open ? " open" : ""}`} aria-hidden>
                       ›
                     </span>
                   </button>
 
                   {open && (
-                    <div className="catrow-detail">
+                    <div className="catrow-detail" id={`${uid}-detail-${b.id}`}>
                       <div className="bookdetail">
                         {coverIsbn && (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -209,8 +316,10 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {d === undefined ? (
                             <p className="hint" style={{ marginTop: 0 }}>Loading…</p>
-                          ) : d?.description ? (
-                            <p className="bookdesc">{d.description}</p>
+                          ) : "error" in d ? (
+                            <p className="hint" style={{ marginTop: 0 }}>{d.error}</p>
+                          ) : book?.description ? (
+                            <p className="bookdesc">{book.description}</p>
                           ) : (
                             <p className="hint" style={{ marginTop: 0 }}>No description on file yet.</p>
                           )}
@@ -220,6 +329,7 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
                                 type="button"
                                 className={`b-btn b-fav${isFavorite(b.dedupe_key) ? " on" : ""}`}
                                 onClick={() => heart(b)}
+                                aria-pressed={isFavorite(b.dedupe_key)}
                               >
                                 <Heart filled={isFavorite(b.dedupe_key)} size={13} />
                                 {isFavorite(b.dedupe_key) ? "Favorited" : "Favorite"}
@@ -235,10 +345,15 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
                               </button>
                             )}
                             <button type="button" className="b-btn b-where" onClick={() => where(b)}>
-                              <Pin /> Where is it?
+                              <Pin /> Show me where
                             </button>
                             {isStudent && (
                               <AddToCollection book={{ book_key: b.dedupe_key, title: b.title, isbn13: b.isbn13 }} />
+                            )}
+                            {role === "guest" && (
+                              <a className="hint" style={{ margin: 0, alignSelf: "center" }} href="/api/auth/google/start">
+                                Sign in with Google to save favorites
+                              </a>
                             )}
                           </div>
                         </div>
@@ -255,6 +370,15 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
             </button>
           )}
         </>
+      )}
+    </div>
+
+      {/* Desktop split view: the compact, read-only mini-map the results
+          talk to. Mobile keeps the navigate-to-/map behavior instead. */}
+      {splitView && (
+        <div className="findbook-map" ref={mapPanelRef}>
+          <LibraryMap editable={false} highlightShelfId={mapShelf} />
+        </div>
       )}
     </div>
   );

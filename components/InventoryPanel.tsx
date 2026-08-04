@@ -1,9 +1,10 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import Papa from "papaparse";
-import { mergeBooks, rowToBook, type BookRecord } from "@/lib/match";
-import { CATEGORIES, CATEGORY_IDS, type CategoryId } from "@/lib/categories";
+import { mergeBooks, mergeCollisions, rowToBook, type BookRecord } from "@/lib/match";
+import { CATEGORIES, CATEGORY_IDS, pillTextClass, type CategoryId } from "@/lib/categories";
+import { announce } from "@/components/Announcer";
+import Modal from "@/components/Modal";
 import TagPicker, { TagPill } from "@/components/TagPicker";
 import TagReviewPanel from "@/components/TagReviewPanel";
 import BookEditModal, { type EditableBook } from "@/components/BookEditModal";
@@ -20,6 +21,17 @@ type Sync = {
   merged_count: number | null;
   started_at: string;
   activated_at: string | null;
+  superseded_at?: string | null;
+  pruned_at?: string | null;
+};
+
+/** Diff of a staged import vs. the live catalog (matched on dedupe_key). */
+type SyncPreview = {
+  added: number;
+  removed: number;
+  unchanged: number;
+  manualMissing: number;
+  manualTitles: string[];
 };
 type Book = {
   id: number;
@@ -48,6 +60,8 @@ type Parsed = {
   skipped: number;
   books: BookRecord[];
   totalCopies: number;
+  /** Titles that were fused from ISBN-less rows matching on name alone. */
+  mergedByName: number;
 };
 
 const BATCH = 500;
@@ -67,11 +81,39 @@ const COL_LABEL = Object.fromEntries(CATALOG_COLS.map((c) => [c.id, c.label])) a
 const COLS_KEY = "ll-catalog-cols";
 const COLW_KEY = "ll-catalog-colw"; // dragged column widths (px), by column id
 
-export default function InventoryPanel({ canImport, canLibib }: { canImport: boolean; canLibib: boolean }) {
+/**
+ * Re-key one parsed CSV row from raw headers to the normalized names
+ * `rowToBook` reads ("title", "ean_isbn13", "upc_isbn10", "copies", …).
+ *
+ * This used to be PapaParse's `transformHeader`, but functions can't be
+ * structured-cloned across the worker boundary, so the same `trim().toLowerCase()`
+ * is applied here instead. First column wins a collision, which is what
+ * transformHeader produced too: PapaParse de-duplicates header names *after*
+ * transforming them, so a second column normalizing onto a taken name became
+ * "title_1" — a key rowToBook never reads. Dropping it here is equivalent.
+ * (BOM stripping is unaffected: PapaParse strips it from the raw header
+ * before transformHeader ever ran.)
+ */
+function normalizeRowKeys(row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const raw of Object.keys(row)) {
+    const key = raw.trim().toLowerCase();
+    if (!(key in out)) out[key] = row[raw];
+  }
+  return out;
+}
+
+export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const [active, setActive] = useState<Sync | null>(null);
   const [bookCount, setBookCount] = useState(0);
   const [history, setHistory] = useState<Sync[]>([]);
+  const [restorableId, setRestorableId] = useState<number | null>(null);
+  const [restoring, setRestoring] = useState(false);
   const [parsed, setParsed] = useState<Parsed | null>(null);
+  // A staged import waiting for the librarian to confirm: rows are uploaded
+  // to a pending sync, nothing is live until they press "Import and replace".
+  const [confirming, setConfirming] = useState<{ syncId: number; preview: SyncPreview | null } | null>(null);
+  const [committing, setCommitting] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -102,6 +144,25 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
 
   // Undo history belongs to this screen — don't let it outlive the panel.
   useEffect(() => clearUndo, []);
+
+  // Every banner on this screen is a plain <div> (.error / .notice), not a
+  // live region, so a screen reader never hears the import results, tag
+  // changes or restore confirmations a sighted user reads. These wrappers
+  // show and speak in one step; errors interrupt, everything else waits its
+  // turn. Clearing a banner (setX(null)) stays a plain setState — there's
+  // nothing to announce.
+  const showError = useCallback((msg: string) => {
+    setError(msg);
+    announce(msg, true);
+  }, []);
+  const showNotice = useCallback((msg: string) => {
+    setNotice(msg);
+    announce(msg);
+  }, []);
+  const showTagError = useCallback((msg: string) => {
+    setTagError(msg);
+    announce(msg, true);
+  }, []);
 
   const [cols, setCols] = useState<ColPref[]>(DEFAULT_COLS);
   useEffect(() => {
@@ -262,36 +323,46 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
       setActive(data.active);
       setBookCount(data.bookCount);
       setHistory(data.syncs ?? []);
+      setRestorableId(typeof data.restorableId === "number" ? data.restorableId : null);
     }
   }
   useEffect(() => {
     load();
   }, []);
 
-  const handleFile = useCallback((file: File) => {
-    setError(null);
-    setNotice(null);
-    setParsed(null);
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      setError("That doesn't look like a CSV file — export it from Libib first.");
-      return;
-    }
-    Papa.parse<Record<string, unknown>>(file, {
-      header: true,
-      skipEmptyLines: "greedy",
-      transformHeader: (h) => h.trim().toLowerCase(),
-      complete: (out) => {
+  const handleFile = useCallback(
+    async (file: File) => {
+      setError(null);
+      setNotice(null);
+      setParsed(null);
+      if (!file.name.toLowerCase().endsWith(".csv")) {
+        showError("That doesn't look like a CSV file — export it from Libib first.");
+        return;
+      }
+      // The CSV parser is only needed once a file is picked — keep it out of
+      // the initial bundle.
+      const Papa = await import("papaparse").then((m) => m.default).catch(() => null);
+      if (!Papa) {
+        showError("Couldn't load the CSV reader — check your connection and try again.");
+        return;
+      }
+
+      const complete = (out: { data: Record<string, unknown>[] }) => {
         const books: BookRecord[] = [];
         let skipped = 0;
         for (const row of out.data) {
-          const b = rowToBook(row);
+          const b = rowToBook(normalizeRowKeys(row));
           if (b) books.push(b);
           else skipped++;
         }
         if (books.length === 0) {
-          setError("No usable rows found — is this the Libib library export?");
+          showError("No usable rows found — is this the Libib library export?");
           return;
         }
+        // Rows without an ISBN merge on title+author alone, which quietly
+        // fuses different books that share a name — surfaced in the summary
+        // so it can be reviewed rather than discovered on the shelf.
+        const collisions = mergeCollisions(books);
         const merged = mergeBooks(books);
         setParsed({
           filename: file.name,
@@ -299,12 +370,39 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
           skipped,
           books: merged,
           totalCopies: merged.reduce((n, b) => n + b.copies, 0),
+          mergedByName: collisions.length,
         });
-      },
-      error: () => setError("Couldn't read that file."),
-    });
-  }, []);
+        // The parse summary renders in a plain .notice — speak it too, or the
+        // file appears to have been swallowed.
+        announce(
+          `${file.name}: ${merged.length.toLocaleString()} unique titles from ${out.data.length.toLocaleString()} rows. Ready to import.`
+        );
+      };
+      const error = () => showError("Couldn't read that file.");
 
+      // A 6,000-row export locks the main thread for seconds on a school
+      // laptop, so parsing runs in PapaParse's blob worker (CSP allows
+      // worker-src blob:). The config crosses to the worker by structured
+      // clone, which throws on functions — so `transformHeader` can't come
+      // along and header normalization happens in `complete` instead, via
+      // normalizeRowKeys. If the Worker can't be constructed at all (a
+      // stricter CSP somewhere, an old browser), fall back to parsing on
+      // the main thread rather than losing CSV import entirely.
+      const config = { header: true as const, skipEmptyLines: "greedy" as const, complete, error };
+      try {
+        Papa.parse<Record<string, unknown>>(file, { ...config, worker: true });
+      } catch {
+        Papa.parse<Record<string, unknown>>(file, config);
+      }
+    },
+    [showError]
+  );
+
+  /**
+   * Stage the import: create a pending sync and upload every row, then show
+   * the confirmation dialog with a diff against the live catalog. Nothing
+   * replaces the live inventory until confirmImport() commits.
+   */
   async function runImport() {
     if (!parsed) return;
     setProgress(0);
@@ -332,24 +430,83 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
         setProgress(Math.min(99, Math.round(((i + rows.length) / parsed.books.length) * 100)));
       }
 
-      const commit = await fetch(`/api/admin/inventory/syncs/${sync_id}/commit`, {
+      // Rows are staged — fetch the diff, then ask before replacing anything.
+      // A preview that can't be built (older database) never blocks the
+      // import; the dialog just shows a plain warning instead of numbers.
+      let preview: SyncPreview | null = null;
+      try {
+        const res = await fetch(`/api/admin/inventory/syncs/${sync_id}/preview`);
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.preview) preview = data.preview as SyncPreview;
+      } catch {
+        /* dialog falls back to no numbers */
+      }
+      setConfirming({ syncId: sync_id, preview });
+    } catch (e) {
+      showError(e instanceof Error ? e.message : "Import failed.");
+    } finally {
+      setTimeout(() => setProgress(null), 800);
+    }
+  }
+
+  /** The librarian confirmed — commit the staged sync (atomic swap). */
+  async function confirmImport() {
+    if (!confirming || !parsed) return;
+    setCommitting(true);
+    setError(null);
+    try {
+      const commit = await fetch(`/api/admin/inventory/syncs/${confirming.syncId}/commit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ row_count: parsed.rawRows, merged_count: parsed.books.length }),
       });
       if (!commit.ok) throw new Error((await commit.json()).error ?? "Couldn't activate the import.");
-
-      setProgress(100);
-      setNotice(
-        `Inventory replaced: ${parsed.books.length.toLocaleString()} titles (${parsed.totalCopies.toLocaleString()} copies) from ${parsed.rawRows.toLocaleString()} CSV rows.`
+      showNotice(
+        `Inventory replaced: ${parsed.books.length.toLocaleString()} titles (${parsed.totalCopies.toLocaleString()} copies) from ${parsed.rawRows.toLocaleString()} CSV rows. The previous catalog is kept for 30 days.`
       );
       setParsed(null);
       if (fileRef.current) fileRef.current.value = "";
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Import failed.");
+      showError(e instanceof Error ? e.message : "Import failed.");
     } finally {
-      setTimeout(() => setProgress(null), 800);
+      setCommitting(false);
+      setConfirming(null);
+    }
+  }
+
+  /** Cancel from the dialog → abort the staged sync (live catalog untouched). */
+  async function cancelImport() {
+    if (!confirming) return;
+    const id = confirming.syncId;
+    setConfirming(null);
+    try {
+      await fetch(`/api/admin/inventory/syncs/${id}`, { method: "DELETE" });
+    } catch {
+      /* stale pending syncs are also swept when the next import starts */
+    }
+    showNotice("Import cancelled — the live catalog is unchanged.");
+  }
+
+  /** Bring the most recent superseded generation back live. */
+  async function restoreSync(id: number) {
+    setRestoring(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/inventory/syncs/${id}/restore`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showError(data.error ?? "Couldn't restore that catalog.");
+        return;
+      }
+      showNotice("Previous catalog restored — it's live again.");
+      load();
+      search();
+    } catch {
+      showError("Couldn't restore that catalog.");
+    } finally {
+      setRestoring(false);
     }
   }
 
@@ -370,7 +527,7 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
       setSelected(new Set()); // selection is per result set
       lastIdx.current = null;
     } else {
-      setTagError(data.error ?? "Search failed.");
+      showTagError(data.error ?? "Search failed.");
     }
   }
 
@@ -410,7 +567,9 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setBulk({ busy: false, msg: data.error ?? "Couldn't update tags." });
+      const msg = data.error ?? "Couldn't update tags.";
+      setBulk({ busy: false, msg });
+      announce(msg, true);
       return false;
     }
     const hit = new Set(keys);
@@ -441,9 +600,11 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
         redo: async () => void (await putBulk(keys, tag)),
       });
       setBulk({ busy: false, msg: label });
+      announce(label);
       setTimeout(() => setBulk((b) => ({ ...b, msg: null })), 5000);
     } catch {
       setBulk({ busy: false, msg: "Couldn't update tags." });
+      announce("Couldn't update tags.", true);
     }
   }
 
@@ -471,7 +632,7 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
     });
     setExpanded((cur) => (cur === id ? null : cur));
     setEditing(null);
-    setNotice("Book deleted from the live catalog.");
+    showNotice("Book deleted from the live catalog.");
     setTimeout(() => setNotice(null), 4000);
   }
 
@@ -493,7 +654,7 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
       setBookCount((c) => c + 1);
     }
     const copyText = `${book.copies} cop${book.copies === 1 ? "y" : "ies"}`;
-    setNotice(
+    showNotice(
       wasNew
         ? `Added “${book.title}” to the catalog — ${copyText}.`
         : `“${book.title}” was already here — now ${copyText}.`
@@ -550,10 +711,16 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
       const res = await fetch(`/api/admin/books/where?key=${encodeURIComponent(b.dedupe_key)}`);
       const data = await res.json();
       if (data.found && data.shelves?.length) {
-        window.location.href = `/admin/map?shelf=${data.shelves[0].id}`;
+        if (data.ranged || data.shelves.length === 1) {
+          window.location.href = `/admin/map?shelf=${data.shelves[0].id}`;
+          return;
+        }
+        showTagError(
+          `“${b.title}” is somewhere in its category — no letter range narrows it to one shelf. The map shows the category's shelves.`
+        );
         return;
       }
-      setTagError(
+      showTagError(
         data.reason === "untagged"
           ? `Tag “${b.title}” first — the shelf is found through its category tag.`
           : `No shelf matches “${b.title}” yet — set categories and letter ranges on the map.`
@@ -572,7 +739,7 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
       body: JSON.stringify({ book_key: book.dedupe_key, category: tag }),
     });
     if (!res.ok) {
-      setTagError((await res.json().catch(() => ({}))).error ?? "Couldn't save the tag.");
+      showTagError((await res.json().catch(() => ({}))).error ?? "Couldn't save the tag.");
       return false;
     }
     setResults((cur) => cur?.map((b) => (b.dedupe_key === book.dedupe_key ? { ...b, tag } : b)) ?? cur);
@@ -590,6 +757,7 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
       redo: async () => void (await putTag(book, tag)),
     });
     setTagNote(label);
+    announce(label);
     setTimeout(() => setTagNote((cur) => (cur === label ? null : cur)), 8000);
   }
 
@@ -672,6 +840,84 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
         />
       )}
       {addOpen && <AddBookModal onClose={() => setAddOpen(false)} onAdded={onAdded} />}
+      {confirming && (
+        // Own head rather than Modal's `title`, so the ✕ can stay disabled
+        // mid-commit; `onClose` is inert then too, which keeps Escape and the
+        // scrim from abandoning an import that's already replacing the catalog.
+        <Modal
+          open
+          onClose={committing ? () => {} : cancelImport}
+          labelledBy="import-confirm-title"
+        >
+          <div className="modal-head">
+            <b id="import-confirm-title" data-modal-title tabIndex={-1}>Replace the live catalog?</b>
+            <button className="scan-close" onClick={cancelImport} aria-label="Close" disabled={committing}>
+              ✕
+            </button>
+          </div>
+          <div style={{ padding: "0 18px" }}>
+            {confirming.preview ? (
+              <>
+                <p style={{ margin: "10px 0 6px" }}>
+                  Compared with the live catalog, <b>{parsed?.filename ?? "this file"}</b> has:
+                </p>
+                <ul style={{ margin: "0 0 10px", paddingLeft: 22 }}>
+                  <li>
+                    <b>{confirming.preview.added.toLocaleString()}</b> new title
+                    {confirming.preview.added === 1 ? "" : "s"}
+                  </li>
+                  <li>
+                    <b>{confirming.preview.removed.toLocaleString()}</b> title
+                    {confirming.preview.removed === 1 ? "" : "s"} no longer present
+                  </li>
+                  <li>
+                    <b>{confirming.preview.unchanged.toLocaleString()}</b> unchanged
+                  </li>
+                </ul>
+                {confirming.preview.manualMissing > 0 && (
+                  <div className="error" style={{ marginBottom: 10 }}>
+                    <b>
+                      {confirming.preview.manualMissing.toLocaleString()} title
+                      {confirming.preview.manualMissing === 1 ? "" : "s"} added by hand
+                    </b>{" "}
+                    since the last import {confirming.preview.manualMissing === 1 ? "is" : "are"} missing
+                    from this file and will be dropped:
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 20 }}>
+                      {confirming.preview.manualTitles.map((t) => (
+                        <li key={t}>{t}</li>
+                      ))}
+                    </ul>
+                    {confirming.preview.manualMissing > confirming.preview.manualTitles.length && (
+                      <p style={{ margin: "6px 0 0" }}>
+                        …and{" "}
+                        {(confirming.preview.manualMissing - confirming.preview.manualTitles.length).toLocaleString()}{" "}
+                        more.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="hint" style={{ margin: "10px 0" }}>
+                A change summary isn&rsquo;t available right now — importing will still replace the
+                whole live catalog with this file.
+              </p>
+            )}
+            <p className="hint" style={{ margin: "0 0 4px" }}>
+              The previous catalog is kept for 30 days — you can restore it from Import history.
+            </p>
+          </div>
+          <div className="modal-actions">
+            <span style={{ flex: 1 }} />
+            <button className="btn ghost" onClick={cancelImport} disabled={committing}>
+              Cancel
+            </button>
+            <button className="btn brand" onClick={confirmImport} disabled={committing}>
+              {committing ? "Importing…" : "Import and replace"}
+            </button>
+          </div>
+        </Modal>
+      )}
       {error && <div className="error">{error}</div>}
       {notice && <div className="notice">{notice}</div>}
 
@@ -741,9 +987,8 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
         </div>
         {canImport && settingsOpen && (
           <div className="catset desk-only">
-            {canLibib && (
-            <div>
-              <label className="lbl">Inventory</label>
+            <div role="group" aria-labelledby="catset-inventory">
+              <span className="lbl" id="catset-inventory">Inventory</span>
               <p className="hint" style={{ margin: "2px 0 10px" }}>
                 {active ? (
                   <>
@@ -771,12 +1016,13 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
               >
                 <p className="hint" style={{ margin: "0 0 8px" }}>
                   Libib → your library → Export → CSV. Drop the file here (or choose it). The
-                  current inventory stays live until the new one is fully imported, then they
-                  swap atomically.
+                  current inventory stays live until the new one is fully imported — you&rsquo;ll
+                  confirm a summary of the changes before anything is replaced.
                 </p>
                 <input
                   ref={fileRef}
                   type="file"
+                  aria-label="Libib CSV export"
                   accept=".csv,text/csv"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
@@ -790,6 +1036,13 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
                       {parsed.totalCopies.toLocaleString()} total copies · from{" "}
                       {parsed.rawRows.toLocaleString()} rows
                       {parsed.skipped > 0 ? ` (${parsed.skipped} rows without titles skipped)` : ""}
+                      {parsed.mergedByName > 0 && (
+                        <div className="hint" style={{ marginTop: 6 }}>
+                          {parsed.mergedByName.toLocaleString()} title
+                          {parsed.mergedByName === 1 ? " was" : "s were"} merged from same-name rows without
+                          an ISBN — review after import.
+                        </div>
+                      )}
                     </div>
                     <button className="btn primary" onClick={runImport} disabled={progress !== null}>
                       {progress !== null ? `Importing… ${progress}%` : "Import & replace inventory"}
@@ -811,54 +1064,73 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
                 )}
               </div>
             </div>
-            )}
-            {canLibib && (
-              <div>
-                <label className="lbl">Import history</label>
-                {history.length === 0 ? (
-                  <p className="hint" style={{ margin: "2px 0 0" }}>No imports yet.</p>
-                ) : (
-                  <div className="tablewrap" style={{ marginTop: 6 }}>
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          <th>When</th>
-                          <th>File</th>
-                          <th>Titles</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {history.map((s) => (
-                          <tr key={s.id}>
-                            <td>{new Date(s.started_at).toLocaleString()}</td>
-                            <td>{s.source_filename ?? "—"}</td>
-                            <td>{s.merged_count?.toLocaleString() ?? "—"}</td>
+            <div role="group" aria-labelledby="catset-history">
+              <span className="lbl" id="catset-history">Import history</span>
+              {history.length === 0 ? (
+                <p className="hint" style={{ margin: "2px 0 0" }}>No imports yet.</p>
+              ) : (
+                <div className="tablewrap" style={{ marginTop: 6 }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>When</th>
+                        <th>File</th>
+                        <th>Titles</th>
+                        <th>Status</th>
+                        {restorableId !== null && <th aria-label="Actions" />}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.map((s) => (
+                        <tr key={s.id}>
+                          <td>{new Date(s.started_at).toLocaleString()}</td>
+                          <td>{s.source_filename ?? "—"}</td>
+                          <td>{s.merged_count?.toLocaleString() ?? "—"}</td>
+                          <td>
+                            <span
+                              className="pill"
+                              style={{
+                                background:
+                                  s.status === "active"
+                                    ? "#e7f6f3"
+                                    : s.status === "pending"
+                                      ? "#fff6e6"
+                                      : "#f3f4f7",
+                              }}
+                            >
+                              {s.status}
+                            </span>
+                          </td>
+                          {restorableId !== null && (
                             <td>
-                              <span
-                                className="pill"
-                                style={{
-                                  background:
-                                    s.status === "active"
-                                      ? "#e7f6f3"
-                                      : s.status === "pending"
-                                        ? "#fff6e6"
-                                        : "#f3f4f7",
-                                }}
-                              >
-                                {s.status}
-                              </span>
+                              {s.id === restorableId && (
+                                <button
+                                  type="button"
+                                  className="btn"
+                                  style={{ padding: "4px 10px", fontSize: 12 }}
+                                  disabled={restoring}
+                                  title="Make this catalog live again"
+                                  onClick={() => restoreSync(s.id)}
+                                >
+                                  {restoring ? "Restoring…" : "Restore"}
+                                </button>
+                              )}
                             </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-            <div>
-              <label className="lbl">Catalog columns</label>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {restorableId !== null && (
+                <p className="hint" style={{ margin: "6px 0 0" }}>
+                  A replaced catalog can be restored for 30 days after an import.
+                </p>
+              )}
+            </div>
+            <div role="group" aria-labelledby="catset-columns">
+              <span className="lbl" id="catset-columns">Catalog columns</span>
               <p className="hint" style={{ margin: "2px 0 8px" }}>
                 Title always shows. Reorder with the arrows — drag a column&rsquo;s edge in the table to
                 resize it.
@@ -905,8 +1177,8 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
                 </div>
               ))}
             </div>
-            <div>
-              <label className="lbl">Sort order</label>
+            <div role="group" aria-labelledby="catset-sort">
+              <span className="lbl" id="catset-sort">Sort order</span>
               <p className="hint" style={{ margin: "2px 0 8px" }}>
                 The catalog lists books by author surname. New imports are sorted
                 automatically; re-index to sort books imported before this feature.
@@ -920,14 +1192,14 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
                   try {
                     const res = await fetch("/api/admin/inventory/reindex-authors", { method: "POST" });
                     const data = await res.json().catch(() => ({}));
-                    setReindex({
-                      busy: false,
-                      msg: res.ok
-                        ? `Sorted ${(data.updated ?? 0).toLocaleString()} books by author.`
-                        : data.error ?? "Couldn't re-index.",
-                    });
+                    const msg = res.ok
+                      ? `Sorted ${(data.updated ?? 0).toLocaleString()} books by author.`
+                      : data.error ?? "Couldn't re-index.";
+                    setReindex({ busy: false, msg });
+                    announce(msg, !res.ok);
                   } catch {
                     setReindex({ busy: false, msg: "Couldn't re-index." });
+                    announce("Couldn't re-index.", true);
                   }
                 }}
               >
@@ -937,8 +1209,8 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
                 <p className="hint" style={{ margin: "8px 0 0" }}>{reindex.msg}</p>
               )}
             </div>
-            <div>
-              <label className="lbl">Covers & descriptions</label>
+            <div role="group" aria-labelledby="catset-covers">
+              <span className="lbl" id="catset-covers">Covers &amp; descriptions</span>
               <p className="hint" style={{ margin: "2px 0 8px" }}>
                 Missing descriptions and covers fill in <b>automatically</b> from Open Library and
                 Google Books — a little each night over the coming weeks. Nothing to press; it only
@@ -970,7 +1242,7 @@ export default function InventoryPanel({ canImport, canLibib }: { canImport: boo
                 type="button"
                 role="radio"
                 aria-checked={active}
-                className={`tagchip${active ? " active" : ""}`}
+                className={`tagchip${active ? ` active ${pillTextClass(id)}` : ""}`}
                 style={active ? { background: CATEGORIES[id].color, borderColor: CATEGORIES[id].color, color: "#fff" } : undefined}
                 onClick={() => setFilterAndSearch(active ? null : id)}
                 title={CATEGORIES[id].label}

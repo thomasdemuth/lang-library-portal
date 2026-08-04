@@ -34,8 +34,9 @@ export default function ProfileForm({ initialName }: { initialName: string }) {
     <form onSubmit={submit} style={{ maxWidth: 420 }}>
       {msg && <div className={msg.ok ? "notice" : "error"}>{msg.text}</div>}
       <div className="field">
-        <label className="lbl">Display name</label>
+        <label className="lbl" htmlFor="profile-display-name">Display name</label>
         <input
+          id="profile-display-name"
           className="input"
           value={name}
           maxLength={80}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   chooseMatch,
   mergeBooks,
+  mergeCollisions,
   normalizeTitle,
   rowToBook,
   similarity,
@@ -144,5 +145,34 @@ describe("CSV rows", () => {
     expect(b?.dedupe_key).toBe("i10:0875349242");
     const c = rowToBook({ title: "No ISBN Book", creators: "Someone" });
     expect(c?.dedupe_key).toBe("ta:no isbn book|someone");
+  });
+});
+
+describe("mergeCollisions", () => {
+  it("reports ISBN-less rows fused on name alone, biggest first", () => {
+    const rows = [
+      ...Array.from({ length: 3 }, () => rowToBook({ title: "Life", copies: "1" })!),
+      rowToBook({ title: "Wonder", creators: "Palacio, R. J." })!,
+      rowToBook({ title: "WONDER", creators: "Palacio, R.J." })!, // same key once normalized
+      rowToBook({ title: "Holes", creators: "Sachar, Louis" })!, // only one of these
+    ];
+    expect(mergeCollisions(rows)).toEqual([
+      { title: "Life", creators: null, count: 3 },
+      { title: "Wonder", creators: "Palacio, R. J.", count: 2 },
+    ]);
+  });
+
+  it("says nothing about rows that merged on an ISBN", () => {
+    const rows = [
+      rowToBook({ title: "Holes", ean_isbn13: "9780440414803", copies: "2" })!,
+      rowToBook({ title: "HOLES", ean_isbn13: "978-0-440-41480-3", copies: "3" })!,
+    ];
+    expect(mergeCollisions(rows)).toEqual([]);
+  });
+
+  it("does not change what mergeBooks does", () => {
+    const rows = [rowToBook({ title: "Life" })!, rowToBook({ title: "Life" })!];
+    expect(mergeBooks(rows).map((b) => b.copies)).toEqual([2]);
+    expect(mergeCollisions(rows)[0].count).toBe(2);
   });
 });

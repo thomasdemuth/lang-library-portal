@@ -1,5 +1,7 @@
 import FeedbackForm from "@/components/FeedbackForm";
 
+export const metadata = { title: "Feedback — Lang Library" };
+
 export default function StaffFeedback() {
   return (
     <div className="wrap narrow">

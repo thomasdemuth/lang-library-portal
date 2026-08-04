@@ -1,13 +1,15 @@
 import InventoryPanel from "@/components/InventoryPanel";
 import { requireAdminPage } from "@/lib/server";
-import { canDo, isDeveloper } from "@/lib/permissions";
+import { canDo } from "@/lib/permissions";
 import { redirect } from "next/navigation";
 
 export default async function InventoryPage() {
   const admin = await requireAdminPage();
+  // The Libib import (and restore) is a grantable power like the rest:
+  // Chiefs always have it, regular admins when a Chief grants
+  // "inventory_import" — it is no longer reserved to the developer account.
   const canImport = canDo(admin, "inventory_import");
   const canView = canDo(admin, "inventory_view");
-  const canLibib = isDeveloper(admin.email);
   if (!canImport && !canView) redirect("/admin");
 
   return (
@@ -19,7 +21,7 @@ export default async function InventoryPage() {
       <a className="btn brand mobile-only" style={{ width: "100%", textAlign: "center", marginBottom: 14 }} href="/admin/requests">
         Manage Book Requests
       </a>
-      <InventoryPanel canImport={canImport} canLibib={canLibib} />
+      <InventoryPanel canImport={canImport} />
     </>
   );
 }

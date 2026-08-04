@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { announce } from "@/components/Announcer";
 import { type CategoryId } from "@/lib/categories";
+import Modal from "@/components/Modal";
 import TagPicker from "@/components/TagPicker";
 import CopyStepper from "@/components/CopyStepper";
 
@@ -37,16 +39,26 @@ export default function AddBookModal({
   const [tag, setTag] = useState<CategoryId | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The add API clamps at MAX_COPIES: the title was already at the ceiling,
+  // so some (or all) of the copies asked for were never recorded. Closing on
+  // a cheerful "added" would hide that, so the modal stays open and says so.
+  const [warn, setWarn] = useState<string | null>(null);
 
   const coverIsbn = isbn13.trim() || isbn10.trim();
+
+  // Arms Modal's discard guard once anything has been entered.
+  const dirty =
+    title !== "" || creators !== "" || isbn13 !== "" || isbn10 !== "" || copies !== 1 || tag !== null;
 
   async function add() {
     if (!title.trim()) {
       setError("A title is required.");
+      announce("A title is required.", true);
       return;
     }
     setBusy(true);
     setError(null);
+    setWarn(null);
     try {
       const res = await fetch("/api/admin/books/add", {
         method: "POST",
@@ -61,7 +73,15 @@ export default function AddBookModal({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.book) {
-        setError(data.error ?? "Couldn't add that title.");
+        const msg = data.error ?? "Couldn't add that title.";
+        setError(msg);
+        announce(msg, true);
+        return;
+      }
+      if (data.clamped) {
+        const msg = data.message ?? "That title is already at the copy limit — the count didn't go up.";
+        setWarn(msg);
+        announce(msg, true);
         return;
       }
       const book = data.book as AddedBook;
@@ -81,73 +101,67 @@ export default function AddBookModal({
   }
 
   return (
-    <div className="modal-scrim" onClick={onClose}>
-      <div className="modal bookedit" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <b>Add a title</b>
-          <button className="scan-close" onClick={onClose} aria-label="Close">✕</button>
+    <Modal open onClose={onClose} title="Add a title" className="bookedit" dirty={dirty}>
+      <div className="bookedit-body">
+        <div className="bookedit-cover">
+          {coverIsbn ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api/admin/books/cover?isbn=${encodeURIComponent(coverIsbn)}`}
+              alt=""
+              onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+            />
+          ) : (
+            <div className="bookedit-nocover">No cover</div>
+          )}
+          <span className="hint" style={{ textAlign: "center" }}>Cover follows the ISBN</span>
         </div>
 
-        <div className="bookedit-body">
-          <div className="bookedit-cover">
-            {coverIsbn ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={`/api/admin/books/cover?isbn=${encodeURIComponent(coverIsbn)}`}
-                alt=""
-                onError={(e) => (e.currentTarget.style.visibility = "hidden")}
-              />
-            ) : (
-              <div className="bookedit-nocover">No cover</div>
-            )}
-            <span className="hint" style={{ textAlign: "center" }}>Cover follows the ISBN</span>
-          </div>
-
-          <div className="bookedit-fields">
-            <label className="field">
-              <span className="lbl">Title</span>
-              <input className="input" value={title} autoFocus onChange={(e) => setTitle(e.target.value)} placeholder="e.g. The Wild Robot" />
+        <div className="bookedit-fields">
+          <label className="field">
+            <span className="lbl">Title</span>
+            <input className="input" value={title} autoFocus onChange={(e) => setTitle(e.target.value)} placeholder="e.g. The Wild Robot" />
+          </label>
+          <label className="field">
+            <span className="lbl">Author(s)</span>
+            <input className="input" value={creators} onChange={(e) => setCreators(e.target.value)} placeholder="e.g. Brown, Peter" />
+          </label>
+          <div className="bookedit-row">
+            <label className="field" style={{ flex: 2 }}>
+              <span className="lbl">ISBN-13</span>
+              <input className="input" value={isbn13} onChange={(e) => setIsbn13(e.target.value)} inputMode="numeric" />
             </label>
-            <label className="field">
-              <span className="lbl">Author(s)</span>
-              <input className="input" value={creators} onChange={(e) => setCreators(e.target.value)} placeholder="e.g. Brown, Peter" />
+            <label className="field" style={{ flex: 2 }}>
+              <span className="lbl">ISBN-10</span>
+              <input className="input" value={isbn10} onChange={(e) => setIsbn10(e.target.value)} />
             </label>
-            <div className="bookedit-row">
-              <label className="field" style={{ flex: 2 }}>
-                <span className="lbl">ISBN-13</span>
-                <input className="input" value={isbn13} onChange={(e) => setIsbn13(e.target.value)} inputMode="numeric" />
-              </label>
-              <label className="field" style={{ flex: 2 }}>
-                <span className="lbl">ISBN-10</span>
-                <input className="input" value={isbn10} onChange={(e) => setIsbn10(e.target.value)} />
-              </label>
-              <div className="field" style={{ flex: "none" }}>
-                <span className="lbl">Copies</span>
-                <CopyStepper value={copies} onChange={setCopies} disabled={busy} />
-              </div>
-            </div>
-            <div className="field">
-              <span className="lbl">Tag</span>
-              <TagPicker value={tag} onChange={setTag} />
+            <div className="field" style={{ flex: "none" }}>
+              <span className="lbl">Copies</span>
+              <CopyStepper value={copies} onChange={setCopies} disabled={busy} />
             </div>
           </div>
-        </div>
-
-        {error && <div className="error" style={{ margin: "0 18px" }}>{error}</div>}
-        <p className="hint" style={{ margin: "0 18px" }}>
-          Adds {copies === 1 ? "one copy" : `${copies} copies`} to the live catalog. If this title's
-          already here, its copies go up by {copies} instead. Manual additions last until the next
-          Libib import.
-        </p>
-
-        <div className="modal-actions">
-          <span style={{ flex: 1 }} />
-          <button className="btn ghost" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn brand" onClick={add} disabled={busy || !title.trim()}>
-            {busy ? "Adding…" : "Add title"}
-          </button>
+          <div className="field">
+            <span className="lbl">Tag</span>
+            <TagPicker value={tag} onChange={setTag} />
+          </div>
         </div>
       </div>
-    </div>
+
+      {error && <div className="error" style={{ margin: "0 18px" }}>{error}</div>}
+      {warn && <div className="notice warn" style={{ margin: "0 18px" }}>{warn}</div>}
+      <p className="hint" style={{ margin: "0 18px" }}>
+        Adds {copies === 1 ? "one copy" : `${copies} copies`} to the live catalog. If this title's
+        already here, its copies go up by {copies} instead. Manual additions last until the next
+        Libib import.
+      </p>
+
+      <div className="modal-actions">
+        <span style={{ flex: 1 }} />
+        <button className="btn ghost" onClick={onClose} disabled={busy}>Cancel</button>
+        <button className="btn brand" onClick={add} disabled={busy || !title.trim()}>
+          {busy ? "Adding…" : "Add title"}
+        </button>
+      </div>
+    </Modal>
   );
 }

@@ -1,4 +1,5 @@
 import GateForm from "@/components/GateForm";
+import { studentUrl } from "@/lib/hosts";
 
 export default function StaffGate() {
   return (
@@ -12,6 +13,9 @@ export default function StaffGate() {
       <div className="card">
         <GateForm placeholder="you@thelangschool.org" />
         <p className="hint" style={{ marginTop: 12 }}>
+          Students: this is the staff site — <a href={studentUrl()}>go to the student site</a>.
+        </p>
+        <p className="hint" style={{ marginTop: 8 }}>
           Library management: <a href="/admin/login">sign in here</a>.
         </p>
       </div>

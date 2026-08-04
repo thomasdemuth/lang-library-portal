@@ -55,10 +55,17 @@ function applyHeaders(res: NextResponse, opts?: { frameable?: boolean }): NextRe
     [
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob:",
+      // App fonts are self-hosted via next/font. Only the sign-maker iframe
+      // (assets/sign-maker.html, the sole frameable response) still pulls
+      // Montserrat from Google Fonts — keep those hosts for it alone.
+      `style-src 'self' 'unsafe-inline'${opts?.frameable ? " https://fonts.googleapis.com" : ""}`,
+      `font-src 'self'${opts?.frameable ? " https://fonts.gstatic.com" : ""}`,
+      // googleusercontent.com serves the Google-account profile photos.
+      "img-src 'self' data: blob: https://*.googleusercontent.com",
       `connect-src 'self'${dev ? " ws:" : ""}`,
+      // Blob workers power client-side CSV parsing (PapaParse) off the main
+      // thread. Main CSP only — the sign-maker frame needs no workers.
+      ...(opts?.frameable ? [] : ["worker-src 'self' blob:"]),
       `frame-ancestors ${opts?.frameable ? "'self'" : "'none'"}`,
       "base-uri 'self'",
       "form-action 'self'",

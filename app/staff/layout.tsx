@@ -27,8 +27,12 @@ export default async function StaffLayout({ children }: { children: React.ReactN
   return (
     <>
       {isAdmin && <LaunchRedirect />}
-      <SiteHeader tagline="staff portal" email={session?.email} links={links} home={home} />
-      {children}
+      {/* First tabbable thing on every staff page — see .skip-link. */}
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
+      <SiteHeader tagline="staff portal" email={session?.email} links={links} home={home} photoUrl={session?.picture} />
+      <main id="main">{children}</main>
     </>
   );
 }

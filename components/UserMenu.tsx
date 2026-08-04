@@ -1,19 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import AvatarView from "@/components/AvatarView";
-import { DEFAULT_AVATAR, displayNameFull, type Avatar } from "@/lib/play";
+import LetterAvatar from "@/components/LetterAvatar";
+import { displayNameFull } from "@/lib/play";
 import { Ic } from "@/components/icons";
 
 /**
  * The top-right identity chip: the person's real name (school emails are
- * first.last) and — on the student site — the avatar they built. Clicking
- * opens a little account menu (profile privacy, sign out).
+ * first.last) with their Google profile photo (or an initial-letter avatar).
+ * Clicking opens a little account menu (profile privacy, sign out).
+ * Students' photos come from their profile row (fetched below); staff have
+ * no profile row, so theirs arrives via the `photoUrl` prop (session cookie).
  */
-export default function UserMenu({ email, audience }: { email: string; audience: "student" | "staff" }) {
+export default function UserMenu({
+  email,
+  audience,
+  photoUrl,
+}: {
+  email: string;
+  audience: "student" | "staff";
+  photoUrl?: string | null;
+}) {
   const [open, setOpen] = useState(false);
-  const [avatar, setAvatar] = useState<Avatar>(DEFAULT_AVATAR);
   const [hidden, setHidden] = useState<boolean | null>(null);
+  const [photo, setPhoto] = useState<string | null>(photoUrl ?? null);
   const [note, setNote] = useState<string | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
@@ -23,8 +33,8 @@ export default function UserMenu({ email, audience }: { email: string; audience:
       .then((r) => r.json())
       .then((d) => {
         if (d.profile) {
-          setAvatar({ ...DEFAULT_AVATAR, ...d.profile.avatar });
           setHidden(Boolean(d.profile.hidden));
+          if (d.profile.photo_url) setPhoto(d.profile.photo_url);
         }
       })
       .catch(() => {});
@@ -75,8 +85,8 @@ export default function UserMenu({ email, audience }: { email: string; audience:
         aria-expanded={open}
         title={email}
       >
-        {audience === "student" ? (
-          <AvatarView avatar={avatar} size={30} />
+        {audience === "student" || photo ? (
+          <LetterAvatar name={name} size={30} src={photo ?? undefined} />
         ) : (
           <span className="usermenu-plain">
             <Ic name="users" size={15} />
@@ -96,18 +106,15 @@ export default function UserMenu({ email, audience }: { email: string; audience:
               <a className="usermenu-item" href="/me">
                 <Ic name="smile" size={15} /> My Page
               </a>
-              <a className="usermenu-item" href="/avatar">
-                <Ic name="sparkle" size={15} /> Avatar Studio
-              </a>
               <button type="button" className="usermenu-item" onClick={togglePrivacy}>
-                <Ic name="feedback" size={15} />
+                <Ic name={hidden ? "eye" : "eyeoff"} size={15} />
                 {hidden ? "Show my profile" : "Hide my profile"}
                 <span className={`usermenu-state${hidden ? " off" : ""}`}>{hidden ? "hidden" : "visible"}</span>
               </button>
             </>
           )}
           <button type="button" className="usermenu-item danger" onClick={signOut}>
-            <Ic name="gear" size={15} /> Sign out
+            <Ic name="exit" size={15} /> Sign out
           </button>
           {note && <div className="usermenu-note">{note}</div>}
         </div>

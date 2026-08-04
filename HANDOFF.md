@@ -2,7 +2,7 @@
 
 ## 1. What this is
 
-Lang Library is the school library's web portal: students browse and search the catalog, earn stars for reading, and build avatars; teachers look up books, request class copies, and browse the games collection; librarians manage inventory, the library map, requests, and analytics. It is a single web app that serves everyone from one subdomain and routes people by role at sign-in.
+Lang Library is the school library's web portal: students browse and search the catalog and keep a personal reading log; teachers look up books, request class copies, and browse the games collection; librarians manage inventory, the library map, requests, and analytics. It is a single web app that serves everyone from one subdomain and routes people by role at sign-in.
 
 **Tech stack:** Next.js 15 (App Router, Node 22) · Supabase (hosted Postgres, accessed server-side only) · deployed on Vercel.
 

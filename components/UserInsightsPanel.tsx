@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import AvatarView from "@/components/AvatarView";
-import { DEFAULT_AVATAR, displayNameFull, type Avatar } from "@/lib/play";
+import LetterAvatar from "@/components/LetterAvatar";
+import { displayNameFull } from "@/lib/play";
 import { STATUS_LABELS } from "@/lib/labels";
-import { Heart, Ic, Star } from "@/components/icons";
+import { Heart, Ic } from "@/components/icons";
 
 type Tab = "students" | "teachers";
 
@@ -12,7 +12,6 @@ type ListRow = {
   email: string;
   lastSeen: string | null;
   notes: number;
-  points?: number;
   booksRead?: number;
   favorites?: number;
   hidden?: boolean;
@@ -22,7 +21,7 @@ type ListRow = {
 };
 
 type Detail = {
-  profile: { avatar: Avatar; points: number; public_id?: string; hidden?: boolean; created_at: string } | null;
+  profile: { public_id?: string; hidden?: boolean; created_at: string; photo_url?: string | null } | null;
   reads: { id: number; title: string; created_at: string }[];
   favorites: { book_key: string; title: string; created_at: string }[];
   requests: { id: number; title: string; author: string | null; copies_requested: number; status: string; created_at: string }[];
@@ -92,7 +91,6 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
   const [openEmail, setOpenEmail] = useState<string | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
-  const [starDraft, setStarDraft] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const loadList = useCallback((t: Tab) => {
@@ -122,7 +120,6 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
     setOpenEmail(email);
     setDetail(null);
     setNoteDraft("");
-    setStarDraft("");
     fetch(`/api/admin/users/detail?email=${encodeURIComponent(email)}`)
       .then((r) => r.json())
       .then((d) => setDetail(d))
@@ -134,7 +131,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
     setTimeout(() => setMsg(null), 3200);
   }
 
-  async function moderate(email: string, action: "hide" | "unhide" | "reset_avatar") {
+  async function moderate(email: string, action: "hide" | "unhide") {
     const res = await fetch("/api/admin/users/moderate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -142,37 +139,10 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return say(false, data.error ?? "Couldn't do that.");
-    say(true, action === "reset_avatar" ? "Avatar reset to the default." : action === "hide" ? "Profile hidden." : "Profile visible again.");
+    say(true, action === "hide" ? "Profile hidden." : "Profile visible again.");
     loadList(tab);
     if (detail?.profile) {
-      setDetail({
-        ...detail,
-        profile:
-          action === "reset_avatar"
-            ? { ...detail.profile, avatar: DEFAULT_AVATAR }
-            : { ...detail.profile, hidden: action === "hide" },
-      });
-    }
-  }
-
-  async function giveStars(email: string, delta: number) {
-    if (!Number.isInteger(delta) || delta === 0) return say(false, "Enter a whole number of stars (like 25 or -10).");
-    const res = await fetch("/api/admin/users/stars", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, delta }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return say(false, data.error ?? "Couldn't adjust stars.");
-    setStarDraft("");
-    say(true, delta > 0 ? `Gave ${delta} stars.` : `Removed ${-delta} stars.`);
-    setRows((cur) => cur.map((r) => (r.email === email ? { ...r, points: data.points, notes: data.note ? r.notes + 1 : r.notes } : r)));
-    if (detail?.profile) {
-      setDetail({
-        ...detail,
-        profile: { ...detail.profile, points: data.points },
-        notes: data.note ? [data.note, ...detail.notes] : detail.notes,
-      });
+      setDetail({ ...detail, profile: { ...detail.profile, hidden: action === "hide" } });
     }
   }
 
@@ -249,7 +219,6 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
                     <>
                       <span title="Books logged"><Ic name="book" size={13} /> {r.booksRead}</span>
                       <span title="Favorites"><Heart filled size={13} /> {r.favorites}</span>
-                      <span title="Stars"><Star size={13} /> {r.points}</span>
                       {r.hidden && <span className="upill">hidden</span>}
                     </>
                   ) : (
@@ -268,7 +237,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
                     <>
                       {tab === "students" && (
                         <div className="udetail-head">
-                          <AvatarView avatar={{ ...DEFAULT_AVATAR, ...(detail.profile?.avatar ?? {}) }} size={64} />
+                          <LetterAvatar name={displayNameFull(r.email)} size={64} src={detail.profile?.photo_url ?? undefined} />
                           <div className="udetail-actions">
                             {detail.profile?.public_id && (
                               <a
@@ -287,39 +256,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
                             >
                               {detail.profile?.hidden ? "Show profile" : "Hide profile"}
                             </button>
-                            <button type="button" className="btn ghost" onClick={() => moderate(r.email, "reset_avatar")}>
-                              Reset avatar
-                            </button>
                           </div>
-                        </div>
-                      )}
-
-                      {tab === "students" && detail.profile && (
-                        <div className="stargrant">
-                          <span className="stargrant-now">
-                            <Star size={14} /> <b>{detail.profile.points}</b> stars
-                          </span>
-                          {[5, 10, 25].map((n) => (
-                            <button key={n} type="button" className="btn ghost" onClick={() => giveStars(r.email, n)}>
-                              +{n}
-                            </button>
-                          ))}
-                          <input
-                            className="input stargrant-input"
-                            type="number"
-                            placeholder="± custom"
-                            value={starDraft}
-                            onChange={(e) => setStarDraft(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && giveStars(r.email, Number(starDraft))}
-                          />
-                          <button
-                            type="button"
-                            className="btn"
-                            disabled={!starDraft.trim()}
-                            onClick={() => giveStars(r.email, Number(starDraft))}
-                          >
-                            Give stars
-                          </button>
                         </div>
                       )}
 

@@ -86,7 +86,7 @@ export async function requirePermission(req: NextRequest, key: PermKey): Promise
   return admin;
 }
 
-/** Developer-only actions (Libib import, publishing updates). */
+/** Developer-only actions (publishing updates). */
 export async function requireDeveloper(req: NextRequest): Promise<AdminIdentity> {
   const admin = await requireAdmin(req);
   if (!isDeveloper(admin.email)) throw deny(403, "That's restricted to the developer account.");

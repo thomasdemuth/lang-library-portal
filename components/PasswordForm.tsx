@@ -41,17 +41,17 @@ export default function PasswordForm() {
     <form onSubmit={submit} style={{ maxWidth: 420 }}>
       {msg && <div className={msg.ok ? "notice" : "error"}>{msg.text}</div>}
       <div className="field">
-        <label className="lbl">Current password</label>
-        <input className="input" type="password" required autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        <label className="lbl" htmlFor="pw-current">Current password</label>
+        <input id="pw-current" className="input" type="password" required autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
       </div>
       <div className="field">
-        <label className="lbl">New password</label>
-        <input className="input" type="password" required minLength={10} autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
-        <p className="hint">At least 10 characters.</p>
+        <label className="lbl" htmlFor="pw-new">New password</label>
+        <input id="pw-new" className="input" type="password" required minLength={10} autoComplete="new-password" aria-describedby="pw-new-hint" value={next} onChange={(e) => setNext(e.target.value)} />
+        <p className="hint" id="pw-new-hint">At least 10 characters.</p>
       </div>
       <div className="field">
-        <label className="lbl">Confirm new password</label>
-        <input className="input" type="password" required autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        <label className="lbl" htmlFor="pw-confirm">Confirm new password</label>
+        <input id="pw-confirm" className="input" type="password" required autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
       </div>
       <button className="btn primary" disabled={busy}>
         {busy ? "Saving…" : "Change password"}

@@ -5,7 +5,7 @@ The Lang School library's web interface: a **student site**, a **staff site**, a
 
 | Audience | Gets in with | Can do |
 |---|---|---|
-| Students | `@students.thelangschool.org` email (student site) | Find-a-book search, library map, the reading game (log reads → earn stars → build an avatar), favorites, custom collections, friends, feedback |
+| Students | `@students.thelangschool.org` email (student site) | Find-a-book search, library map, a personal reading log, favorites, custom collections, friends, feedback |
 | Teachers | `@thelangschool.org` email (staff site) | Book requests (their own), library map, feedback |
 | Management | username + password (staff site → `/admin`) | Requests queue, inventory, map editor, feedback triage, user insights, site usage, sign maker, admin invites |
 

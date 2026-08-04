@@ -19,6 +19,13 @@ export type Session = {
   name?: string;
   /** admin session version — must match admins.session_v */
   v?: number;
+  /**
+   * Google profile-photo URL — staff sessions only. Staff have no DB profile
+   * row, so the (short, ~100-char) URL rides in the cookie and refreshes on
+   * re-login. Students get theirs from student_profiles.photo_url instead,
+   * keeping the long-lived student cookie small.
+   */
+  picture?: string;
 };
 
 const encoder = new TextEncoder();
@@ -57,6 +64,7 @@ export async function verifySessionToken(token: string | undefined): Promise<Ses
       sub: typeof payload.sub === "string" ? payload.sub : undefined,
       name: typeof payload.name === "string" ? payload.name : undefined,
       v: typeof payload.v === "number" ? payload.v : undefined,
+      picture: typeof payload.picture === "string" ? payload.picture : undefined,
     };
   } catch {
     return null;
