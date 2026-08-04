@@ -28,6 +28,11 @@ export default function SignInPage() {
       <p className="hint" style={{ textAlign: "center", marginTop: 14 }}>
         use your google account to access all features
       </p>
+      {process.env.NEW2_TARGET ? (
+        <p className="hint" style={{ textAlign: "center", marginTop: 22 }}>
+          <a href="/new2/preview">Visit the new site &rarr;</a>
+        </p>
+      ) : null}
     </div>
   );
 }
