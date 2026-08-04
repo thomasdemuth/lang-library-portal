@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guarded, requireSession } from "@/lib/guards";
 
+// Admins get notes_internal and editable:true in the same payload, so this
+// varies by role and must never land in a shared cache.
+const CACHE = { "Cache-Control": "private, max-age=60" };
+
 /** Map data for any signed-in user; internal notes only for admins. */
 export const GET = guarded(async (req: NextRequest) => {
   const session = await requireSession(req);
@@ -40,10 +44,13 @@ export const GET = guarded(async (req: NextRequest) => {
     ? times.reduce((a, b) => (a > b ? a : b))
     : null;
 
-  return NextResponse.json({
-    settings: settings ?? null,
-    shelves: shelves ?? [],
-    mapUpdatedAt,
-    editable: isAdmin,
-  });
+  return NextResponse.json(
+    {
+      settings: settings ?? null,
+      shelves: shelves ?? [],
+      mapUpdatedAt,
+      editable: isAdmin,
+    },
+    { headers: CACHE }
+  );
 });

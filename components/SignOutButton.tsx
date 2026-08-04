@@ -1,11 +1,13 @@
 "use client";
 
+import { withBase } from "@/lib/base";
+
 export default function SignOutButton() {
   async function signOut() {
     try {
-      await fetch("/api/logout", { method: "POST" });
+      await fetch(withBase("/api/logout"), { method: "POST" });
     } finally {
-      window.location.href = "/gate";
+      window.location.href = withBase("/gate");
     }
   }
   return (

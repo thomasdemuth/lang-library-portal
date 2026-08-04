@@ -4,15 +4,9 @@
  *  - @zxing/library fallback (iOS Safari has no BarcodeDetector)
  * Both scan for EAN-13/UPC-A — the Bookland barcodes printed on books.
  */
-import {
-  BarcodeFormat,
-  BinaryBitmap,
-  DecodeHintType,
-  HybridBinarizer,
-  MultiFormatReader,
-  NotFoundException,
-  RGBLuminanceSource,
-} from "@zxing/library";
+import type { MultiFormatReader } from "@zxing/library";
+
+type Zxing = typeof import("@zxing/library");
 
 type NativeDetector = {
   detect: (source: CanvasImageSource) => Promise<{ rawValue: string }[]>;
@@ -41,15 +35,17 @@ async function nativeDetector(): Promise<NativeDetector | null> {
   }
 }
 
-function zxingReader(): MultiFormatReader {
-  const reader = new MultiFormatReader();
+// Loaded on demand: only the no-BarcodeDetector path pays for the decoder.
+async function zxingEngine(): Promise<{ lib: Zxing; reader: MultiFormatReader }> {
+  const lib = await import("@zxing/library");
+  const reader = new lib.MultiFormatReader();
   const hints = new Map();
-  hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.UPC_A]);
+  hints.set(lib.DecodeHintType.POSSIBLE_FORMATS, [lib.BarcodeFormat.EAN_13, lib.BarcodeFormat.UPC_A]);
   // No TRY_HARDER: it triggers exhaustive (rotated etc.) searches that
   // roughly double per-frame cost. Trying more frames per second beats
   // trying harder per frame for handheld barcode alignment.
   reader.setHints(hints);
-  return reader;
+  return { lib, reader };
 }
 
 /**
@@ -77,7 +73,7 @@ export async function startScanner(
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
   const native = await nativeDetector();
-  const zxing = native ? null : zxingReader();
+  const zxing = native ? null : await zxingEngine();
 
   async function tick() {
     if (stopped) return;
@@ -87,6 +83,7 @@ export async function startScanner(
           const codes = await native.detect(video);
           for (const c of codes) if (c.rawValue) onCode(c.rawValue);
         } else if (zxing) {
+          const { BinaryBitmap, HybridBinarizer, RGBLuminanceSource } = zxing.lib;
           // Decode only the region under the guide frame (center band,
           // middle ~84% width), downscaled to ≤720px — a fraction of the
           // pixels of a full frame, so we can afford many more attempts
@@ -107,11 +104,11 @@ export async function startScanner(
             gray[i] = (data[j] * 306 + data[j + 1] * 601 + data[j + 2] * 117) >> 10;
           }
           const bitmap = new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(gray, width, height)));
-          const result = zxing.decodeWithState(bitmap);
+          const result = zxing.reader.decodeWithState(bitmap);
           if (result?.getText()) onCode(result.getText());
         }
       } catch (e) {
-        if (!(e instanceof NotFoundException)) {
+        if (!(zxing && e instanceof zxing.lib.NotFoundException)) {
           // decoding hiccup on a frame — keep scanning
         }
       }

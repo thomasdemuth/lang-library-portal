@@ -18,6 +18,32 @@ import { homePathFor, portalIdForEmail, splitPortalPath, treeFor } from "@/lib/u
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+/**
+ * Subpath staging (APP_BASE_PATH=/new2 — see lib/base.ts). The branch is
+ * reached through a rewrite on the production domain, so the Host header this
+ * deployment sees is its own *.vercel.app URL, never UNIFIED_HOST. Two things
+ * follow, and both are inert when APP_BASE_PATH is unset:
+ *   - routing is UNIFIED (single host, path + session) regardless of Host, so
+ *     student/staff routing behaves exactly as it will in production;
+ *   - the production-domain funnel below is off, or it would bounce every
+ *     staging request to the bare domain and out of /new2.
+ * NOTE: every `pathname` in this file comes from req.nextUrl, which Next
+ * strips the basePath from — so all the comparisons below are written in
+ * un-prefixed paths and keep matching. Conversely every redirect/rewrite is
+ * built from req.nextUrl.clone(), which re-adds the basePath when it is
+ * serialized; a `new URL(path, req.url)` would NOT and is not used here.
+ */
+const SUBPATH_MODE = Boolean(process.env.APP_BASE_PATH);
+
+/**
+ * Reviewer preview gate (staging deployments ONLY — see app/preview and
+ * lib/preview.ts). PREVIEW_KEY is a server-only env var that production never
+ * sets, so there this flag is false and the two preview paths below are as
+ * closed as any other unknown route (page redirects to sign-in / rewrites to
+ * a 404; API 401s) — and the page + API additionally 404 on their own.
+ */
+const PREVIEW_ENABLED = Boolean(process.env.PREVIEW_KEY);
+
 // Sign-in entry points reachable while signed out (Google OAuth + guest).
 const AUTH_OPEN = ["/api/auth/google/start", "/api/auth/google/callback", "/api/auth/guest"];
 // Paths open on both hosts (external form)
@@ -55,10 +81,17 @@ function applyHeaders(res: NextResponse, opts?: { frameable?: boolean }): NextRe
     [
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob:",
+      // App fonts are self-hosted via next/font. Only the sign-maker iframe
+      // (assets/sign-maker.html, the sole frameable response) still pulls
+      // Montserrat from Google Fonts — keep those hosts for it alone.
+      `style-src 'self' 'unsafe-inline'${opts?.frameable ? " https://fonts.googleapis.com" : ""}`,
+      `font-src 'self'${opts?.frameable ? " https://fonts.gstatic.com" : ""}`,
+      // googleusercontent.com serves the Google-account profile photos.
+      "img-src 'self' data: blob: https://*.googleusercontent.com",
       `connect-src 'self'${dev ? " ws:" : ""}`,
+      // Blob workers power client-side CSV parsing (PapaParse) off the main
+      // thread. Main CSP only — the sign-maker frame needs no workers.
+      ...(opts?.frameable ? [] : ["worker-src 'self' blob:"]),
       `frame-ancestors ${opts?.frameable ? "'self'" : "'none'"}`,
       "base-uri 'self'",
       "form-action 'self'",
@@ -210,15 +243,16 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
   const { pathname } = req.nextUrl;
 
   // ── 1. Host header → routing mode ─────────────────────────────────────
-  const unified = isUnifiedHost(host);
+  const unified = SUBPATH_MODE || isUnifiedHost(host);
 
   // In production the app lives ONLY at the unified domain. Every other host
   // — the retired *.vercel.app aliases and per-deployment URLs — permanently
   // funnels there, preserving the path + query so old deep links still land.
   // (Skipped when UNIFIED_HOST isn't configured, so there's never a redirect
   // to nowhere; dev and Vercel previews keep their dual-host behavior.)
+  // (Also skipped outright on a subpath staging deployment — see SUBPATH_MODE.)
   const uHost = unifiedHost();
-  if (!unified && uHost && process.env.VERCEL_ENV === "production") {
+  if (!SUBPATH_MODE && !unified && uHost && process.env.VERCEL_ENV === "production") {
     const target = req.nextUrl.clone();
     target.protocol = "https:";
     target.host = uHost;
@@ -272,6 +306,24 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
         originHost === (unifiedHost() ?? "").toLowerCase();
       if (!ok) return applyHeaders(NextResponse.json({ error: "Bad origin" }, { status: 403 }));
     }
+  }
+
+  // Reviewer preview entrance — reachable without a session, in every routing
+  // mode, but ONLY when the staging-only PREVIEW_KEY is configured. Placed
+  // after the CSRF origin check so the key POST keeps that protection. The
+  // page and API also 404 by themselves when PREVIEW_KEY is unset.
+  if (PREVIEW_ENABLED && (pathname === "/preview" || pathname === "/api/preview")) {
+    // /preview?key=… one-tap link: hand the key to the API route, which
+    // validates it, sets the reviewer cookie (server components can't), and
+    // returns to /preview. This redirect happens HERE because it must be
+    // built from req.nextUrl.clone() — the only construction that serializes
+    // the basePath exactly once on a subpath staging deployment.
+    if (pathname === "/preview" && req.nextUrl.searchParams.has("key")) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/api/preview";
+      return applyHeaders(NextResponse.redirect(url));
+    }
+    return applyHeaders(NextResponse.next());
   }
 
   const session: Session | null = await verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
@@ -355,5 +407,14 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|ico|webp|txt)$).*)"],
+  matcher: [
+    // The site root. Redundant at the domain root (the pattern below already
+    // matches "/"), but required under a basePath: Next prefixes each matcher
+    // source, and "/new2/((?!…).*)" compiles to a regex whose slash is NOT
+    // optional — so bare "/new2" would skip the middleware entirely and 404.
+    // "/" prefixes to "/new2", which matches. Matchers are OR-ed, so adding
+    // this changes nothing for a root deployment.
+    "/",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|ico|webp|txt)$).*)",
+  ],
 };

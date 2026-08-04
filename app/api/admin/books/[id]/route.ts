@@ -105,25 +105,51 @@ export const PATCH = guarded(
     }
 
     // ── Copy count ±1 ────────────────────────────────────────────────
-    const { data: row, error: readErr } = await db()
-      .from("books")
-      .select("id, copies")
-      .eq("id", bookId)
-      .maybeSingle();
-    if (readErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
-    if (!row) return NextResponse.json({ error: "No such book" }, { status: 404 });
+    // Optimistic lock, not a plain read-modify-write: two people stepping the
+    // same book at once (or one person double-tapping) otherwise lose an
+    // increment, and the delete-on-last-copy could fire against a count that
+    // had already moved. Each attempt re-reads and only commits if the count
+    // it decided from still holds.
+    const { delta } = parsed.data;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { data: row, error: readErr } = await db()
+        .from("books")
+        .select("id, copies")
+        .eq("id", bookId)
+        .maybeSingle();
+      if (readErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
+      if (!row) return NextResponse.json({ error: "No such book" }, { status: 404 });
 
-    const next = row.copies + parsed.data.delta;
-    if (next <= 0) {
-      const { error } = await db().from("books").delete().eq("id", bookId);
+      const next = row.copies + delta;
+      if (next <= 0) {
+        const { data: gone, error } = await db()
+          .from("books")
+          .delete()
+          .eq("id", bookId)
+          .eq("copies", row.copies)
+          .select("id")
+          .maybeSingle();
+        if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
+        if (gone) return NextResponse.json({ ok: true, removed: true, book: null });
+        continue;
+      }
+
+      const { data: book, error } = await db()
+        .from("books")
+        .update({ copies: next })
+        .eq("id", bookId)
+        .eq("copies", row.copies)
+        .select(COLS)
+        .maybeSingle();
       if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
-      return NextResponse.json({ ok: true, removed: true, book: null });
+      if (book) {
+        return NextResponse.json({ ok: true, removed: false, book: (await attachTags([book]))[0] });
+      }
     }
-
-    const { error } = await db().from("books").update({ copies: next }).eq("id", bookId);
-    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
-    const { data: book } = await db().from("books").select(COLS).eq("id", bookId).single();
-    return NextResponse.json({ ok: true, removed: false, book: book ? (await attachTags([book]))[0] : null });
+    return NextResponse.json(
+      { error: "Someone else is changing this book's copies — try again." },
+      { status: 409 }
+    );
   }
 );
 

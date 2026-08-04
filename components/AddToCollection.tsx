@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, Ic } from "@/components/icons";
+import Modal from "@/components/Modal";
 import {
   type ClientCollection,
   type CollectBook,
@@ -83,76 +84,70 @@ function CollectModal({ book, onClose }: { book: CollectBook; onClose: () => voi
   }
 
   return (
-    <div className="modal-scrim" onClick={onClose}>
-      <div className="modal collect-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <b>Add to a list</b>
-          <button type="button" className="scan-close" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
-        <div className="collect-body">
-          <p className="hint" style={{ marginTop: 0 }}>
-            “{book.title}”
-          </p>
+    // Toggling a list saves immediately, so the only unsaved work here is a
+    // half-typed new-list name — that's what arms the discard guard.
+    <Modal open onClose={onClose} title="Add to a list" className="collect-modal" dirty={newName.trim() !== ""}>
+      <div className="collect-body">
+        <p className="hint" style={{ marginTop: 0 }}>
+          “{book.title}”
+        </p>
 
-          {err && <div className="error">{err}</div>}
+        {err && <div className="error">{err}</div>}
 
-          {migration ? (
-            <p className="hint">Collections unlock after the next library update — check back soon!</p>
-          ) : (
-            <>
-              {collections === null ? (
-                <p className="hint">Loading your lists…</p>
-              ) : collections.length === 0 ? (
-                <p className="hint">No lists yet — make your first one below.</p>
-              ) : (
-                <div className="collect-list">
-                  {collections.map((col) => {
-                    const inList = col.bookKeys.includes(book.book_key);
-                    return (
-                      <button
-                        key={col.id}
-                        type="button"
-                        className={`collect-opt${inList ? " on" : ""}`}
-                        onClick={() => toggle(col)}
-                        disabled={busy === col.id}
-                      >
-                        <span className={`collect-check${inList ? " on" : ""}`}>
-                          {inList && <Check done size={13} />}
-                        </span>
-                        <b>{col.name}</b>
-                        <span className="hint" style={{ margin: 0 }}>
-                          {col.bookKeys.length} book{col.bookKeys.length === 1 ? "" : "s"}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="collect-new">
-                <input
-                  className="input"
-                  placeholder="New list — “Dragons”, “Summer reads”…"
-                  value={newName}
-                  maxLength={40}
-                  onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && create()}
-                />
-                <button type="button" className="btn" onClick={create} disabled={!newName.trim() || busy === "new"}>
-                  Create &amp; add
-                </button>
+        {migration ? (
+          <p className="hint">Collections unlock after the next library update — check back soon!</p>
+        ) : (
+          <>
+            {collections === null ? (
+              <p className="hint">Loading your lists…</p>
+            ) : collections.length === 0 ? (
+              <p className="hint">No lists yet — make your first one below.</p>
+            ) : (
+              <div className="collect-list">
+                {collections.map((col) => {
+                  const inList = col.bookKeys.includes(book.book_key);
+                  return (
+                    <button
+                      key={col.id}
+                      type="button"
+                      className={`collect-opt${inList ? " on" : ""}`}
+                      onClick={() => toggle(col)}
+                      disabled={busy === col.id}
+                    >
+                      <span className={`collect-check${inList ? " on" : ""}`}>
+                        {inList && <Check done size={13} />}
+                      </span>
+                      <b>{col.name}</b>
+                      <span className="hint" style={{ margin: 0 }}>
+                        {col.bookKeys.length} book{col.bookKeys.length === 1 ? "" : "s"}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-            </>
-          )}
-        </div>
-        <div className="modal-actions">
-          <button type="button" className="btn ghost" onClick={onClose}>
-            Done
-          </button>
-        </div>
+            )}
+
+            <div className="collect-new">
+              <input
+                className="input"
+                placeholder="New list — “Dragons”, “Summer reads”…"
+                value={newName}
+                maxLength={40}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && create()}
+              />
+              <button type="button" className="btn" onClick={create} disabled={!newName.trim() || busy === "new"}>
+                Create &amp; add
+              </button>
+            </div>
+          </>
+        )}
       </div>
-    </div>
+      <div className="modal-actions">
+        <button type="button" className="btn ghost" onClick={onClose}>
+          Done
+        </button>
+      </div>
+    </Modal>
   );
 }

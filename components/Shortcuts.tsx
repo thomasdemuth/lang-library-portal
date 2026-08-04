@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { runRedo, runUndo } from "@/lib/undo";
 import { shortcutsEnabled, type NavShortcut } from "@/lib/shortcuts";
+import { stripBase, withBase } from "@/lib/base";
 
 /** Is the caret in a field? Then ⌘Z belongs to the browser, not us. */
 function isTyping(el: EventTarget | null): boolean {
@@ -51,7 +52,7 @@ export default function Shortcuts({ links }: { links: NavShortcut[] }) {
         const hit = links.find((l) => l.key === e.code.slice(-1));
         if (!hit) return;
         e.preventDefault();
-        if (window.location.pathname !== hit.href) window.location.href = hit.href;
+        if (stripBase(window.location.pathname) !== hit.href) window.location.href = withBase(hit.href);
       }
     }
     window.addEventListener("keydown", onKey);

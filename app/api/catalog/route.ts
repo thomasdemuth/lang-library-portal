@@ -3,6 +3,10 @@ import { guarded, requireSession } from "@/lib/guards";
 import { isCategoryId } from "@/lib/tags";
 import { searchCatalog } from "@/lib/catalog";
 
+// Per-browser only: the results are the same for everyone, but the route sits
+// behind a session so no shared cache should hold it.
+const CACHE = { "Cache-Control": "private, max-age=3600, stale-while-revalidate=86400" };
+
 /**
  * The public-side catalog search: students and teachers can look up
  * books (read-only, no admin fields beyond what search results show).
@@ -15,5 +19,5 @@ export const GET = guarded(async (req: NextRequest) => {
   const result = await searchCatalog({ q, page, tag: isCategoryId(tagParam) ? tagParam : null });
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
   const { ok: _ok, ...body } = result;
-  return NextResponse.json(body);
+  return NextResponse.json(body, { headers: CACHE });
 });

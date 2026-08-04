@@ -1,5 +1,6 @@
 import SiteHeader from "@/components/SiteHeader";
 import { currentSession } from "@/lib/server";
+import { withBase } from "@/lib/base";
 
 const STUDENT_LINKS = [
   { href: "/", label: "Home" },
@@ -7,7 +8,6 @@ const STUDENT_LINKS = [
   { href: "/games", label: "Games" },
   { href: "/map", label: "Library Map" },
   { href: "/me", label: "My Page" },
-  { href: "/avatar", label: "Avatar Studio" },
   { href: "/feedback", label: "Feedback" },
 ];
 
@@ -25,21 +25,27 @@ export default async function StudentLayout({ children }: { children: React.Reac
 
   return (
     <>
+      {/* First tabbable thing on every student page — see .skip-link. */}
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
       <SiteHeader
         tagline={isGuest ? "guest" : "student portal"}
         email={session?.email}
         audience="student"
         links={links}
       />
-      {isGuest && (
-        <div className="wrap" style={{ paddingTop: 12 }}>
-          <div className="notice">
-            You&rsquo;re browsing as a guest — Find a Book and the Library Map only.{" "}
-            <a href="/api/auth/google/start">Sign in with your school Google account</a> for the full library.
+      <main id="main">
+        {isGuest && (
+          <div className="wrap" style={{ paddingTop: 12 }}>
+            <div className="notice">
+              You&rsquo;re browsing as a guest — Find a Book and the Library Map only.{" "}
+              <a href={withBase("/api/auth/google/start")}>Sign in with your school Google account</a> for the full library.
+            </div>
           </div>
-        </div>
-      )}
-      {children}
+        )}
+        {children}
+      </main>
     </>
   );
 }

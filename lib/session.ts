@@ -19,6 +19,22 @@ export type Session = {
   name?: string;
   /** admin session version — must match admins.session_v */
   v?: number;
+  /**
+   * Google profile-photo URL — staff sessions only. Staff have no DB profile
+   * row, so the (short, ~100-char) URL rides in the cookie and refreshes on
+   * re-login. Students get theirs from student_profiles.photo_url instead,
+   * keeping the long-lived student cookie small.
+   */
+  picture?: string;
+  /**
+   * Staging reviewer flag — set ONLY by /api/preview (which requires the
+   * staging-only PREVIEW_KEY env var) on the synthetic admin session. The
+   * claim is inert unless the running server ALSO has PREVIEW_KEY set: every
+   * consumer (lib/guards.ts, lib/server.ts) checks that first. In production
+   * PREVIEW_KEY is unset, so no such token is ever minted and a forged claim
+   * changes nothing.
+   */
+  preview?: boolean;
 };
 
 const encoder = new TextEncoder();
@@ -57,6 +73,8 @@ export async function verifySessionToken(token: string | undefined): Promise<Ses
       sub: typeof payload.sub === "string" ? payload.sub : undefined,
       name: typeof payload.name === "string" ? payload.name : undefined,
       v: typeof payload.v === "number" ? payload.v : undefined,
+      picture: typeof payload.picture === "string" ? payload.picture : undefined,
+      preview: payload.preview === true ? true : undefined,
     };
   } catch {
     return null;

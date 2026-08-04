@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { guarded, requireSession } from "@/lib/guards";
 import { searchGames } from "@/lib/games-search";
 
+// Identical for every viewer, but the route sits behind the sign-in gate and the
+// CDN doesn't vary on cookies — a shared cache entry would serve it to anyone.
+const CACHE = { "Cache-Control": "private, max-age=300, stale-while-revalidate=3600" };
+
 /**
  * The games collection for the student & staff portals — every game, ordered
  * by sub-category then title, so the client can lay them out one row per
@@ -13,7 +17,9 @@ export const GET = guarded(async (req: NextRequest) => {
   const q = (req.nextUrl.searchParams.get("q") ?? "").slice(0, 200);
 
   const result = await searchGames({ q, subcategory: null, order: "subcategory" });
-  if (result.ok) return NextResponse.json({ games: result.games });
-  if ("migrationPending" in result) return NextResponse.json({ games: [], migrationPending: true });
+  if (result.ok) return NextResponse.json({ games: result.games }, { headers: CACHE });
+  if ("migrationPending" in result) {
+    return NextResponse.json({ games: [], migrationPending: true }, { headers: CACHE });
+  }
   return NextResponse.json({ error: result.error }, { status: result.status });
 });

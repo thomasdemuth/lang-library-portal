@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Ic } from "@/components/icons";
+import { stripBase, withBase } from "@/lib/base";
 
 export type SideLink = { href: string; label: string; icon: string };
 
@@ -24,7 +25,7 @@ export default function SideNav({
   const [path, setPath] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
-    setPath(window.location.pathname);
+    setPath(stripBase(window.location.pathname));
     setCollapsed(document.documentElement.dataset.sidenav === "collapsed");
   }, []);
 
@@ -43,7 +44,15 @@ export default function SideNav({
   const item = (l: SideLink) => {
     const active = l.href === "/admin" ? path === "/admin" : path.startsWith(l.href);
     return (
-      <a key={l.href} href={l.href} className={active ? "active" : undefined} title={l.label}>
+      <a
+        key={l.href}
+        href={withBase(l.href)}
+        className={active ? "active" : undefined}
+        // The highlight is colour alone without this — aria-current is what
+        // tells a screen reader which link is the page you're on.
+        aria-current={active ? "page" : undefined}
+        title={l.label}
+      >
         <span className="side-ico">
           <Ic name={l.icon} size={17} />
         </span>

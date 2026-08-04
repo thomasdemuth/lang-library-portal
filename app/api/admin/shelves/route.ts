@@ -23,7 +23,32 @@ const Shelf = z.object({
 const Body = z.object({
   upserts: z.array(Shelf).max(500),
   deleteIds: z.array(z.string().uuid()).max(500),
+  // Optimistic concurrency, both optional: `baseUpdatedAt` is the map's
+  // "last updated" stamp the editor loaded, and `force` says to save over
+  // a newer map anyway. A payload without them behaves exactly as this
+  // route always has — last write wins, no check.
+  baseUpdatedAt: z.string().min(1).nullable().optional(),
+  force: z.boolean().optional(),
 });
+
+/**
+ * The map's "last updated" stamp, computed the same way GET /api/map does:
+ * the newest of the floor-plan settings row and any shelf. Null when it
+ * can't be established (empty map, database hiccup) — callers then skip
+ * the version check rather than block a save on a missing timestamp.
+ */
+async function currentMapStamp(): Promise<string | null> {
+  const [settings, newest] = await Promise.all([
+    db().from("map_settings").select("updated_at").eq("id", 1).maybeSingle(),
+    db().from("shelves").select("updated_at").order("updated_at", { ascending: false }).limit(1),
+  ]);
+  const times = [
+    (settings.data as { updated_at?: string } | null)?.updated_at,
+    (newest.data as { updated_at?: string }[] | null)?.[0]?.updated_at,
+  ].filter(Boolean) as string[];
+  if (times.length === 0) return null;
+  return times.reduce((a, b) => (Date.parse(a) >= Date.parse(b) ? a : b));
+}
 
 /** Bulk save from the map editor: upsert everything, delete the removed. */
 export const PUT = guarded(async (req: NextRequest) => {
@@ -32,7 +57,28 @@ export const PUT = guarded(async (req: NextRequest) => {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid shelves payload" }, { status: 400 });
   }
-  const { upserts, deleteIds } = parsed.data;
+  const { upserts, deleteIds, baseUpdatedAt, force } = parsed.data;
+
+  // Two admins with the map open both PUT the whole shelf set, so the
+  // second save would silently undo the first. If this one is based on an
+  // older map than the one on the server, refuse and let the editor choose
+  // (reload theirs, or re-send with force).
+  if (baseUpdatedAt && !force) {
+    const current = await currentMapStamp();
+    const base = Date.parse(baseUpdatedAt);
+    // A second of slack absorbs timestamp-precision differences; real
+    // conflicts are seconds-to-minutes apart.
+    if (current && Number.isFinite(base) && Date.parse(current) > base + 1000) {
+      return NextResponse.json(
+        {
+          error: "Someone else changed the map since you opened it.",
+          conflict: true,
+          mapUpdatedAt: current,
+        },
+        { status: 409 }
+      );
+    }
+  }
 
   if (deleteIds.length > 0) {
     const { error } = await db().from("shelves").delete().in("id", deleteIds);

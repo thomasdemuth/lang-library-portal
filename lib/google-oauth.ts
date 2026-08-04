@@ -118,15 +118,34 @@ export async function exchangeCode(code: string, verifier: string): Promise<stri
 }
 
 /**
+ * The id_token's `picture` claim, but only when it looks like a genuine
+ * Google-hosted photo URL (https on *.googleusercontent.com — the host our
+ * CSP img-src allows). Anything else is dropped rather than stored.
+ */
+function safePictureUrl(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length > 500) return undefined;
+  try {
+    const u = new URL(value);
+    if (u.protocol !== "https:") return undefined;
+    if (u.hostname !== "googleusercontent.com" && !u.hostname.endsWith(".googleusercontent.com")) return undefined;
+    return value;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Verify the ID token's signature (Google JWKS), issuer, audience, that the
  * email is verified, and that the nonce matches the one we sent. Returns the
- * (lowercased) verified email + display name.
+ * (lowercased) verified email + display name + profile photo (scope includes
+ * `profile`, so Google puts a `picture` claim in the id_token when the
+ * account has one — absent otherwise, and we tolerate that).
  */
 export async function verifyIdToken(
   idToken: string,
   expectedNonce: string,
   keys: KeyLike | Uint8Array | ReturnType<typeof createRemoteJWKSet> = JWKS
-): Promise<{ email: string; name?: string }> {
+): Promise<{ email: string; name?: string; picture?: string }> {
   const opts = { issuer: ISSUERS, audience: process.env.GOOGLE_CLIENT_ID };
   // `keys` is either a remote-JWKS getter (function) or a raw key — pick the
   // matching jwtVerify overload so both prod and tests type-check.
@@ -140,5 +159,6 @@ export async function verifyIdToken(
   return {
     email: payload.email.toLowerCase(),
     name: typeof payload.name === "string" ? payload.name : undefined,
+    picture: safePictureUrl(payload.picture),
   };
 }

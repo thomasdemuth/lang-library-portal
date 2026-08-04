@@ -11,6 +11,9 @@ import type { AdminRole } from "@/lib/permissions";
  * - With EMAIL_OVERRIDE_TO set, ALL mail reroutes to that one inbox and the
  *   subject gains a "[for: …]" suffix showing the true recipients.
  * - Sending never throws: a mail failure must never take a request down.
+ *   It DOES report: sendEmail resolves false when nothing was accepted by the
+ *   server (no recipients, or SMTP threw), so callers can decide whether to
+ *   retry, tell the user, or hold off on stamping "notified" state.
  * Node runtime only (route handlers + cron) — never imported from middleware.
  */
 
@@ -31,8 +34,13 @@ function smtp(): Transporter | null {
   return transport;
 }
 
-export async function sendEmail(to: string[], subject: string, text: string): Promise<void> {
-  if (to.length === 0) return;
+/**
+ * Send one message. Resolves true when the mail was handed off successfully
+ * (dev-log mode counts as delivered — there is no SMTP to fail), false when
+ * there was nobody to send to or the send threw. Never throws.
+ */
+export async function sendEmail(to: string[], subject: string, text: string): Promise<boolean> {
+  if (to.length === 0) return false;
   const override = process.env.EMAIL_OVERRIDE_TO?.trim();
   const recipients = override ? [override] : to;
   const finalSubject = override ? `${subject} [for: ${to.join(", ")}]` : subject;
@@ -40,7 +48,7 @@ export async function sendEmail(to: string[], subject: string, text: string): Pr
   const t = smtp();
   if (!t) {
     console.log(`[email dev-log] to=${recipients.join(",")} subject="${finalSubject}"\n${text}`);
-    return;
+    return true;
   }
   try {
     await t.sendMail({
@@ -49,8 +57,10 @@ export async function sendEmail(to: string[], subject: string, text: string): Pr
       subject: finalSubject,
       text,
     });
+    return true;
   } catch (e) {
     console.error("email send failed:", e);
+    return false;
   }
 }
 

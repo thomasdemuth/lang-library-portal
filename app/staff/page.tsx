@@ -2,16 +2,11 @@ import { currentSession } from "@/lib/server";
 import { db } from "@/lib/db";
 import { STATUS_LABELS } from "@/lib/labels";
 import { Ic } from "@/components/icons";
+import { withBase } from "@/lib/base";
+
+export const metadata = { title: "Home — Lang Library" };
 
 export const dynamic = "force-dynamic";
-
-const STATUS_COLORS: Record<string, string> = {
-  new: "#eef0f5",
-  in_progress: "#fff6e6",
-  ordered: "#eef1fb",
-  ready: "#e7f6f3",
-  declined: "#fdecec",
-};
 
 type MyRequest = { id: number; title: string; status: string; created_at: string };
 
@@ -43,7 +38,7 @@ export default async function StaffHome() {
             {requests.map((r) => (
               <a
                 key={r.id}
-                href="/requests"
+                href={withBase("/requests")}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -56,30 +51,41 @@ export default async function StaffHome() {
                 <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {r.title}
                 </span>
-                <span className="pill" style={{ background: STATUS_COLORS[r.status] ?? "#eef0f5" }}>
+                {/* Same status-pill vocabulary as the requests page (RequestsPanel). */}
+                <span className="pill" style={{ background: r.status === "ready" ? "#e7f6f3" : "#eef0f5" }}>
                   {STATUS_LABELS[r.status] ?? r.status}
                 </span>
               </a>
             ))}
           </div>
           <p className="hint" style={{ marginBottom: 0 }}>
-            <a href="/requests">All requests →</a>
+            <a href={withBase("/requests")}>All requests →</a>
           </p>
         </div>
       )}
 
       <div className="cards">
-        <a className="card navcard" href="/requests">
+        <a className="card navcard" href={withBase("/search")}>
+          <h2>
+            <span className="navcard-icon" style={{ background: "#2e50c8" }}>
+              <Ic name="search" size={17} />
+            </span>
+            Find a Book
+            <span className="navcard-arrow" aria-hidden>→</span>
+          </h2>
+          <p>Search the catalog and see which shelf it lives on.</p>
+        </a>
+        <a className="card navcard" href={withBase("/requests")}>
           <h2>
             <span className="navcard-icon" style={{ background: "#b2222c" }}>
               <Ic name="requests" size={17} />
             </span>
-            Book Requests
+            Request books
             <span className="navcard-arrow" aria-hidden>→</span>
           </h2>
-          <p>Need copies for your class? Submit a request and see what the library already has on the shelves.</p>
+          <p>Class sets and new titles.</p>
         </a>
-        <a className="card navcard" href="/map">
+        <a className="card navcard" href={withBase("/map")}>
           <h2>
             <span className="navcard-icon" style={{ background: "#2e3b8e" }}>
               <Ic name="map" size={17} />
@@ -87,9 +93,19 @@ export default async function StaffHome() {
             Library Map
             <span className="navcard-arrow" aria-hidden>→</span>
           </h2>
-          <p>See where every genre and section lives, shelf by shelf.</p>
+          <p>Where everything lives.</p>
         </a>
-        <a className="card navcard" href="/feedback">
+        <a className="card navcard" href={withBase("/games")}>
+          <h2>
+            <span className="navcard-icon" style={{ background: "#4caf50" }}>
+              <Ic name="dice" size={17} />
+            </span>
+            Games
+            <span className="navcard-arrow" aria-hidden>→</span>
+          </h2>
+          <p>Browse the games collection.</p>
+        </a>
+        <a className="card navcard" href={withBase("/feedback")}>
           <h2>
             <span className="navcard-icon" style={{ background: "#29ac9c" }}>
               <Ic name="feedback" size={17} />
@@ -97,7 +113,7 @@ export default async function StaffHome() {
             Feedback
             <span className="navcard-arrow" aria-hidden>→</span>
           </h2>
-          <p>Ideas, issues, wishes — straight to the library team.</p>
+          <p>Tell the library team anything.</p>
         </a>
       </div>
     </div>

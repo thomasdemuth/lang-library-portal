@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { stripBase, withBase } from "@/lib/base";
 
 /** Paths that count as "the app just opened here" for an admin. */
 function isLandingPath(p: string): boolean {
@@ -27,7 +28,7 @@ export default function LaunchRedirect() {
       if (sessionStorage.getItem("ll-launched")) return;
       // Claim the one shot up front: only the app's very first page can jump.
       sessionStorage.setItem("ll-launched", "1");
-      if (isLandingPath(window.location.pathname)) window.location.replace(`/admin/${target}`);
+      if (isLandingPath(stripBase(window.location.pathname))) window.location.replace(withBase(`/admin/${target}`));
     } catch {
       /* private mode etc. — just load normally */
     }

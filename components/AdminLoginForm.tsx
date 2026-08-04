@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { safeNextPath } from "@/lib/safe-next";
+import { withBase } from "@/lib/base";
 
 export default function AdminLoginForm() {
   const [username, setUsername] = useState("");
@@ -14,7 +15,7 @@ export default function AdminLoginForm() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/login", {
+      const res = await fetch(withBase("/api/admin/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -25,7 +26,7 @@ export default function AdminLoginForm() {
         return;
       }
       const next = new URLSearchParams(window.location.search).get("next");
-      window.location.href = safeNextPath(next, "/admin");
+      window.location.href = withBase(safeNextPath(next, "/admin"));
     } catch {
       setError("Couldn't reach the server — try again.");
     } finally {

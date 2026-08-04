@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { withBase } from "@/lib/base";
 
 type Update = { id: number; title: string; body: string; created_at: string };
 
@@ -14,7 +15,7 @@ export default function UpdatesPanel({ canPublish }: { canPublish: boolean }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function load() {
-    const res = await fetch("/api/admin/updates");
+    const res = await fetch(withBase("/api/admin/updates"));
     const data = await res.json();
     if (res.ok) {
       setUpdates(data.updates ?? []);
@@ -30,7 +31,7 @@ export default function UpdatesPanel({ canPublish }: { canPublish: boolean }) {
     setBusy(true);
     setMsg(null);
     try {
-      const res = await fetch("/api/admin/updates", {
+      const res = await fetch(withBase("/api/admin/updates"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, body, override }),

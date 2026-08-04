@@ -2,19 +2,23 @@
 
 import { useEffect, useRef, useState } from "react";
 import BookRow, { type RowKind } from "@/components/BookRow";
-import AvatarView from "@/components/AvatarView";
-import { DEFAULT_AVATAR, displayName, type Avatar } from "@/lib/play";
+import LetterAvatar from "@/components/LetterAvatar";
+import { displayName } from "@/lib/play";
 import { type CategoryId } from "@/lib/categories";
-import { Ic, Medal, Star } from "@/components/icons";
-
-type Leader = { rank: number; name: string; books: number; avatar: Avatar; id: string | null };
+import { Ic } from "@/components/icons";
+import { withBase } from "@/lib/base";
 
 /**
- * The rotation the endless "Keep exploring" grid cycles through. Every entry
+ * The rotation the "Keep exploring" grid walks through. Every entry
  * resamples fresh books on each mount (random sample / random-offset category
  * slice), so rows stay varied and rarely repeat. The curated "Because you
  * read…" rows are deliberately NOT reused here — their content is fixed and
  * would repeat, which we avoid.
+ *
+ * v8: the grid is no longer endless. The first AUTO_ROWS rows arrive on
+ * their own (one immediately, two more as the student scrolls), then an
+ * explicit "Show me more books" button adds one row per press. When the
+ * rotation would start repeating, an end-cap says so and points at search.
  */
 const EXPLORE_KINDS: { kind: RowKind; tag?: CategoryId }[] = [
   { kind: "random" },
@@ -27,45 +31,42 @@ const EXPLORE_KINDS: { kind: RowKind; tag?: CategoryId }[] = [
   { kind: "tag", tag: "drama" },
 ];
 
-/** The student homepage: a wall of book shelves plus the reading game. */
+/** 1 explore row on load + 2 auto-loaded by scrolling; the rest are asked for. */
+const AUTO_ROWS = 3;
+/** Past this the rotation repeats — that's the whole shelf. */
+const MAX_ROWS = EXPLORE_KINDS.length;
+
+/** The student homepage: a wall of book shelves plus quick links. */
 export default function StudentHome({ email }: { email: string }) {
-  const [avatar, setAvatar] = useState<Avatar>(DEFAULT_AVATAR);
-  const [points, setPoints] = useState<number | null>(null);
-  const [booksRead, setBooksRead] = useState(0);
-  const [leaders, setLeaders] = useState<Leader[]>([]);
+  const [booksThisYear, setBooksThisYear] = useState<number | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [extraRows, setExtraRows] = useState(1);
   const sentinel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch("/api/play/profile")
+    fetch(withBase("/api/play/profile"))
       .then((r) => r.json())
       .then((d) => {
         if (d.profile) {
-          setAvatar({ ...DEFAULT_AVATAR, ...d.profile.avatar });
-          setPoints(d.profile.points);
-          setBooksRead(d.booksRead ?? 0);
+          setBooksThisYear(d.booksThisYear ?? 0);
+          setPhotoUrl(d.profile.photo_url ?? null);
         }
       })
       .catch(() => {});
-    fetch("/api/play/leaderboard")
-      .then((r) => r.json())
-      .then((d) => setLeaders(d.leaders ?? []))
-      .catch(() => {});
   }, []);
 
-  // Truly infinite shelves. Re-arming on every extraRows change is what makes
-  // it endless: an IntersectionObserver only fires on transitions, so once the
-  // sentinel sits inside the root margin it goes quiet. Re-observing forces a
-  // fresh reading each time a row lands, so it keeps topping up until the
-  // sentinel is finally pushed past the margin — then waits for the next
-  // scroll. Unloaded rows reserve height (CSS min-height), so this tops up by
-  // only a few rows, never a storm.
+  // Auto-load the first couple of explore rows on scroll. Re-arming on every
+  // extraRows change keeps the observer honest: it only fires on transitions,
+  // so re-observing forces a fresh reading each time a row lands. Unloaded
+  // rows reserve height (CSS min-height), so this tops up one row at a time.
+  // Once AUTO_ROWS have landed the sentinel is gone from the tree and the
+  // explicit "Show me more books" button takes over (v8: no infinite scroll).
   useEffect(() => {
     const el = sentinel.current;
-    if (!el) return;
+    if (!el || extraRows >= AUTO_ROWS) return;
     const obs = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) setExtraRows((n) => n + 1);
+        if (entries[0].isIntersecting) setExtraRows((n) => Math.min(AUTO_ROWS, n + 1));
       },
       { rootMargin: "600px" }
     );
@@ -73,101 +74,65 @@ export default function StudentHome({ email }: { email: string }) {
     return () => obs.disconnect();
   }, [extraRows]);
 
-  const onPoints = (p: number) => {
-    setPoints(p);
-    setBooksRead((n) => n + 1);
-  };
+  const onLogged = (delta: number) => setBooksThisYear((n) => Math.max(0, (n ?? 0) + delta));
+
+  const name = displayName(email);
 
   return (
     <div className="wrap student-theme">
       <div className="play-hero">
-        <a className="play-me" href="/avatar">
-          <AvatarView avatar={avatar} size={74} />
+        <div className="play-me">
+          <LetterAvatar name={name} size={74} src={photoUrl ?? undefined} />
           <span>
-            <b>Hi, {displayName(email)}!</b>
+            <b>Hi, {name.split(" ")[0]}!</b>
             <span className="play-stats">
-              {points !== null ? (
-                <>
-                  <Star size={12} /> {points} stars · <Ic name="book" size={12} /> {booksRead} book
-                  {booksRead === 1 ? "" : "s"} logged
-                </>
-              ) : (
-                "Read books, earn stars, build your avatar"
-              )}
+              <Ic name="book" size={12} />{" "}
+              {booksThisYear === null
+                ? "Tap “I read this” on any book to keep your reading log"
+                : `${booksThisYear} book${booksThisYear === 1 ? "" : "s"} this year`}
             </span>
-            <span className="play-cta">Customize your avatar →</span>
           </span>
-        </a>
+        </div>
         <div className="play-links">
-          <a href="/me"><Ic name="smile" size={16} /> My Page</a>
-          <a href="/search"><Ic name="search" size={16} /> Find a Book</a>
-          <a href="/map"><Ic name="map" size={16} /> Library Map</a>
-          <a href="/feedback"><Ic name="feedback" size={16} /> Feedback</a>
+          <a href={withBase("/me")}><Ic name="smile" size={16} /> My Page</a>
+          <a href={withBase("/search")}><Ic name="search" size={16} /> Find a Book</a>
+          <a href={withBase("/map")}><Ic name="map" size={16} /> Library Map</a>
+          <a href={withBase("/feedback")}><Ic name="feedback" size={16} /> Feedback</a>
         </div>
       </div>
 
-      <BookRow title="Fresh picks" kind="new" onPoints={onPoints} emoji={""} />
-      <BookRow title="Because you read…" kind="because" index={0} onPoints={onPoints} emoji={""} />
-      <BookRow title="Class favorites" kind="loved" onPoints={onPoints} emoji={""} />
-      <BookRow title="Fictional Reads" kind="tag" tag="fiction" onPoints={onPoints} emoji={""} />
-      <BookRow title="True Stories" kind="tag" tag="nonfiction" onPoints={onPoints} emoji={""} />
-      <BookRow title="Graphic Novels" kind="tag" tag="comics" onPoints={onPoints} emoji={""} />
-      <BookRow title="Shorter Books" kind="tag" tag="young" onPoints={onPoints} emoji={""} />
-      <BookRow title="Because you read…" kind="because" index={1} onPoints={onPoints} emoji={""} />
-      <BookRow title="Feeling Lucky?" kind="random" onPoints={onPoints} emoji={""} />
+      <BookRow title="Fresh picks" kind="new" onLogged={onLogged} emoji={""} />
+      <BookRow title="Because you read…" kind="because" index={0} onLogged={onLogged} emoji={""} />
+      <BookRow title="Class favorites" kind="loved" onLogged={onLogged} emoji={""} />
+      <BookRow title="Fictional Reads" kind="tag" tag="fiction" onLogged={onLogged} emoji={""} />
+      <BookRow title="True Stories" kind="tag" tag="nonfiction" onLogged={onLogged} emoji={""} />
+      <BookRow title="Graphic Novels" kind="tag" tag="comics" onLogged={onLogged} emoji={""} />
+      <BookRow title="Shorter Books" kind="tag" tag="young" onLogged={onLogged} emoji={""} />
+      <BookRow title="Because you read…" kind="because" index={1} onLogged={onLogged} emoji={""} />
+      <BookRow title="Feeling Lucky?" kind="random" onLogged={onLogged} emoji={""} />
 
-      {leaders.length > 0 && (
-        <div className="card leaderboard">
-          <h2><Ic name="trophy" size={17} /> Top readers</h2>
-          <div className="leader-rows">
-            {leaders.map((l) => {
-              const inner = (
-                <>
-                  <span className="leader-rank">
-                    {l.rank <= 3 ? <Medal place={l.rank as 1 | 2 | 3} size={22} /> : `#${l.rank}`}
-                  </span>
-                  <AvatarView avatar={l.avatar} size={38} />
-                  <b>{l.name}</b>
-                  <span className="leader-books">
-                    {l.books} book{l.books === 1 ? "" : "s"}
-                  </span>
-                </>
-              );
-              return l.id ? (
-                <a key={l.rank} className="leader-row tappable" href={`/students/${l.id}`} title={`See ${l.name}'s favorites`}>
-                  {inner}
-                </a>
-              ) : (
-                <div key={l.rank} className="leader-row">{inner}</div>
-              );
-            })}
-          </div>
-          <p className="hint" style={{ marginBottom: 0 }}>
-            Tap “I read this” to climb the board — tap a reader to see their favorites.
-          </p>
-        </div>
-      )}
-
+      {/* v8: these link to OUR pages, which set expectations (OverDrive,
+          library card, "ask your teacher") before anyone leaves the site. */}
       <div className="cards" style={{ marginTop: 18 }}>
-        <a className="card navcard" href="https://nypl.overdrive.com/" target="_blank" rel="noopener noreferrer">
+        <a className="card navcard" href={withBase("/ebooks")}>
           <h2>
             <span className="navcard-icon" style={{ background: "#7c4dbc" }}>
-              <Ic name="book" size={17} />
+              <Ic name="tablet" size={17} />
             </span>
             E-Books
-            <span className="navcard-arrow" aria-hidden>↗</span>
+            <span className="navcard-arrow" aria-hidden>→</span>
           </h2>
-          <p>Read on a screen — borrow digital books through OverDrive.</p>
+          <p>Read on a screen — see how to borrow digital books for free.</p>
         </a>
-        <a className="card navcard" href="https://nypl.overdrive.com/" target="_blank" rel="noopener noreferrer">
+        <a className="card navcard" href={withBase("/audiobooks")}>
           <h2>
             <span className="navcard-icon" style={{ background: "#c2417f" }}>
-              <Ic name="megaphone" size={17} />
+              <Ic name="headphones" size={17} />
             </span>
             Audiobooks
-            <span className="navcard-arrow" aria-hidden>↗</span>
+            <span className="navcard-arrow" aria-hidden>→</span>
           </h2>
-          <p>Stories read aloud — listen through OverDrive.</p>
+          <p>Stories read aloud — see how to listen for free.</p>
         </a>
       </div>
 
@@ -182,11 +147,27 @@ export default function StudentHome({ email }: { email: string }) {
             hideTitle
             kind={pick.kind}
             tag={pick.tag}
-            onPoints={onPoints}
+            onLogged={onLogged}
           />
         );
       })}
-      <div ref={sentinel} style={{ height: 1 }} />
+      {extraRows < AUTO_ROWS && <div ref={sentinel} style={{ height: 1 }} />}
+      {extraRows >= AUTO_ROWS && extraRows < MAX_ROWS && (
+        <div className="explore-more">
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setExtraRows((n) => Math.min(MAX_ROWS, n + 1))}
+          >
+            Show me more books
+          </button>
+        </div>
+      )}
+      {extraRows >= MAX_ROWS && (
+        <p className="explore-end">
+          That&rsquo;s the whole shelf! <a href={withBase("/search")}>Find a Book →</a>
+        </p>
+      )}
     </div>
   );
 }

@@ -47,11 +47,19 @@ export default async function AdminShell({ children }: { children: React.ReactNo
     <div className="admin-grid">
       <Shortcuts links={navShortcutsFor(admin)} />
       <MobileUndo />
+      {/* This shell renders INSIDE app/staff/layout.tsx, which already owns
+          the page's single <main id="main">. So the content column stays a
+          <div> (nested <main> is invalid, and a second id="main" would be a
+          duplicate) and gets its own skip link — the one worth having here,
+          since it clears the sidebar the outer link lands in front of. */}
+      <a className="skip-link" href="#admin-content">
+        Skip past navigation
+      </a>
       <SideNav library={libraryLinks} tools={toolLinks} account={accountLinks} />
-      <main className="admin-main">
+      <div className="admin-main" id="admin-content">
         <MobileHeader />
         {children}
-      </main>
+      </div>
       <MobileTabBar
         canScan={canDo(admin, "inventory_view") || canDo(admin, "inventory_import")}
         canInventory={canDo(admin, "inventory_view") || canDo(admin, "inventory_import")}

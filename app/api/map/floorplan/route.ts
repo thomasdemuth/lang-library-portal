@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guarded, requireSession } from "@/lib/guards";
 
-/** Streams the floor plan image to any signed-in user. */
+/**
+ * Streams the floor plan image to any signed-in user. The client busts the
+ * URL with ?v=updated_at whenever the plan changes, so each version is
+ * immutable and can be held forever.
+ */
 export const GET = guarded(async (req: NextRequest) => {
   await requireSession(req);
   const { data: settings } = await db()
@@ -19,7 +23,7 @@ export const GET = guarded(async (req: NextRequest) => {
   return new NextResponse(data.stream(), {
     headers: {
       "Content-Type": data.type || "image/png",
-      "Cache-Control": "private, max-age=3600",
+      "Cache-Control": "public, max-age=31536000, s-maxage=31536000, immutable",
     },
   });
 });

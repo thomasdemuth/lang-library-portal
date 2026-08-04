@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { withBase } from "@/lib/base";
 
 const MAX_BYTES = 4 * 1024 * 1024;
 const MAX_DIM = 4096;
@@ -36,7 +37,7 @@ export default function FloorplanUpload() {
         return;
       }
 
-      const res = await fetch(`/api/admin/map/floorplan?w=${w}&h=${h}`, {
+      const res = await fetch(withBase(`/api/admin/map/floorplan?w=${w}&h=${h}`), {
         method: "PUT",
         headers: { "Content-Type": blob.type || "image/png" },
         body: blob,

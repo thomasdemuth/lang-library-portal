@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { SESSION_COOKIE, verifySessionToken, type Session } from "@/lib/session";
 import { audienceForHost, type HostAudience } from "@/lib/hosts";
 import { db, dbConfigured } from "@/lib/db";
-import type { AdminIdentity } from "@/lib/guards";
+import { previewAdminIdentity, type AdminIdentity } from "@/lib/guards";
 import { canDo, type PermKey } from "@/lib/permissions";
 
 /** Session of the current server-rendered request (or null). */
@@ -18,7 +18,11 @@ export async function currentSession(): Promise<Session | null> {
  */
 export async function currentAdmin(): Promise<AdminIdentity | null> {
   const session = await currentSession();
-  if (session?.aud !== "admin" || !session.sub || !dbConfigured()) return null;
+  if (!session) return null;
+  // Staging-only reviewer bypass — null in production (PREVIEW_KEY unset).
+  const preview = previewAdminIdentity(session);
+  if (preview) return preview;
+  if (session.aud !== "admin" || !session.sub || !dbConfigured()) return null;
   const full = "id, username, email, name, session_v, notify_requests, disabled_at, role, permissions";
   let { data, error } = await db().from("admins").select(full).eq("id", session.sub).maybeSingle();
   if (error && /role|permissions|column/i.test(error.message ?? "")) {

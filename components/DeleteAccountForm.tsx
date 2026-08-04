@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { withBase } from "@/lib/base";
 
 export default function DeleteAccountForm() {
   const [open, setOpen] = useState(false);
@@ -14,7 +15,7 @@ export default function DeleteAccountForm() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/account", {
+      const res = await fetch(withBase("/api/admin/account"), {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
@@ -24,7 +25,7 @@ export default function DeleteAccountForm() {
         setError(data.error ?? "Couldn't delete the account.");
         return;
       }
-      window.location.href = "/admin/login";
+      window.location.href = withBase("/admin/login");
     } finally {
       setBusy(false);
     }
@@ -49,8 +50,9 @@ export default function DeleteAccountForm() {
       <form onSubmit={submit} style={{ maxWidth: 420 }}>
         {error && <div className="error">{error}</div>}
         <div className="field">
-          <label className="lbl">Password</label>
+          <label className="lbl" htmlFor="delete-account-password">Password</label>
           <input
+            id="delete-account-password"
             className="input"
             type="password"
             required

@@ -7,8 +7,10 @@ import { hashPassword } from "@/lib/passwords";
 import { allowHit, clientIp } from "@/lib/ratelimit";
 import { SESSION_COOKIE, sessionCookieOptions, signSession } from "@/lib/session";
 
-const Body = z.object({
-  token: z.string().min(20).max(200),
+const Token = z.string().min(20).max(200);
+
+const InviteBody = z.object({
+  token: Token,
   username: z
     .string()
     .trim()
@@ -19,21 +21,85 @@ const Body = z.object({
   password: z.string().min(10, "Password must be at least 10 characters").max(500),
 });
 
+const ResetBody = z.object({
+  token: Token,
+  password: z.string().min(10, "Password must be at least 10 characters").max(500),
+});
+
+type AdminRow = { id: string; username: string; email: string; name: string; session_v: number };
+
+async function sessionResponse(admin: AdminRow): Promise<NextResponse> {
+  const jwt = await signSession({
+    aud: "admin",
+    email: admin.email,
+    sub: admin.id,
+    name: admin.name,
+    v: admin.session_v,
+  });
+  const res = NextResponse.json({ ok: true, name: admin.name });
+  res.cookies.set(SESSION_COOKIE, jwt, sessionCookieOptions("admin"));
+  return res;
+}
+
+/**
+ * One endpoint, two token kinds (the kind lives server-side on the row, so
+ * the client can't pick):
+ *  - invite: consume the token and CREATE a new admin account
+ *  - reset:  consume the token and set a new password on the EXISTING admin
+ *    (claim_password_reset bumps session_v, revoking all their sessions)
+ * Either way the claiming browser leaves signed in.
+ */
 export const POST = guarded(async (req: NextRequest) => {
   if (!(await allowHit("invite_claim", `ip:${clientIp(req)}`, 10, 60 * 60))) {
     return NextResponse.json({ error: "Too many attempts — try again later." }, { status: 429 });
   }
 
-  const parsed = Body.safeParse(await req.json().catch(() => null));
+  const body = await req.json().catch(() => null);
+  const tokenParsed = z.object({ token: Token }).safeParse(body);
+  if (!tokenParsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+  const tokenHash = createHash("sha256").update(tokenParsed.data.token).digest("hex");
+
+  // Which kind of link is this? Pre-migration-0023 the kind column doesn't
+  // exist — every token is an invite then (resets can't have been minted).
+  let kind: "invite" | "reset" = "invite";
+  const probe = await db().from("invite_tokens").select("kind").eq("token_hash", tokenHash).maybeSingle();
+  if (!probe.error && probe.data?.kind === "reset") kind = "reset";
+
+  if (kind === "reset") {
+    const parsed = ResetBody.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        { status: 400 }
+      );
+    }
+    const passwordHash = await hashPassword(parsed.data.password);
+    const { data, error } = await db().rpc("claim_password_reset", {
+      p_token_hash: tokenHash,
+      p_password_hash: passwordHash,
+    });
+    if (error) {
+      if ((error.message ?? "").includes("invalid_invite")) {
+        return NextResponse.json(
+          { error: "This reset link is invalid, expired, or already used." },
+          { status: 403 }
+        );
+      }
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
+    }
+    return sessionResponse((Array.isArray(data) ? data[0] : data) as AdminRow);
+  }
+
+  const parsed = InviteBody.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? "Invalid input" },
       { status: 400 }
     );
   }
-  const { token, username, email, name, password } = parsed.data;
-
-  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const { username, email, name, password } = parsed.data;
   const passwordHash = await hashPassword(password);
 
   const { data, error } = await db().rpc("claim_invite", {
@@ -61,15 +127,5 @@ export const POST = guarded(async (req: NextRequest) => {
     return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
-  const admin = Array.isArray(data) ? data[0] : data;
-  const jwt = await signSession({
-    aud: "admin",
-    email: admin.email,
-    sub: admin.id,
-    name: admin.name,
-    v: admin.session_v,
-  });
-  const res = NextResponse.json({ ok: true, name: admin.name });
-  res.cookies.set(SESSION_COOKIE, jwt, sessionCookieOptions("admin"));
-  return res;
+  return sessionResponse((Array.isArray(data) ? data[0] : data) as AdminRow);
 });

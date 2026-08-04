@@ -1,5 +1,7 @@
 import { db } from "@/lib/db";
+import { getActiveSyncId } from "@/lib/active-sync";
 import { gbVolumesByIsbn } from "@/lib/googlebooks";
+import { acceptOlMatch, type OlDoc } from "@/lib/enrich-match";
 
 /**
  * Automated catalog enrichment. A nightly cron drips through books that are
@@ -9,6 +11,11 @@ import { gbVolumesByIsbn } from "@/lib/googlebooks";
  * priority queue — never-tried books first, then the longest-ago-tried —
  * which spreads ~8k lookups over a few weeks and re-attempts stragglers as
  * quotas free up. Filling an ISBN also unlocks the cover proxy.
+ *
+ * Books with an ISBN are looked up BY that ISBN, which is exact. Books without
+ * one can only be searched by title, which is a guess — every such guess has to
+ * clear lib/enrich-match's acceptOlMatch before anything is written, because
+ * nobody reads this cron's output before it lands in the live catalog.
  */
 
 const FETCH_MS = 4500;
@@ -43,23 +50,39 @@ async function olDescription(isbn: string): Promise<string | null> {
   }
 }
 
-/** Search Open Library by title (+author) for a book with no ISBN on file. */
-async function olSearch(title: string, creators: string | null): Promise<{ isbn13: string | null; description: string | null }> {
+/**
+ * Search Open Library by title (+author) for a book with no ISBN on file, and
+ * keep only what acceptOlMatch vouches for. `skipped` says which writes the
+ * hit was refused, so the nightly summary can show how often that happens.
+ */
+async function olSearch(
+  book: { title: string; creators: string | null }
+): Promise<{ isbn13: string | null; description: string | null; skipped: { isbn: boolean; description: boolean } }> {
+  const none = { isbn13: null, description: null, skipped: { isbn: false, description: false } };
   try {
-    const params = new URLSearchParams({ title, limit: "1", fields: "isbn,key" });
-    if (creators) params.set("author", creators.split(/[,;/]/)[0].trim());
+    const params = new URLSearchParams({ title: book.title, limit: "1", fields: "isbn,key,title,author_name" });
+    if (book.creators) params.set("author", book.creators.split(/[,;/]/)[0].trim());
     const res = await fetch(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(FETCH_MS), headers: UA });
-    if (!res.ok) return { isbn13: null, description: null };
-    const doc = (await res.json()).docs?.[0];
-    const isbn13: string | null = (doc?.isbn ?? []).find((i: string) => i.length === 13) ?? null;
+    if (!res.ok) return none;
+    const doc = (await res.json()).docs?.[0] as OlDoc | undefined;
+    if (!doc) return none;
+
+    const accept = acceptOlMatch(book, doc);
+    const candidateIsbn: string | null = (doc.isbn ?? []).find((i: string) => i.length === 13) ?? null;
     let description: string | null = null;
-    if (doc?.key) {
+    if (accept.description && doc.key) {
       const wk = await fetch(`https://openlibrary.org${doc.key}.json`, { signal: AbortSignal.timeout(FETCH_MS), headers: UA });
       if (wk.ok) description = pickDesc((await wk.json()).description);
     }
-    return { isbn13, description };
+    return {
+      isbn13: accept.isbn ? candidateIsbn : null,
+      description,
+      // isbn: an ISBN was on offer and we turned it down. description: we
+      // declined to even read the work record (it may not have had one).
+      skipped: { isbn: !accept.isbn && Boolean(candidateIsbn), description: !accept.description },
+    };
   } catch {
-    return { isbn13: null, description: null };
+    return none;
   }
 }
 
@@ -76,7 +99,16 @@ async function gbDescription(isbn: string): Promise<string | null | "quota"> {
   }
 }
 
-export type EnrichResult = { scanned: number; filledDesc: number; filledIsbn: number; gbQuotaHit: boolean; done: boolean };
+export type EnrichResult = {
+  scanned: number;
+  filledDesc: number;
+  filledIsbn: number;
+  /** Title-search hits refused by acceptOlMatch — the guard's visible output. */
+  skippedIsbn: number;
+  skippedDesc: number;
+  gbQuotaHit: boolean;
+  done: boolean;
+};
 
 /**
  * Drip-enrich the active generation for up to `timeBudgetMs`. Safe to call
@@ -88,24 +120,35 @@ export async function enrichDrip(timeBudgetMs: number): Promise<EnrichResult> {
   let scanned = 0;
   let filledDesc = 0;
   let filledIsbn = 0;
+  let skippedIsbn = 0;
+  let skippedDesc = 0;
   let gbQuotaHit = false;
+  const summary = (done: boolean): EnrichResult => ({
+    scanned,
+    filledDesc,
+    filledIsbn,
+    skippedIsbn,
+    skippedDesc,
+    gbQuotaHit,
+    done,
+  });
 
-  const { data: active } = await db().from("inventory_syncs").select("id").eq("status", "active").maybeSingle();
-  if (!active) return { scanned, filledDesc, filledIsbn, gbQuotaHit, done: true };
+  const activeId = await getActiveSyncId();
+  if (!activeId) return summary(true);
 
   while (Date.now() - started < timeBudgetMs) {
     const { data, error } = await db()
       .from("books")
       .select("id, title, creators, isbn13, isbn10")
-      .eq("sync_id", active.id)
+      .eq("sync_id", activeId)
       .is("description", null)
       .order("enrich_attempted_at", { ascending: true, nullsFirst: true })
       .order("id", { ascending: true })
       .limit(WAVE);
     // Pre-migration (no enrich_attempted_at column): bail quietly.
-    if (error) return { scanned, filledDesc, filledIsbn, gbQuotaHit, done: true };
+    if (error) return summary(true);
     const books = (data ?? []) as Book[];
-    if (books.length === 0) return { scanned, filledDesc, filledIsbn, gbQuotaHit, done: true };
+    if (books.length === 0) return summary(true);
 
     await Promise.all(
       books.map(async (b) => {
@@ -120,9 +163,11 @@ export async function enrichDrip(timeBudgetMs: number): Promise<EnrichResult> {
             else description = gb;
           }
         } else if (b.title) {
-          const hit = await olSearch(b.title, b.creators);
+          const hit = await olSearch({ title: b.title, creators: b.creators });
           description = hit.description;
           if (hit.isbn13 && !b.isbn13) newIsbn13 = hit.isbn13;
+          if (hit.skipped.isbn) skippedIsbn++;
+          if (hit.skipped.description) skippedDesc++;
         }
         const patch: Record<string, unknown> = { enrich_attempted_at: new Date().toISOString() };
         if (description) patch.description = description.slice(0, 5000);
@@ -136,16 +181,16 @@ export async function enrichDrip(timeBudgetMs: number): Promise<EnrichResult> {
       })
     );
   }
-  return { scanned, filledDesc, filledIsbn, gbQuotaHit, done: false };
+  return summary(false);
 }
 
 /** How much of the active catalog now has a description (for the status line). */
 export async function enrichProgress(): Promise<{ total: number; withDescription: number }> {
-  const { data: active } = await db().from("inventory_syncs").select("id").eq("status", "active").maybeSingle();
-  if (!active) return { total: 0, withDescription: 0 };
+  const activeId = await getActiveSyncId();
+  if (!activeId) return { total: 0, withDescription: 0 };
   const [{ count: total }, withDesc] = await Promise.all([
-    db().from("books").select("id", { count: "exact", head: true }).eq("sync_id", active.id),
-    db().from("books").select("id", { count: "exact", head: true }).eq("sync_id", active.id).not("description", "is", null),
+    db().from("books").select("id", { count: "exact", head: true }).eq("sync_id", activeId),
+    db().from("books").select("id", { count: "exact", head: true }).eq("sync_id", activeId).not("description", "is", null),
   ]);
   return { total: total ?? 0, withDescription: withDesc.count ?? 0 };
 }

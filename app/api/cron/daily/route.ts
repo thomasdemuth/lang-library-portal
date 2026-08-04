@@ -157,34 +157,44 @@ export async function GET(req: NextRequest) {
     .limit(100);
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
+  // `reminder_sent_at` is the flag that keeps a request from being chased
+  // twice — so it may only be stamped on rows that were genuinely named in a
+  // mail that a server accepted. Stamping unconditionally (no chiefs
+  // subscribed, SMTP down) would disarm the reminder forever; leaving it
+  // alone means tomorrow's run simply tries again.
   let reminded = 0;
+  let reminderPending = 0;
   if (stale && stale.length > 0) {
     const admins = await notifyChiefEmails();
-    if (admins.length > 0) {
-      const lines = [
-        `${stale.length} book request${stale.length === 1 ? " has" : "s have"} been waiting more than 72 hours with no action:`,
-        ``,
-        ...stale.map(
-          (r) =>
-            `• #${r.id} “${r.title}”${r.author ? ` by ${r.author}` : ""} — ${r.copies_requested} cop${
-              r.copies_requested === 1 ? "y" : "ies"
-            } for ${r.requester_name ?? r.requester_email} (submitted ${new Date(r.created_at).toLocaleDateString()})`
-        ),
-        ``,
-        `Review: ${staffUrl()}/admin/requests`,
-      ];
-      await sendEmail(
+    const lines = [
+      `${stale.length} book request${stale.length === 1 ? " has" : "s have"} been waiting more than 72 hours with no action:`,
+      ``,
+      ...stale.map(
+        (r) =>
+          `• #${r.id} “${r.title}”${r.author ? ` by ${r.author}` : ""} — ${r.copies_requested} cop${
+            r.copies_requested === 1 ? "y" : "ies"
+          } for ${r.requester_name ?? r.requester_email} (submitted ${fmtDay(r.created_at)})`
+      ),
+      ``,
+      `Review: ${staffUrl()}/admin/requests`,
+    ];
+    const sent =
+      admins.length > 0 &&
+      (await sendEmail(
         admins,
         `Reminder: ${stale.length} book request${stale.length === 1 ? "" : "s"} awaiting action`,
         lines.join("\n")
-      );
+      ));
+    if (sent) {
+      const now = new Date().toISOString();
+      await db()
+        .from("book_requests")
+        .update({ reminder_sent_at: now })
+        .in("id", stale.map((r) => r.id));
+      reminded = stale.length;
+    } else {
+      reminderPending = stale.length;
     }
-    const now = new Date().toISOString();
-    await db()
-      .from("book_requests")
-      .update({ reminder_sent_at: now })
-      .in("id", stale.map((r) => r.id));
-    reminded = stale.length;
   }
 
   // Pruning
@@ -208,6 +218,20 @@ export async function GET(req: NextRequest) {
     weekly = await sendWeeklyDigest(date);
   }
 
+  // ── Inventory generations (W3-A) ────────────────────────────────────────
+  // Superseded catalog generations are kept 30 days so an import can be
+  // undone from Import history; after that their books are deleted by
+  // prune_superseded_syncs (migration 0021). Best-effort: a DB without the
+  // function just skips this.
+  let prunedSyncs = 0;
+  try {
+    const { data: pruned, error: pruneErr } = await db().rpc("prune_superseded_syncs", { p_days: 30 });
+    if (!pruneErr && typeof pruned === "number") prunedSyncs = pruned;
+  } catch {
+    /* non-critical */
+  }
+  // ── end inventory generations ───────────────────────────────────────────
+
   // Cover/description enrichment — runs LAST, time-boxed, best-effort.
   let enrich = { scanned: 0, filledDesc: 0, filledIsbn: 0, gbQuotaHit: false, done: true };
   try {
@@ -216,5 +240,5 @@ export async function GET(req: NextRequest) {
     /* never let enrichment fail the cron */
   }
 
-  return NextResponse.json({ ok: true, reminded, weekly, enrich, ranAt: new Date().toISOString() });
+  return NextResponse.json({ ok: true, reminded, reminderPending, weekly, prunedSyncs, enrich, ranAt: new Date().toISOString() });
 }

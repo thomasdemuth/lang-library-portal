@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { withBase } from "@/lib/base";
 
 export default function ProfileForm({ initialName }: { initialName: string }) {
   const [name, setName] = useState(initialName);
@@ -14,7 +15,7 @@ export default function ProfileForm({ initialName }: { initialName: string }) {
     setBusy(true);
     setMsg(null);
     try {
-      const res = await fetch("/api/admin/account", {
+      const res = await fetch(withBase("/api/admin/account"), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim() }),
@@ -34,8 +35,9 @@ export default function ProfileForm({ initialName }: { initialName: string }) {
     <form onSubmit={submit} style={{ maxWidth: 420 }}>
       {msg && <div className={msg.ok ? "notice" : "error"}>{msg.text}</div>}
       <div className="field">
-        <label className="lbl">Display name</label>
+        <label className="lbl" htmlFor="profile-display-name">Display name</label>
         <input
+          id="profile-display-name"
           className="input"
           value={name}
           maxLength={80}

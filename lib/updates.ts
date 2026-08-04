@@ -1,6 +1,7 @@
 import webpush from "web-push";
 import { db } from "@/lib/db";
 import { isDeveloper } from "@/lib/permissions";
+import { serverBase } from "@/lib/base";
 
 /** Who can publish app updates (the developer account). */
 export function canPublishUpdates(email: string): boolean {
@@ -46,7 +47,7 @@ export async function pushUpdateToAdmins(
     recipients.has(s.admin_id)
   );
 
-  const payload = JSON.stringify({ title, body, url: "/admin/updates" });
+  const payload = JSON.stringify({ title, body, url: `${serverBase()}/admin/updates` });
   let sent = 0;
   await Promise.all(
     targets.map(async (s) => {

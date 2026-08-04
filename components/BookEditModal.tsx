@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { type CategoryId } from "@/lib/categories";
+import Modal from "@/components/Modal";
 import TagPicker from "@/components/TagPicker";
 import CopyStepper, { clampCopies } from "@/components/CopyStepper";
+import { withBase } from "@/lib/base";
 
 export type EditableBook = {
   id: number;
@@ -50,12 +52,25 @@ export default function BookEditModal({
 
   const coverIsbn = isbn13.trim() || isbn10.trim();
 
+  // Arms Modal's discard guard: scrim/Escape/✕ ask before throwing away
+  // edits. Compared against the book rather than tracked with a "touched"
+  // flag, so typing something and typing it back out isn't "dirty".
+  const dirty =
+    title !== book.title ||
+    creators !== (book.creators ?? "") ||
+    isbn13 !== (book.isbn13 ?? "") ||
+    isbn10 !== (book.isbn10 ?? "") ||
+    copies !== clampCopies(book.copies) ||
+    description !== (book.description ?? "") ||
+    notes !== (book.notes ?? "") ||
+    tag !== book.tag;
+
   async function save() {
     const copyNum = clampCopies(copies);
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/books/${book.id}`, {
+      const res = await fetch(withBase(`/api/admin/books/${book.id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -77,7 +92,7 @@ export default function BookEditModal({
       }
       // Tag lives in book_tags (keyed by dedupe_key), saved separately.
       if (tag !== book.tag) {
-        const tagRes = await fetch("/api/admin/books/tag", {
+        const tagRes = await fetch(withBase("/api/admin/books/tag"), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ book_key: book.dedupe_key, category: tag }),
@@ -107,7 +122,7 @@ export default function BookEditModal({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/books/${book.id}`, { method: "DELETE" });
+      const res = await fetch(withBase(`/api/admin/books/${book.id}`), { method: "DELETE" });
       if (!res.ok) {
         setError((await res.json().catch(() => ({}))).error ?? "Couldn't delete.");
         return;
@@ -119,88 +134,81 @@ export default function BookEditModal({
   }
 
   return (
-    <div className="modal-scrim" onClick={onClose}>
-      <div className="modal bookedit" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <b>Edit book</b>
-          <button className="scan-close" onClick={onClose} aria-label="Close">✕</button>
-        </div>
-
-        <div className="bookedit-body">
-          <div className="bookedit-cover">
-            {coverIsbn ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={`/api/admin/books/cover?isbn=${encodeURIComponent(coverIsbn)}`}
-                alt=""
-                onError={(e) => (e.currentTarget.style.visibility = "hidden")}
-              />
-            ) : (
-              <div className="bookedit-nocover">No cover</div>
-            )}
-            <span className="hint" style={{ textAlign: "center" }}>Cover follows the ISBN</span>
-          </div>
-
-          <div className="bookedit-fields">
-            <label className="field">
-              <span className="lbl">Title</span>
-              <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} />
-            </label>
-            <label className="field">
-              <span className="lbl">Author(s)</span>
-              <input className="input" value={creators} onChange={(e) => setCreators(e.target.value)} placeholder="e.g. Kinney, Jeff" />
-            </label>
-            <div className="bookedit-row">
-              <label className="field" style={{ flex: 2 }}>
-                <span className="lbl">ISBN-13</span>
-                <input className="input" value={isbn13} onChange={(e) => setIsbn13(e.target.value)} inputMode="numeric" />
-              </label>
-              <label className="field" style={{ flex: 2 }}>
-                <span className="lbl">ISBN-10</span>
-                <input className="input" value={isbn10} onChange={(e) => setIsbn10(e.target.value)} />
-              </label>
-              <div className="field" style={{ flex: "none" }}>
-                <span className="lbl">Copies</span>
-                <CopyStepper value={copies} onChange={setCopies} disabled={busy} />
-              </div>
-            </div>
-            <div className="field">
-              <span className="lbl">Tag</span>
-              <TagPicker value={tag} onChange={setTag} />
-            </div>
-            <label className="field">
-              <span className="lbl">Description</span>
-              <textarea className="input" style={{ minHeight: 90 }} value={description} onChange={(e) => setDescription(e.target.value)} />
-            </label>
-            <label className="field">
-              <span className="lbl">Internal notes (staff only)</span>
-              <textarea className="input" style={{ minHeight: 56 }} value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </label>
-          </div>
-        </div>
-
-        {error && <div className="error" style={{ margin: "0 18px" }}>{error}</div>}
-        <p className="hint" style={{ margin: "0 18px" }}>
-          Heads up: edits here last until the next Libib import, which re-baselines every field. The tag persists.
-        </p>
-
-        <div className="modal-actions">
-          {confirmDelete ? (
-            <span className="modal-confirm">
-              <span className="hint" style={{ margin: 0 }}>Delete this book?</span>
-              <button className="btn danger" onClick={remove} disabled={busy}>{busy ? "Deleting…" : "Yes, delete"}</button>
-              <button className="btn ghost" onClick={() => setConfirmDelete(false)} disabled={busy}>No</button>
-            </span>
+    <Modal open onClose={onClose} title="Edit book" className="bookedit" dirty={dirty}>
+      <div className="bookedit-body">
+        <div className="bookedit-cover">
+          {coverIsbn ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={withBase(`/api/admin/books/cover?isbn=${encodeURIComponent(coverIsbn)}`)}
+              alt=""
+              onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+            />
           ) : (
-            <button className="btn ghost modal-delete" onClick={() => setConfirmDelete(true)} disabled={busy}>
-              Delete book
-            </button>
+            <div className="bookedit-nocover">No cover</div>
           )}
-          <span style={{ flex: 1 }} />
-          <button className="btn ghost" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn brand" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save changes"}</button>
+          <span className="hint" style={{ textAlign: "center" }}>Cover follows the ISBN</span>
+        </div>
+
+        <div className="bookedit-fields">
+          <label className="field">
+            <span className="lbl">Title</span>
+            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </label>
+          <label className="field">
+            <span className="lbl">Author(s)</span>
+            <input className="input" value={creators} onChange={(e) => setCreators(e.target.value)} placeholder="e.g. Kinney, Jeff" />
+          </label>
+          <div className="bookedit-row">
+            <label className="field" style={{ flex: 2 }}>
+              <span className="lbl">ISBN-13</span>
+              <input className="input" value={isbn13} onChange={(e) => setIsbn13(e.target.value)} inputMode="numeric" />
+            </label>
+            <label className="field" style={{ flex: 2 }}>
+              <span className="lbl">ISBN-10</span>
+              <input className="input" value={isbn10} onChange={(e) => setIsbn10(e.target.value)} />
+            </label>
+            <div className="field" style={{ flex: "none" }}>
+              <span className="lbl">Copies</span>
+              <CopyStepper value={copies} onChange={setCopies} disabled={busy} />
+            </div>
+          </div>
+          <div className="field">
+            <span className="lbl">Tag</span>
+            <TagPicker value={tag} onChange={setTag} />
+          </div>
+          <label className="field">
+            <span className="lbl">Description</span>
+            <textarea className="input" style={{ minHeight: 90 }} value={description} onChange={(e) => setDescription(e.target.value)} />
+          </label>
+          <label className="field">
+            <span className="lbl">Internal notes (staff only)</span>
+            <textarea className="input" style={{ minHeight: 56 }} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </label>
         </div>
       </div>
-    </div>
+
+      {error && <div className="error" style={{ margin: "0 18px" }}>{error}</div>}
+      <p className="hint" style={{ margin: "0 18px" }}>
+        Heads up: edits here last until the next Libib import, which re-baselines every field. The tag persists.
+      </p>
+
+      <div className="modal-actions">
+        {confirmDelete ? (
+          <span className="modal-confirm">
+            <span className="hint" style={{ margin: 0 }}>Delete this book?</span>
+            <button className="btn danger" onClick={remove} disabled={busy}>{busy ? "Deleting…" : "Yes, delete"}</button>
+            <button className="btn ghost" onClick={() => setConfirmDelete(false)} disabled={busy}>No</button>
+          </span>
+        ) : (
+          <button className="btn ghost modal-delete" onClick={() => setConfirmDelete(true)} disabled={busy}>
+            Delete book
+          </button>
+        )}
+        <span style={{ flex: 1 }} />
+        <button className="btn ghost" onClick={onClose} disabled={busy}>Cancel</button>
+        <button className="btn brand" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save changes"}</button>
+      </div>
+    </Modal>
   );
 }

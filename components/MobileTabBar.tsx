@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { stripBase, withBase } from "@/lib/base";
 
 const ICONS = {
   scan: (
@@ -51,17 +52,25 @@ export default function MobileTabBar({
 }) {
   // Active tab from the real browser URL (rewrite-proof), set after mount.
   const [path, setPath] = useState("");
-  useEffect(() => setPath(window.location.pathname), []);
+  useEffect(() => setPath(stripBase(window.location.pathname)), []);
   const allowed = { scan: canScan, inventory: canInventory, map: canMap };
 
   return (
     <nav className="tabbar" aria-label="App navigation">
-      {TABS.filter((t) => t.need === null || allowed[t.need]).map((t) => (
-        <a key={t.href} href={t.href} className={path.startsWith(t.href) ? "active" : undefined}>
-          {ICONS[t.icon]}
-          {t.label}
-        </a>
-      ))}
+      {TABS.filter((t) => t.need === null || allowed[t.need]).map((t) => {
+        const current = path.startsWith(t.href);
+        return (
+          <a
+            key={t.href}
+            href={withBase(t.href)}
+            className={current ? "active" : undefined}
+            aria-current={current ? "page" : undefined}
+          >
+            {ICONS[t.icon]}
+            {t.label}
+          </a>
+        );
+      })}
     </nav>
   );
 }

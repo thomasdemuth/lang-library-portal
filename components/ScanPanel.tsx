@@ -2,9 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { startScanner, beep, type ScannerHandle } from "@/lib/scan";
+import { announce } from "@/components/Announcer";
+import { upcAToEan13 } from "@/lib/isbn";
 import { CATEGORIES, type CategoryId } from "@/lib/categories";
 import TagPicker, { TagPill } from "@/components/TagPicker";
 import { Ic, Pin } from "@/components/icons";
+import { withBase } from "@/lib/base";
 
 type Book = {
   id: number;
@@ -28,9 +31,39 @@ type External = {
 };
 type Lookup = { code: string; found: boolean; book?: Book; external?: External | null };
 type ShelfHit = { id: string; label: string; shelf_number: string | null; letter_range: string | null };
+/** A shelf answer plus how it was reached: `ranged` = narrowed by letter range. */
+type WhereHit = { ranged: boolean; tag: CategoryId; shelves: ShelfHit[] };
 type Suggestion = { tag: CategoryId; confidence: number; reasons: string[] };
+/** One tag applied during a bulk stint, with the tag it replaced. */
+type BulkEntry = { key: string; previous: CategoryId | null };
 
 const COOLDOWN_MS = 3000;
+/** Above this many tags, "Undo session" asks first. */
+const CONFIRM_UNDO_OVER = 10;
+
+/**
+ * The shelf callout. Without a letter-range match the resolver only knows the
+ * category, so the line says exactly that instead of naming a shelf the book
+ * may well not be on.
+ */
+function ShelfLine({ where }: { where: WhereHit }) {
+  const confident = where.ranged ? where.shelves[0] : null;
+  const target = confident ?? (where.shelves.length === 1 ? where.shelves[0] : null);
+  const text = confident
+    ? `${confident.shelf_number ? `Shelf ${confident.shelf_number} · ` : ""}${confident.label}${
+        confident.letter_range ? ` (${confident.letter_range})` : ""
+      }`
+    : `Somewhere in ${CATEGORIES[where.tag].label} — no letter range set`;
+  return target ? (
+    <a className="scan-shelf" href={withBase(`/admin/map?shelf=${target.id}`)}>
+      <Pin size={13} /> {text} →
+    </a>
+  ) : (
+    <span className="scan-shelf">
+      <Pin size={13} /> {text}
+    </span>
+  );
+}
 
 export default function ScanPanel({
   canImport,
@@ -45,29 +78,35 @@ export default function ScanPanel({
   const isPage = variant === "page";
   const [open, setOpen] = useState(isPage);
   const [mode, setMode] = useState<"lookup" | "bulk" | "putaway">("lookup");
-  const [bulkTag, setBulkTag] = useState<CategoryId>("fiction");
+  // Null until this bulk stint is told which category — never inherited from
+  // a previous stint, so nothing gets tagged from a category nobody chose.
+  const [bulkTag, setBulkTag] = useState<CategoryId | null>(null);
+  const [bulkSession, setBulkSession] = useState<BulkEntry[]>([]);
+  const [undoingBulk, setUndoingBulk] = useState<number | null>(null);
   const [camError, setCamError] = useState<string | null>(null);
   const [result, setResult] = useState<Lookup | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ ok: boolean; text: string; undo?: () => Promise<void> } | null>(null);
   const [manual, setManual] = useState("");
   const [flash, setFlash] = useState(false);
-  const [shelf, setShelf] = useState<ShelfHit | null>(null);
+  const [where, setWhere] = useState<WhereHit | null>(null);
   // Put-away mode: the last scanned book and where it goes, kept on screen
   // until the next scan replaces it — cart, scan, shelve, repeat.
-  const [putaway, setPutaway] = useState<{ title: string; shelf: ShelfHit | null; error?: string } | null>(null);
+  const [putaway, setPutaway] = useState<{ title: string; where: WhereHit | null; error?: string } | null>(null);
 
   // The put-away line: whenever a tagged catalog book is on the sheet,
   // resolve which shelf it belongs on and show it right there.
   useEffect(() => {
-    setShelf(null);
+    setWhere(null);
     const book = result?.found ? result.book : null;
     if (!book?.tag) return;
     let stale = false;
     (async () => {
-      const res = await fetch(`/api/admin/books/where?key=${encodeURIComponent(book.dedupe_key)}`);
+      const res = await fetch(withBase(`/api/admin/books/where?key=${encodeURIComponent(book.dedupe_key)}`));
       const data = await res.json().catch(() => null);
-      if (!stale && data?.found && data.shelves?.length) setShelf(data.shelves[0]);
+      if (!stale && data?.found && data.shelves?.length) {
+        setWhere({ ranged: Boolean(data.ranged), tag: data.tag, shelves: data.shelves });
+      }
     })();
     return () => {
       stale = true;
@@ -82,7 +121,7 @@ export default function ScanPanel({
     if (!book || book.tag || !canImport) return;
     let stale = false;
     (async () => {
-      const res = await fetch(`/api/admin/books/suggest?key=${encodeURIComponent(book.dedupe_key)}`);
+      const res = await fetch(withBase(`/api/admin/books/suggest?key=${encodeURIComponent(book.dedupe_key)}`));
       const data = await res.json().catch(() => null);
       if (!stale && data?.suggestion) setSuggestion(data.suggestion);
     })();
@@ -102,37 +141,55 @@ export default function ScanPanel({
 
   const say = useCallback((ok: boolean, text: string, undo?: () => Promise<void>) => {
     setToast({ ok, text, undo });
+    // The toast is a plain div and the other half of the feedback is a beep,
+    // so without this a scan is silent to a screen reader. Failures interrupt.
+    announce(text, !ok);
     beep(ok);
     // undoable toasts linger longer so there's time to tap
     setTimeout(() => setToast((t) => (t?.text === text ? null : t)), undo ? 6000 : 2400);
   }, []);
 
   const lookup = useCallback(async (code: string): Promise<Lookup | null> => {
-    const res = await fetch(`/api/admin/books/lookup?code=${encodeURIComponent(code)}`);
+    const res = await fetch(withBase(`/api/admin/books/lookup?code=${encodeURIComponent(code)}`));
     if (!res.ok) return null;
     return res.json();
   }, []);
 
   const tagBook = useCallback(async (book_key: string, category: CategoryId | null): Promise<boolean> => {
-    const res = await fetch("/api/admin/books/tag", {
+    const res = await fetch(withBase("/api/admin/books/tag"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ book_key, category }),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      setToast({ ok: false, text: data.error ?? "Couldn't save the tag." });
+      // Through say(), not a bare setToast: that one had no dismissal timer,
+      // so a failed tag save sat on the camera until some later toast
+      // replaced it — and it never made the failure sound.
+      say(false, data.error ?? "Couldn't save the tag.");
       return false;
     }
     return true;
-  }, []);
+  }, [say]);
 
   const onCode = useCallback(
     async (raw: string) => {
-      const code = raw.replace(/[^0-9Xx]/g, "");
-      if (code.length !== 13 && code.length !== 10) return;
       if (pausedRef.current) return;
       const now = Date.now();
+      const cleaned = raw.replace(/[^0-9Xx]/g, "").toUpperCase();
+      if (!cleaned) return;
+      // UPC-A is one of the two formats the decoder is configured to read, so
+      // pad it into an EAN-13 rather than dropping it. Anything else that
+      // isn't an ISBN length says so — silence reads as a broken scanner.
+      const code = cleaned.length === 12 ? upcAToEan13(cleaned) : cleaned;
+      if (!code || (code.length !== 10 && code.length !== 13)) {
+        const shouted = lastSeen.current.get(cleaned);
+        if (!shouted || now - shouted >= COOLDOWN_MS) {
+          lastSeen.current.set(cleaned, now);
+          say(false, "That barcode isn't an ISBN.");
+        }
+        return;
+      }
       const seen = lastSeen.current.get(code);
       if (seen && now - seen < COOLDOWN_MS) return;
       lastSeen.current.set(code, now);
@@ -150,42 +207,74 @@ export default function ScanPanel({
           return;
         }
         setResult(data);
+        announce(
+          data.found && data.book
+            ? `${data.book.title} — in the catalog, ${data.book.copies} ${data.book.copies === 1 ? "copy" : "copies"}.`
+            : data.external
+              ? `${data.external.title} — not in the catalog.`
+              : `No match for ${code}.`
+        );
       } else if (modeRef.current === "putaway") {
         // Put away: keep scanning; each book replaces the shelf callout.
         const data = await lookup(code);
         const book = data?.found ? data.book : null;
         if (!book) {
           beep(false);
-          setPutaway({ title: data?.external?.title ?? code, shelf: null, error: "Not in the catalog" });
+          const title = data?.external?.title ?? code;
+          setPutaway({ title, where: null, error: "Not in the catalog" });
+          announce(`${title} — not in the catalog.`, true);
           return;
         }
         if (!book.tag) {
           beep(false);
-          setPutaway({ title: book.title, shelf: null, error: "No tag yet — tag it first" });
+          setPutaway({ title: book.title, where: null, error: "No tag yet — tag it first" });
+          announce(`${book.title} — no tag yet, tag it first.`, true);
           return;
         }
-        const res = await fetch(`/api/admin/books/where?key=${encodeURIComponent(book.dedupe_key)}`);
+        const res = await fetch(withBase(`/api/admin/books/where?key=${encodeURIComponent(book.dedupe_key)}`));
         const whereData = await res.json().catch(() => null);
         if (whereData?.found && whereData.shelves?.length) {
-          beep(true);
-          setPutaway({ title: book.title, shelf: whereData.shelves[0] });
+          // A category-only match is a hint, not an answer — beep it as one.
+          beep(Boolean(whereData.ranged));
+          setPutaway({
+            title: book.title,
+            where: { ranged: Boolean(whereData.ranged), tag: whereData.tag, shelves: whereData.shelves },
+          });
+          const top = whereData.shelves[0];
+          announce(
+            whereData.ranged
+              ? `${book.title} — ${top.shelf_number ? `shelf ${top.shelf_number}, ` : ""}${top.label}${top.letter_range ? `, ${top.letter_range}` : ""}.`
+              : `${book.title} — somewhere in ${CATEGORIES[whereData.tag as CategoryId].label}, no letter range set.`
+          );
         } else {
           beep(false);
-          setPutaway({ title: book.title, shelf: null, error: "No shelf matches its tag yet" });
+          setPutaway({ title: book.title, where: null, error: "No shelf matches its tag yet" });
+          announce(`${book.title} — no shelf matches its tag yet.`, true);
         }
       } else {
         // Bulk tagging: every scanned catalog book gets the chosen tag.
+        const tag = bulkTagRef.current;
+        if (!tag) {
+          say(false, "Pick a category first.");
+          return;
+        }
         const data = await lookup(code);
         if (data?.found && data.book) {
           const previous = data.book.tag;
           const key = data.book.dedupe_key;
-          const ok = await tagBook(key, bulkTagRef.current);
-          if (ok)
-            say(true, `${data.book.title} → ${CATEGORIES[bulkTagRef.current].label}`, async () => {
+          const ok = await tagBook(key, tag);
+          if (ok) {
+            setBulkSession((s) => [...s, { key, previous }]);
+            say(true, `${data.book.title} → ${CATEGORIES[tag].label}`, async () => {
               await tagBook(key, previous);
+              setBulkSession((s) => {
+                const at = s.findLastIndex((e) => e.key === key);
+                return at < 0 ? s : [...s.slice(0, at), ...s.slice(at + 1)];
+              });
               lastSeen.current.delete(code); // allow an immediate re-scan
               say(true, "Undone.");
             });
+          }
         } else {
           say(false, data?.external ? `Not in catalog: ${data.external.title}` : "Not in the catalog.");
         }
@@ -218,10 +307,21 @@ export default function ScanPanel({
     };
   }, [open, onCode]);
 
+  // Closing ends the bulk session: the panel stays mounted behind the
+  // launcher, so without this the next open would inherit a category nobody
+  // chose this time round, and an "Undo session" that spans two sittings.
+  function endBulkSession() {
+    setBulkTag(null);
+    setBulkSession([]);
+    setUndoingBulk(null);
+  }
+
   function close() {
     setOpen(false);
     setResult(null);
+    setPutaway(null); // a stale shelf callout must not greet the next session
     setToast(null);
+    endBulkSession();
     pausedRef.current = false;
     lastSeen.current.clear();
   }
@@ -232,18 +332,54 @@ export default function ScanPanel({
   }
 
   function switchMode(m: "lookup" | "bulk" | "putaway") {
-    setMode(m);
     setResult(null);
     setPutaway(null);
     setToast(null);
     pausedRef.current = false;
     lastSeen.current.clear();
+    if (m === mode) return;
+    setMode(m);
+    endBulkSession();
+  }
+
+  /** Put every tag this bulk session applied back the way it was found. */
+  async function undoBulkSession() {
+    if (undoingBulk !== null || bulkSession.length === 0) return;
+    const entries = [...bulkSession].reverse();
+    if (
+      entries.length > CONFIRM_UNDO_OVER &&
+      !window.confirm(`Put back all ${entries.length} tags from this session?`)
+    ) {
+      return;
+    }
+    setToast(null);
+    setUndoingBulk(0);
+    // Hold the scanner off: a book still in frame would otherwise be re-tagged
+    // halfway through the revert it's part of.
+    pausedRef.current = true;
+    let done = 0;
+    for (const entry of entries) {
+      if (await tagBook(entry.key, entry.previous)) done++;
+      setUndoingBulk(done);
+    }
+    pausedRef.current = false;
+    setUndoingBulk(null);
+    setBulkSession([]);
+    lastSeen.current.clear();
+    say(
+      done === entries.length,
+      done === entries.length
+        ? `Session undone — ${done} ${done === 1 ? "tag" : "tags"} put back.`
+        : `Put back ${done} of ${entries.length} tags — the rest failed.`
+    );
+    onCatalogChange?.();
   }
 
   async function submitManual(e: React.FormEvent) {
     e.preventDefault();
-    const code = manual.replace(/[^0-9Xx]/g, "");
-    if (code.length !== 10 && code.length !== 13) {
+    const cleaned = manual.replace(/[^0-9Xx]/g, "").toUpperCase();
+    const code = cleaned.length === 12 ? upcAToEan13(cleaned) : cleaned;
+    if (!code || (code.length !== 10 && code.length !== 13)) {
       say(false, "Enter the 10- or 13-digit ISBN.");
       return;
     }
@@ -276,7 +412,7 @@ export default function ScanPanel({
   async function adjustCopies(delta: 1 | -1) {
     if (!result?.book || busy) return;
     setBusy(true);
-    const res = await fetch(`/api/admin/books/${result.book.id}`, {
+    const res = await fetch(withBase(`/api/admin/books/${result.book.id}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ delta }),
@@ -287,7 +423,7 @@ export default function ScanPanel({
     } else if (data.removed) {
       const gone = result.book;
       say(true, "Removed from the catalog.", async () => {
-        const back = await fetch("/api/admin/books/add", {
+        const back = await fetch(withBase("/api/admin/books/add"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -311,7 +447,7 @@ export default function ScanPanel({
       const bookId = data.book.id;
       setResult({ ...result, book: data.book });
       say(true, delta > 0 ? "Copy added." : "Copy removed.", async () => {
-        const rev = await fetch(`/api/admin/books/${bookId}`, {
+        const rev = await fetch(withBase(`/api/admin/books/${bookId}`), {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ delta: -delta }),
@@ -333,7 +469,7 @@ export default function ScanPanel({
   async function addExternal() {
     if (!result?.external || busy) return;
     setBusy(true);
-    const res = await fetch("/api/admin/books/add", {
+    const res = await fetch(withBase("/api/admin/books/add"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(result.external),
@@ -344,18 +480,26 @@ export default function ScanPanel({
       const ext = result.external;
       const code = result.code;
       setResult({ code, found: true, book: data.book });
-      say(true, "Added to the catalog.", async () => {
-        const rev = await fetch(`/api/admin/books/${data.book.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ delta: -1 }),
-        });
-        if (rev.ok) {
-          setResult({ code, found: false, external: ext });
-          say(true, "Undone — not added.");
-          onCatalogChange?.();
-        }
-      });
+      // A clamped add changed nothing, so there is nothing to undo — and the
+      // server says so rather than letting "Added" stand for a no-op.
+      say(
+        !data.clamped,
+        data.message ?? "Added to the catalog.",
+        data.clamped
+          ? undefined
+          : async () => {
+              const rev = await fetch(withBase(`/api/admin/books/${data.book.id}`), {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ delta: -1 }),
+              });
+              if (rev.ok) {
+                setResult({ code, found: false, external: ext });
+                say(true, "Undone — not added.");
+                onCatalogChange?.();
+              }
+            }
+      );
       onCatalogChange?.();
     }
     setBusy(false);
@@ -402,7 +546,7 @@ export default function ScanPanel({
             </button>
           ) : (
             // Unlinked on desktop, but a typed URL shouldn't be a trap
-            <a className="scan-close desk-only" href="/admin" aria-label="Leave scanner">
+            <a className="scan-close desk-only" href={withBase("/admin")} aria-label="Leave scanner">
               ✕
             </a>
           )}
@@ -410,27 +554,74 @@ export default function ScanPanel({
 
         {mode === "bulk" && (
           <div className="scan-bulkbar">
-            <span className="scan-bulkhint">Every scan tags the book:</span>
-            <TagPicker value={bulkTag} onChange={(t) => t && setBulkTag(t)} />
+            <span className="scan-bulkhint">
+              {bulkTag ? "Every scan tags the book:" : "Which category is this session tagging?"}
+            </span>
+            <TagPicker value={bulkTag} onChange={(t) => t && setBulkTag(t)} disabled={undoingBulk !== null} />
+            {bulkTag && (
+              <div
+                className="scan-session"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  borderTop: "1px solid var(--line)",
+                  paddingTop: 8,
+                }}
+              >
+                <span className="scan-bulkhint">
+                  Bulk tag: {CATEGORIES[bulkTag].label} · {bulkSession.length}{" "}
+                  {bulkSession.length === 1 ? "book" : "books"} tagged
+                </span>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ padding: "6px 12px", fontSize: 12.5 }}
+                  disabled={bulkSession.length === 0 || undoingBulk !== null}
+                  onClick={undoBulkSession}
+                >
+                  {undoingBulk === null
+                    ? "Undo session"
+                    : `Undoing ${undoingBulk}/${bulkSession.length}…`}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
         {mode === "putaway" && (
           <div className="scan-putaway">
             {putaway ? (
-              putaway.shelf ? (
+              putaway.where?.ranged ? (
                 <>
                   <div className="pa-book">{putaway.title}</div>
                   <div className="pa-shelf">
-                    {putaway.shelf.shelf_number ? `Shelf ${putaway.shelf.shelf_number}` : putaway.shelf.label}
+                    {putaway.where.shelves[0].shelf_number
+                      ? `Shelf ${putaway.where.shelves[0].shelf_number}`
+                      : putaway.where.shelves[0].label}
                   </div>
                   <div className="pa-sub">
-                    {putaway.shelf.shelf_number ? putaway.shelf.label : ""}
-                    {putaway.shelf.letter_range ? ` · ${putaway.shelf.letter_range}` : ""}
+                    {putaway.where.shelves[0].shelf_number ? putaway.where.shelves[0].label : ""}
+                    {putaway.where.shelves[0].letter_range ? ` · ${putaway.where.shelves[0].letter_range}` : ""}
                   </div>
-                  <a className="pa-map" href={`/admin/map?shelf=${putaway.shelf.id}`}>
+                  <a className="pa-map" href={withBase(`/admin/map?shelf=${putaway.where.shelves[0].id}`)}>
                     Show on map →
                   </a>
+                </>
+              ) : putaway.where ? (
+                // Category matched but no letter range did: the shelf number
+                // would be a guess, so say what's actually known instead.
+                <>
+                  <div className="pa-book">{putaway.title}</div>
+                  <div className="pa-sub">Somewhere in {CATEGORIES[putaway.where.tag].label}</div>
+                  <div className="pa-hint">no letter range set for these shelves</div>
+                  {putaway.where.shelves.length === 1 && (
+                    <a className="pa-map" href={withBase(`/admin/map?shelf=${putaway.where.shelves[0].id}`)}>
+                      Show on map →
+                    </a>
+                  )}
                 </>
               ) : (
                 <>
@@ -486,7 +677,7 @@ export default function ScanPanel({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     className="scan-cover"
-                    src={`/api/admin/books/cover?isbn=${isbnFor}`}
+                    src={withBase(`/api/admin/books/cover?isbn=${isbnFor}`)}
                     alt=""
                     onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
                   />
@@ -501,13 +692,7 @@ export default function ScanPanel({
                     {result.book.group_name ? ` · ${result.book.group_name}` : ""}
                   </div>
                   <div className="scan-meta ok">✓ In the catalog</div>
-                  {shelf && (
-                    <a className="scan-shelf" href={`/admin/map?shelf=${shelf.id}`}>
-                      <Pin size={13} /> {shelf.shelf_number ? `Shelf ${shelf.shelf_number} · ` : ""}
-                      {shelf.label}
-                      {shelf.letter_range ? ` (${shelf.letter_range})` : ""} →
-                    </a>
-                  )}
+                  {where && <ShelfLine where={where} />}
                 </div>
               </div>
               {canImport && (
@@ -546,7 +731,7 @@ export default function ScanPanel({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     className="scan-cover"
-                    src={`/api/admin/books/cover?isbn=${isbnFor}`}
+                    src={withBase(`/api/admin/books/cover?isbn=${isbnFor}`)}
                     alt=""
                     onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
                   />

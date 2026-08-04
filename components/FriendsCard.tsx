@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import AvatarView from "@/components/AvatarView";
+import LetterAvatar from "@/components/LetterAvatar";
 import { Ic } from "@/components/icons";
-import { type Avatar } from "@/lib/play";
+import { withBase } from "@/lib/base";
 
-type Friend = { id: string; name: string; avatar: Avatar; booksRead: number };
+type Friend = { id: string; name: string; booksRead: number; photoUrl?: string | null };
 
 /** My friends: readers I've added from their public pages. */
 export default function FriendsCard() {
@@ -14,7 +14,7 @@ export default function FriendsCard() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/play/friends")
+    fetch(withBase("/api/play/friends"))
       .then((r) => r.json())
       .then((d) => {
         setFriends(d.friends ?? []);
@@ -25,7 +25,7 @@ export default function FriendsCard() {
   }, []);
 
   async function remove(f: Friend) {
-    const res = await fetch("/api/play/friends", {
+    const res = await fetch(withBase("/api/play/friends"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: f.id, action: "remove" }),
@@ -44,14 +44,14 @@ export default function FriendsCard() {
         <p className="hint">Loading…</p>
       ) : friends.length === 0 ? (
         <p className="hint" style={{ marginBottom: 0 }}>
-          Tap a reader on the Top Readers board, then hit “Add friend” on their page — they'll show up here.
+          Hit “Add friend” on a classmate's page — they'll show up here.
         </p>
       ) : (
         <div className="friend-grid">
           {friends.map((f) => (
             <div key={f.id} className="friend-tile">
-              <a href={`/students/${f.id}`} title={`Visit ${f.name}'s page`}>
-                <AvatarView avatar={f.avatar} size={56} />
+              <a href={withBase(`/students/${f.id}`)} title={`Visit ${f.name}'s page`}>
+                <LetterAvatar name={f.name} size={56} src={f.photoUrl ?? undefined} />
                 <b>{f.name}</b>
                 <span className="hint" style={{ margin: 0 }}>
                   {f.booksRead} book{f.booksRead === 1 ? "" : "s"}

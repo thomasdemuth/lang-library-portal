@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import { PERMISSIONS, type PermKey } from "@/lib/permissions";
+import { withBase } from "@/lib/base";
 
 type Admin = {
   id: string;
@@ -37,6 +38,53 @@ function splitName(full: string): { first: string; last: string } {
   return { first: parts[0], last: parts.slice(1).join(" ") };
 }
 
+/**
+ * One-time link with a copy button. Clipboard access can be denied silently
+ * (permissions, non-secure context) — a failure switches to a selectable
+ * input so the link is never lost.
+ */
+export function CopyOnceBox({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setFailed(false);
+    } catch {
+      setCopied(false);
+      setFailed(true);
+    }
+  }
+
+  return (
+    <>
+      <div className="copybox">
+        <span style={{ flex: 1, wordBreak: "break-all" }}>{url}</span>
+        <button className="btn" onClick={copy}>
+          {copied ? "Copied ✓" : "Copy"}
+        </button>
+      </div>
+      {failed && (
+        <div style={{ marginTop: 8 }}>
+          <p className="hint" style={{ margin: "0 0 4px" }}>
+            Copy didn&rsquo;t work — select and copy:
+          </p>
+          <input
+            className="input"
+            readOnly
+            value={url}
+            aria-label="Link to copy manually"
+            onFocus={(e) => e.currentTarget.select()}
+            onClick={(e) => e.currentTarget.select()}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
 const EMPTY_PERMS: Record<string, boolean> = {};
 
 export default function AdminsPanel({ selfId }: { selfId: string }) {
@@ -48,13 +96,19 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
   const [newLink, setNewLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [openPowers, setOpenPowers] = useState<string | null>(null);
+  // Two-step confirms for the destructive actions
+  const [pendingRole, setPendingRole] = useState<{ id: string; role: "chief" | "admin" } | null>(null);
+  const [confirmDisable, setConfirmDisable] = useState<string | null>(null);
+  const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
+  // One-time links minted from this screen
+  const [resetLink, setResetLink] = useState<{ id: string; name: string; url: string } | null>(null);
+  const [regenLink, setRegenLink] = useState<{ id: string; label: string; url: string } | null>(null);
 
   async function load() {
     const [a, i] = await Promise.all([
-      fetch("/api/admin/admins").then((r) => r.json()),
-      fetch("/api/admin/invites").then((r) => r.json()),
+      fetch(withBase("/api/admin/admins")).then((r) => r.json()),
+      fetch(withBase("/api/admin/invites")).then((r) => r.json()),
     ]);
     if (a.admins) setAdmins(a.admins);
     if (i.invites) setInvites(i.invites);
@@ -67,9 +121,8 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
     setBusy(true);
     setError(null);
     setNewLink(null);
-    setCopied(false);
     try {
-      const res = await fetch("/api/admin/invites", {
+      const res = await fetch(withBase("/api/admin/invites"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -93,13 +146,56 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
   }
 
   async function revoke(id: string) {
-    await fetch(`/api/admin/invites/${id}`, { method: "DELETE" });
+    setError(null);
+    setConfirmRevoke(null);
+    try {
+      const res = await fetch(withBase(`/api/admin/invites/${id}`), { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "Couldn't revoke that invite — try again.");
+      }
+    } catch {
+      setError("Couldn't reach the server — that invite wasn't revoked.");
+    }
     load();
+  }
+
+  async function regenerate(invite: Invite) {
+    setError(null);
+    setRegenLink(null);
+    try {
+      const res = await fetch(withBase(`/api/admin/invites/${invite.id}`), { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Couldn't regenerate that invite.");
+        return;
+      }
+      setRegenLink({ id: invite.id, label: invite.label ?? "this invite", url: data.url });
+    } catch {
+      setError("Couldn't reach the server — try again.");
+    }
+    load();
+  }
+
+  async function resetPassword(a: Admin) {
+    setError(null);
+    setResetLink(null);
+    try {
+      const res = await fetch(withBase(`/api/admin/admins/${a.id}/reset`), { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Couldn't create the reset link.");
+        return;
+      }
+      setResetLink({ id: a.id, name: splitName(a.name).first, url: data.url });
+    } catch {
+      setError("Couldn't reach the server — try again.");
+    }
   }
 
   async function patchAdmin(id: string, body: Record<string, unknown>) {
     setError(null);
-    const res = await fetch(`/api/admin/admins/${id}`, {
+    const res = await fetch(withBase(`/api/admin/admins/${id}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -114,12 +210,6 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
     // optimistic
     setAdmins((cur) => cur.map((x) => (x.id === a.id ? { ...x, permissions: next } : x)));
     patchAdmin(a.id, { permissions: next });
-  }
-
-  async function copy() {
-    if (!newLink) return;
-    await navigator.clipboard.writeText(newLink);
-    setCopied(true);
   }
 
   return (
@@ -183,14 +273,10 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
         {newLink && (
           <div style={{ marginTop: 14 }}>
             <div className="notice">
-              This link is shown <b>once</b> — copy it now.
+              This link is shown <b>once</b> — copy it now. (Lost it? Regenerate it from the
+              invite-links table below.)
             </div>
-            <div className="copybox">
-              <span style={{ flex: 1 }}>{newLink}</span>
-              <button className="btn" onClick={copy}>
-                {copied ? "Copied ✓" : "Copy"}
-              </button>
-            </div>
+            <CopyOnceBox url={newLink} />
           </div>
         )}
       </div>
@@ -214,6 +300,7 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
               const perms = a.permissions ?? {};
               const grantedCount = PERMISSIONS.filter((p) => perms[p.key]).length;
               const { first, last } = splitName(a.name);
+              const roleChange = pendingRole?.id === a.id ? pendingRole : null;
               return (
                 <Fragment key={a.id}>
                   <tr style={a.disabled_at ? { opacity: 0.55 } : undefined}>
@@ -232,8 +319,12 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
                       <select
                         className="input"
                         style={{ width: "auto", padding: "6px 8px" }}
-                        value={a.role}
-                        onChange={(e) => patchAdmin(a.id, { role: e.target.value })}
+                        value={roleChange?.role ?? a.role}
+                        onChange={(e) => {
+                          const role = e.target.value as "chief" | "admin";
+                          if (role === a.role) setPendingRole(null);
+                          else setPendingRole({ id: a.id, role });
+                        }}
                       >
                         <option value="admin">Admin</option>
                         <option value="chief">Chief Admin</option>
@@ -254,12 +345,98 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
                     </td>
                     <td>
                       {a.id !== selfId && (
-                        <button className="btn ghost" onClick={() => patchAdmin(a.id, { disabled: !a.disabled_at })}>
-                          {a.disabled_at ? "Re-enable" : "Disable"}
-                        </button>
+                        <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                          {!a.disabled_at && (
+                            <button className="btn ghost" onClick={() => resetPassword(a)}>
+                              Reset password
+                            </button>
+                          )}
+                          {confirmDisable === a.id ? (
+                            <span className="modal-confirm">
+                              <span className="hint" style={{ margin: 0 }}>
+                                Disable {first}? They&rsquo;re signed out immediately.
+                              </span>
+                              <button
+                                className="btn danger"
+                                onClick={() => {
+                                  setConfirmDisable(null);
+                                  patchAdmin(a.id, { disabled: true });
+                                }}
+                              >
+                                Yes, disable
+                              </button>
+                              <button className="btn ghost" onClick={() => setConfirmDisable(null)}>
+                                No
+                              </button>
+                            </span>
+                          ) : (
+                            <button
+                              className="btn ghost"
+                              onClick={() =>
+                                a.disabled_at
+                                  ? patchAdmin(a.id, { disabled: false })
+                                  : setConfirmDisable(a.id)
+                              }
+                            >
+                              {a.disabled_at ? "Re-enable" : "Disable"}
+                            </button>
+                          )}
+                        </span>
                       )}
                     </td>
                   </tr>
+                  {roleChange && (
+                    <tr>
+                      <td colSpan={6} style={{ background: "var(--bg)" }}>
+                        <div className="notice warn" role="group" aria-label="Confirm role change" style={{ margin: "4px 0" }}>
+                          <p style={{ margin: "0 0 8px" }}>
+                            {roleChange.role === "chief" ? (
+                              <>
+                                Make <b>{a.name}</b> a <b>Chief Admin</b>? Chiefs hold every power,
+                                including managing admins, invites, and deletions.
+                              </>
+                            ) : (
+                              <>
+                                Change <b>{a.name}</b> to <b>Admin</b>? Chief powers are removed —
+                                they keep only the powers you grant below.
+                              </>
+                            )}
+                          </p>
+                          <span className="modal-confirm">
+                            <button
+                              className="btn brand"
+                              onClick={() => {
+                                setPendingRole(null);
+                                patchAdmin(a.id, { role: roleChange.role });
+                              }}
+                            >
+                              Yes, change role
+                            </button>
+                            <button className="btn ghost" onClick={() => setPendingRole(null)}>
+                              Cancel
+                            </button>
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  {resetLink?.id === a.id && (
+                    <tr>
+                      <td colSpan={6} style={{ background: "var(--bg)" }}>
+                        <div style={{ padding: "4px 2px" }}>
+                          <div className="notice">
+                            One-time password-reset link for <b>{resetLink.name}</b> — shown{" "}
+                            <b>once</b>. Share it directly; their other sessions end when they set
+                            the new password. Expires in 7 days.
+                          </div>
+                          <CopyOnceBox url={resetLink.url} />
+                          <button className="btn ghost" style={{ marginTop: 8 }} onClick={() => setResetLink(null)}>
+                            Done
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   {a.role === "admin" && openPowers === a.id && (
                     <tr>
                       <td colSpan={6} style={{ background: "var(--bg)" }}>
@@ -284,6 +461,18 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
 
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Invite links</h2>
+        {regenLink && (
+          <div style={{ marginBottom: 14 }}>
+            <div className="notice">
+              New link for <b>{regenLink.label}</b> — shown <b>once</b>. The old link no longer
+              works. Expires in 7 days.
+            </div>
+            <CopyOnceBox url={regenLink.url} />
+            <button className="btn ghost" style={{ marginTop: 8 }} onClick={() => setRegenLink(null)}>
+              Done
+            </button>
+          </div>
+        )}
         {invites.length === 0 ? (
           <p className="hint">No invites yet.</p>
         ) : (
@@ -293,6 +482,7 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
               <tr>
                 <th>Label</th>
                 <th>Created</th>
+                <th>Expires</th>
                 <th>Status</th>
                 <th></th>
               </tr>
@@ -304,6 +494,7 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
                   <tr key={i.id}>
                     <td>{i.label ?? "—"}</td>
                     <td>{new Date(i.created_at).toLocaleDateString()}</td>
+                    <td>{i.used_at || i.revoked_at ? "—" : new Date(i.expires_at).toLocaleDateString()}</td>
                     <td>
                       <span
                         className="pill"
@@ -316,10 +507,34 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
                       </span>
                     </td>
                     <td>
-                      {state === "active" && (
-                        <button className="btn ghost" onClick={() => revoke(i.id)}>
-                          Revoke
-                        </button>
+                      {(state === "active" || state === "expired") && (
+                        <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                          <button
+                            className="btn ghost"
+                            title="Voids the old link and mints a fresh one, shown once"
+                            onClick={() => regenerate(i)}
+                          >
+                            Regenerate link
+                          </button>
+                          {state === "active" &&
+                            (confirmRevoke === i.id ? (
+                              <span className="modal-confirm">
+                                <span className="hint" style={{ margin: 0 }}>
+                                  Revoke this invite? The link stops working immediately.
+                                </span>
+                                <button className="btn danger" onClick={() => revoke(i.id)}>
+                                  Yes, revoke
+                                </button>
+                                <button className="btn ghost" onClick={() => setConfirmRevoke(null)}>
+                                  No
+                                </button>
+                              </span>
+                            ) : (
+                              <button className="btn ghost" onClick={() => setConfirmRevoke(i.id)}>
+                                Revoke
+                              </button>
+                            ))}
+                        </span>
                       )}
                     </td>
                   </tr>

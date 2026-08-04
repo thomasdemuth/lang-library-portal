@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Ic, Pencil } from "@/components/icons";
+import { withBase } from "@/lib/base";
 
 export type DashKpi = { id: string; value: string; label: string };
 export type DashWidget = {
@@ -320,7 +321,7 @@ export default function DashboardCards({
                   resizing?.id === w.id ? "resizing" : "",
                 ].join(" ").trim()}
                 style={{ gridColumn: `span ${wSpan}`, gridRow: `span ${s.h}` }}
-                href={w.href}
+                href={withBase(w.href)}
                 key={w.id}
                 data-wid={w.id}
                 onClick={(e) => editing && e.preventDefault()}
@@ -505,7 +506,7 @@ function InventorySearch({ editing }: { editing: boolean }) {
   const [q, setQ] = useState("");
   function go() {
     if (editing) return;
-    window.location.href = `/admin/inventory${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`;
+    window.location.href = withBase(`/admin/inventory${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`);
   }
   return (
     <div className="peek-search" onClick={(e) => e.preventDefault()}>

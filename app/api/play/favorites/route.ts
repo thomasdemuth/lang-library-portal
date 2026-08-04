@@ -9,6 +9,8 @@ function missingTable(message: string | undefined): boolean {
   return /favorites|relation|does not exist|schema cache/i.test(message ?? "");
 }
 
+const CACHE = { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" };
+
 /** My favorites, newest first. */
 export const GET = guarded(async (req: NextRequest) => {
   const session = await requireSession(req);
@@ -19,10 +21,12 @@ export const GET = guarded(async (req: NextRequest) => {
     .order("created_at", { ascending: false })
     .limit(MAX_FAVORITES);
   if (error) {
-    if (missingTable(error.message)) return NextResponse.json({ favorites: [], migrationPending: true });
+    if (missingTable(error.message)) {
+      return NextResponse.json({ favorites: [], migrationPending: true }, { headers: CACHE });
+    }
     return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
-  return NextResponse.json({ favorites: data ?? [] });
+  return NextResponse.json({ favorites: data ?? [] }, { headers: CACHE });
 });
 
 const Body = z.object({

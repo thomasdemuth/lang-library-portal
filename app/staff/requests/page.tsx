@@ -1,5 +1,7 @@
 import RequestsPanel from "@/components/RequestsPanel";
 
+export const metadata = { title: "Book Requests — Lang Library" };
+
 export default function StaffRequests() {
   return (
     <div className="wrap">

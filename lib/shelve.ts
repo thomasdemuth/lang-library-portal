@@ -18,17 +18,26 @@ export type ShelfInfo = {
   shelf_number: string | null;
 };
 
-/** "Kinney, Jeff" → "KINNEY"; "Jeff Kinney" → "KINNEY"; multiple authors use the first. */
-export function surnameKey(creators: string | null): string | null {
+/**
+ * The first author's surname, exactly as written: "Kinney, Jeff" → "Kinney";
+ * "Scott O'Dell" → "O'Dell"; "Muñoz Ryan, Pam" → "Muñoz Ryan". Punctuation and
+ * accents are left in place — callers that need a normalized form run it
+ * through whichever normalizer their comparison target uses (surnameKey for
+ * the map's letter ranges, lib/match's normalizeCreators for creators_norm).
+ */
+export function surnameOf(creators: string | null): string | null {
   if (!creators) return null;
   const first = creators.split(/[;/]|,(?=\s*[A-Z][^,]*,)/)[0].trim(); // first author chunk
-  let name: string;
-  if (first.includes(",")) {
-    name = first.split(",")[0]; // "Last, First"
-  } else {
-    const tokens = first.split(/\s+/).filter((t) => !/^(jr|sr|iii?|iv)\.?$/i.test(t));
-    name = tokens[tokens.length - 1] ?? first; // "First Last"
-  }
+  if (!first) return null;
+  if (first.includes(",")) return first.split(",")[0].trim() || null; // "Last, First"
+  const tokens = first.split(/\s+/).filter((t) => !/^(jr|sr|iii?|iv)\.?$/i.test(t));
+  return (tokens[tokens.length - 1] ?? first).trim() || null; // "First Last"
+}
+
+/** "Kinney, Jeff" → "KINNEY"; "Jeff Kinney" → "KINNEY"; multiple authors use the first. */
+export function surnameKey(creators: string | null): string | null {
+  const name = surnameOf(creators);
+  if (!name) return null;
   const key = name
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "") // strip accents
@@ -55,7 +64,20 @@ export function authorSortKey(creators: string | null): string | null {
   return `${surname.toLowerCase()} ${rest}`.slice(0, 200);
 }
 
-/** Parse "AA–CZ" / "A-Z" / "000–999" into [lo, hi]; null when there's no usable range. */
+/** Letter endpoints are short prefixes ("A", "AA", "Mz"); numeric ones are digits. */
+const LETTER_ENDPOINT = /^[A-Z]{1,3}$/;
+const NUMBER_ENDPOINT = /^[0-9]+$/;
+
+/**
+ * Parse "AA–CZ" / "A-Z" / "000–999" into [lo, hi]; null when there's no usable
+ * range.
+ *
+ * Both halves have to LOOK like range endpoints — a short letter prefix, or
+ * digits on both sides. Without that test any hyphenated name reads as a span:
+ * "Easy-Readers" parsed as EASY→READERS, a bucket that swallows most of the
+ * alphabet (KINNEY sits inside it), so a shelf whose label merely contains a
+ * hyphen claimed books it has nothing to do with.
+ */
 export function parseRange(raw: string | null): [string, string] | null {
   if (!raw) return null;
   const parts = raw
@@ -64,7 +86,11 @@ export function parseRange(raw: string | null): [string, string] | null {
     .map((s) => s.replace(/[^A-Z0-9]/g, ""))
     .filter(Boolean);
   if (parts.length !== 2) return null;
-  return [parts[0], parts[1]];
+  const [lo, hi] = parts;
+  const letters = LETTER_ENDPOINT.test(lo) && LETTER_ENDPOINT.test(hi);
+  const numbers = NUMBER_ENDPOINT.test(lo) && NUMBER_ENDPOINT.test(hi);
+  if (!letters && !numbers) return null;
+  return [lo, hi];
 }
 
 /** Prefix-range test, library style: "KINNEY" is within [KA, LZ]. */

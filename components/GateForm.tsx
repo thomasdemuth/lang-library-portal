@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { safeNextPath } from "@/lib/safe-next";
+import { withBase } from "@/lib/base";
 
 export default function GateForm({ placeholder }: { placeholder: string }) {
   const [email, setEmail] = useState("");
@@ -28,7 +29,7 @@ export default function GateForm({ placeholder }: { placeholder: string }) {
     setError(null);
     setHint(null);
     try {
-      const res = await fetch("/api/gate", {
+      const res = await fetch(withBase("/api/gate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: value }),
@@ -41,11 +42,11 @@ export default function GateForm({ placeholder }: { placeholder: string }) {
       }
       if (data.redirect) {
         // a student on the staff gate (or vice versa) — hand off
-        window.location.href = data.redirect;
+        window.location.href = withBase(data.redirect);
         return;
       }
       const next = new URLSearchParams(window.location.search).get("next");
-      window.location.href = safeNextPath(next, "/");
+      window.location.href = withBase(safeNextPath(next, "/"));
     } catch {
       setError("Couldn't reach the server — try again.");
     } finally {

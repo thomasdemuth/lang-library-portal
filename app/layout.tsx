@@ -1,14 +1,28 @@
 import type { Metadata, Viewport } from "next";
+import { Lexend } from "next/font/google";
 import UpdatePrompt from "@/components/UpdatePrompt";
+import Announcer from "@/components/Announcer";
+import { withBase } from "@/lib/base";
 import "./globals.css";
+
+// Self-hosted via next/font: no render-blocking Google Fonts request, no
+// layout-shift flash. Exposed as a CSS variable so globals.css owns the stack.
+const lexend = Lexend({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  display: "swap",
+  variable: "--font-lexend",
+});
 
 export const metadata: Metadata = {
   title: "Lang Library",
   description: "The Lang School library portal",
-  manifest: "/manifest.webmanifest",
+  // Next does NOT apply basePath to URL strings inside `metadata` — only to
+  // the metadata ROUTE that serves the manifest. Prefix them ourselves.
+  manifest: withBase("/manifest.webmanifest"),
   icons: {
-    icon: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    icon: [{ url: withBase("/icon-192.png"), sizes: "192x192", type: "image/png" }],
+    apple: [{ url: withBase("/apple-touch-icon.png"), sizes: "180x180", type: "image/png" }],
   },
   appleWebApp: {
     capable: true,
@@ -30,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     // The pre-paint script may stamp data-theme/data-textsize on <html>
     // before hydration — that attribute delta is expected, not a bug.
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={lexend.variable}>
       <head>
         {/* Next's appleWebApp emits the modern tag; older iOS wants this one */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -49,15 +63,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             ].join(""),
           }}
         />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
       </head>
       <body>
         {children}
+        {/* Shared screen-reader live regions — every surface announces through this */}
+        <Announcer />
         <UpdatePrompt />
       </body>
     </html>

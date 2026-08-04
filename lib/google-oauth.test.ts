@@ -54,6 +54,30 @@ describe("verifyIdToken", () => {
     const t = await idToken({});
     await expect(verifyIdToken(t, "different-nonce", pub)).rejects.toThrow();
   });
+
+  it("returns the picture claim when it's a Google-hosted https URL", async () => {
+    const picture = "https://lh3.googleusercontent.com/a/ACg8ocK=s96-c";
+    const t = await idToken({ picture });
+    expect((await verifyIdToken(t, NONCE, pub)).picture).toBe(picture);
+  });
+
+  it("drops picture claims that aren't https googleusercontent URLs", async () => {
+    for (const bad of [
+      "http://lh3.googleusercontent.com/a/photo", // not https
+      "https://evil.example.com/photo.png", // wrong host
+      "https://evilgoogleusercontent.com/x", // suffix trick, not a subdomain
+      "not a url",
+      12345,
+    ]) {
+      const t = await idToken({ picture: bad });
+      expect((await verifyIdToken(t, NONCE, pub)).picture).toBeUndefined();
+    }
+  });
+
+  it("tolerates a missing picture claim", async () => {
+    const t = await idToken({});
+    expect((await verifyIdToken(t, NONCE, pub)).picture).toBeUndefined();
+  });
 });
 
 describe("pkceChallenge", () => {

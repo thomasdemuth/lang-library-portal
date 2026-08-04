@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { withBase } from "@/lib/base";
 
 type Feedback = {
   id: number;
@@ -17,33 +18,74 @@ const FILTERS = ["new", "read", "archived", "all"] as const;
 export default function AdminFeedbackPanel({ canManage }: { canManage: boolean }) {
   const [items, setItems] = useState<Feedback[]>([]);
   const [newCount, setNewCount] = useState(0);
+  const [total, setTotal] = useState(0);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("new");
+  const [q, setQ] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const load = useCallback(async () => {
-    const qs = filter === "all" ? "" : `?status=${filter}`;
-    const res = await fetch(`/api/admin/feedback${qs}`);
-    const data = await res.json();
-    if (res.ok) {
-      setItems(data.feedback);
-      setNewCount(data.newCount);
-    }
-  }, [filter]);
+  const load = useCallback(
+    async (offset = 0) => {
+      const params = new URLSearchParams();
+      if (filter !== "all") params.set("status", filter);
+      if (q.trim()) params.set("q", q.trim());
+      if (offset > 0) params.set("offset", String(offset));
+      const qs = params.toString();
+      try {
+        const res = await fetch(withBase(`/api/admin/feedback${qs ? `?${qs}` : ""}`));
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error ?? "Couldn't load feedback.");
+          return;
+        }
+        setItems((cur) => (offset > 0 ? [...cur, ...data.feedback] : data.feedback));
+        setNewCount(data.newCount);
+        setTotal(data.total ?? data.feedback.length);
+      } catch {
+        setError("Couldn't reach the server — try again.");
+      }
+    },
+    [filter, q]
+  );
+
+  // Reload on filter change immediately; debounce while typing a search.
   useEffect(() => {
-    load();
-  }, [load]);
+    const t = setTimeout(() => load(0), q.trim() ? 250 : 0);
+    return () => clearTimeout(t);
+  }, [load, q]);
 
   async function setStatus(id: number, status: Feedback["status"]) {
-    await fetch(`/api/admin/feedback/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
+    setError(null);
+    try {
+      const res = await fetch(withBase(`/api/admin/feedback/${id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "Couldn't update that feedback — try again.");
+      }
+    } catch {
+      setError("Couldn't reach the server — that feedback wasn't updated.");
+    }
     load();
+  }
+
+  async function showMore() {
+    setLoadingMore(true);
+    try {
+      await load(items.length);
+    } finally {
+      setLoadingMore(false);
+    }
   }
 
   return (
     <>
-      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+      {error && <div className="error">{error}</div>}
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
         {FILTERS.map((f) => (
           <button
             key={f}
@@ -55,12 +97,28 @@ export default function AdminFeedbackPanel({ canManage }: { canManage: boolean }
             {f === "new" && newCount > 0 ? ` (${newCount})` : ""}
           </button>
         ))}
+        <input
+          className="input"
+          type="search"
+          style={{ maxWidth: 260, marginLeft: "auto" }}
+          placeholder="Search messages…"
+          aria-label="Search feedback messages"
+          value={q}
+          maxLength={200}
+          onChange={(e) => setQ(e.target.value)}
+        />
       </div>
+
+      <p className="hint" style={{ margin: "0 0 12px" }}>
+        Showing {items.length} of {total}
+        {q.trim() ? ` matching “${q.trim()}”` : ""}
+        {filter === "all" ? "" : ` ${filter}`} feedback item{total === 1 ? "" : "s"}.
+      </p>
 
       {items.length === 0 ? (
         <div className="card">
           <p className="hint" style={{ margin: 0 }}>
-            No {filter === "all" ? "" : filter + " "}feedback.
+            No {filter === "all" ? "" : filter + " "}feedback{q.trim() ? ` matching “${q.trim()}”` : ""}.
           </p>
         </div>
       ) : (
@@ -77,7 +135,15 @@ export default function AdminFeedbackPanel({ canManage }: { canManage: boolean }
                 {f.name ? `${f.name} · ` : ""}
                 {f.email} · {new Date(f.created_at).toLocaleString()}
               </p>
-              <span style={{ display: "flex", gap: 6 }}>
+              <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {f.email && (
+                  <a
+                    className="btn"
+                    href={`mailto:${f.email}?subject=${encodeURIComponent("Re: your Lang Library feedback")}`}
+                  >
+                    Reply by email
+                  </a>
+                )}
                 {canManage && f.status !== "read" && (
                   <button className="btn" onClick={() => setStatus(f.id, "read")}>
                     Mark read
@@ -93,6 +159,14 @@ export default function AdminFeedbackPanel({ canManage }: { canManage: boolean }
             <p style={{ margin: "10px 0 0", whiteSpace: "pre-wrap" }}>{f.message}</p>
           </div>
         ))
+      )}
+
+      {items.length < total && (
+        <div style={{ textAlign: "center", marginTop: 4 }}>
+          <button className="btn" onClick={showMore} disabled={loadingMore}>
+            {loadingMore ? "Loading…" : `Show more (${total - items.length} left)`}
+          </button>
+        </div>
       )}
     </>
   );

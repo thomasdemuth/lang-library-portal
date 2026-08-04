@@ -2,17 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guarded, requirePermission } from "@/lib/guards";
-import { DEFAULT_AVATAR } from "@/lib/play";
 
 const Body = z.object({
   email: z.string().trim().toLowerCase().email().max(200),
-  action: z.enum(["hide", "unhide", "reset_avatar"]),
+  action: z.enum(["hide", "unhide"]),
 });
 
 /**
- * Student moderation. "hide" pulls the profile off the leaderboard and
- * 404s the public page; "reset_avatar" puts the default fox back (owned
- * items and stars are untouched).
+ * Student moderation. "hide" makes the profile private — it 404s the
+ * public page and drops the student from classmates' views; "unhide"
+ * brings it back.
  */
 export const POST = guarded(async (req: NextRequest) => {
   await requirePermission(req, "users");
@@ -20,11 +19,9 @@ export const POST = guarded(async (req: NextRequest) => {
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   const { email, action } = parsed.data;
 
-  const patch =
-    action === "reset_avatar" ? { avatar: DEFAULT_AVATAR } : { hidden: action === "hide" };
   const { data, error } = await db()
     .from("student_profiles")
-    .update(patch)
+    .update({ hidden: action === "hide" })
     .eq("email", email)
     .select("email")
     .maybeSingle();

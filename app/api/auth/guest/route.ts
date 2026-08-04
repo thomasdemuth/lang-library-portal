@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GUEST_HOME } from "@/lib/unified";
 import { SESSION_COOKIE, sessionCookieOptions, signSession } from "@/lib/session";
+import { withBase } from "@/lib/base";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
   const token = await signSession({ aud: "guest", email: "" });
-  const res = NextResponse.redirect(new URL(GUEST_HOME, req.url));
+  const res = NextResponse.redirect(new URL(withBase(GUEST_HOME), req.url));
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions("guest"));
   return res;
 }

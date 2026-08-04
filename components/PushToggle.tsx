@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { withBase } from "@/lib/base";
 
 type State = "unsupported" | "checking" | "off" | "on" | "denied";
 
@@ -21,7 +22,7 @@ export default function PushToggle() {
         return;
       }
       try {
-        const reg = await navigator.serviceWorker.getRegistration("/");
+        const reg = await navigator.serviceWorker.getRegistration(withBase("/"));
         const sub = await reg?.pushManager.getSubscription();
         setState(sub ? "on" : "off");
       } catch {
@@ -39,18 +40,18 @@ export default function PushToggle() {
         setState(perm === "denied" ? "denied" : "off");
         return;
       }
-      const { publicKey } = await fetch("/api/admin/push").then((r) => r.json());
+      const { publicKey } = await fetch(withBase("/api/admin/push")).then((r) => r.json());
       if (!publicKey) {
         setError("Notifications aren't configured on the server yet.");
         return;
       }
-      const reg = await navigator.serviceWorker.register("/sw.js");
+      const reg = await navigator.serviceWorker.register(withBase("/sw.js"));
       await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: publicKey,
       });
-      const res = await fetch("/api/admin/push", {
+      const res = await fetch(withBase("/api/admin/push"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(sub.toJSON()),
@@ -71,10 +72,10 @@ export default function PushToggle() {
   async function disable() {
     setBusy(true);
     try {
-      const reg = await navigator.serviceWorker.getRegistration("/");
+      const reg = await navigator.serviceWorker.getRegistration(withBase("/"));
       const sub = await reg?.pushManager.getSubscription();
       if (sub) {
-        await fetch("/api/admin/push", {
+        await fetch(withBase("/api/admin/push"), {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ endpoint: sub.endpoint }),

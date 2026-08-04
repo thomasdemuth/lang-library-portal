@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { withBase } from "@/lib/base";
 
 /** Series colors: validated (dataviz six checks, light surface) — do not eyeball-edit. */
 const C_STUDENT = "#0FA48E";
@@ -22,7 +23,7 @@ export default function AnalyticsPanel() {
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch(`/api/admin/analytics/usage?days=${days}`)
+    fetch(withBase(`/api/admin/analytics/usage?days=${days}`))
       .then((r) => r.json())
       .then((d) => {
         if (d.series) setData(d);

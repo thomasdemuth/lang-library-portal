@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { GAMES_COLOR } from "@/lib/categories";
 import { GAME_SUBCATEGORIES, GAME_SUBCATEGORY_IDS, type Game, type GameSubcategory } from "@/lib/games";
 import { Ic, Pin } from "@/components/icons";
+import { CARD_HIT_CSS } from "@/components/BookRow";
+import { withBase } from "@/lib/base";
 
 /**
  * The games collection, laid out like the student home shelves: one
@@ -19,7 +21,7 @@ export default function GamesBrowser() {
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/games")
+    fetch(withBase("/api/games"))
       .then((r) => r.json())
       .then((d) => {
         setGames(d.games ?? []);
@@ -46,8 +48,8 @@ export default function GamesBrowser() {
 
   async function where(e: React.MouseEvent) {
     e.stopPropagation();
-    const res = await fetch("/api/games/where").then((r) => r.json()).catch(() => null);
-    if (res?.found) window.location.href = `/map?shelf=${res.shelfId}`;
+    const res = await fetch(withBase("/api/games/where")).then((r) => r.json()).catch(() => null);
+    if (res?.found) window.location.href = withBase(`/map?shelf=${res.shelfId}`);
     else say("The games area isn't marked on the map yet.");
   }
 
@@ -70,6 +72,7 @@ export default function GamesBrowser() {
         if (list.length === 0) return null; // hide empty sub-categories
         return (
           <div className="newshelf" key={sub}>
+            <style href="bookcard-hit" precedence="default">{CARD_HIT_CSS}</style>
             <h2>
               <span className="newshelf-spark"><Ic name="dice" size={17} /></span> {GAME_SUBCATEGORIES[sub].label}
               {toast && <span className="row-toast">{toast}</span>}
@@ -78,40 +81,41 @@ export default function GamesBrowser() {
               {list.map((g) => {
                 const open = expandedId === g.id;
                 return (
-                  <div
-                    key={g.id}
-                    className={`bookcard gamecard${open ? " expanded" : ""}`}
-                    onClick={(e) => toggle(g, e.currentTarget)}
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded={open}
-                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggle(g, e.currentTarget)}
-                  >
-                    <div className="bc-cover">
-                      {g.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={g.image_url} alt="" loading="lazy" />
-                      ) : (
+                  <div key={g.id} className={`bookcard gamecard${open ? " expanded" : ""}`}>
+                    {/* Cover = the disclosure button; the panel is its sibling. */}
+                    <button
+                      type="button"
+                      className="bc-hit"
+                      aria-expanded={open}
+                      aria-controls={`game-panel-${g.id}`}
+                      onClick={(e) => toggle(g, e.currentTarget.closest(".bookcard") as HTMLElement)}
+                    >
+                      <span className="bc-cover">
+                        {g.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={g.image_url} alt="" loading="lazy" />
+                        ) : (
+                          <span
+                            className="game-cover-fallback"
+                            style={{ background: `linear-gradient(150deg, ${GAMES_COLOR}, #2e7d32)` }}
+                            aria-hidden
+                          >
+                            <Ic name="dice" size={38} />
+                          </span>
+                        )}
                         <span
-                          className="game-cover-fallback"
-                          style={{ background: `linear-gradient(150deg, ${GAMES_COLOR}, #2e7d32)` }}
+                          className="bc-glow"
+                          style={{ background: `radial-gradient(circle at top right, ${GAMES_COLOR} 0%, transparent 72%)` }}
                           aria-hidden
-                        >
-                          <Ic name="dice" size={38} />
-                        </span>
-                      )}
-                      <span
-                        className="bc-glow"
-                        style={{ background: `radial-gradient(circle at top right, ${GAMES_COLOR} 0%, transparent 72%)` }}
-                        aria-hidden
-                      />
-                      <span className="bc-titlebar"><span>{g.title}</span></span>
-                    </div>
+                        />
+                        <span className="bc-titlebar"><span>{g.title}</span></span>
+                      </span>
+                    </button>
 
                     {open && (
-                      <div className="bc-body">
+                      <div className="bc-body" id={`game-panel-${g.id}`}>
                         <span className="bc-tag">
-                          <span className="tagpill" style={{ background: GAMES_COLOR, fontSize: 10.5, padding: "2px 8px" }}>
+                          <span className="tagpill pill-dk" style={{ background: GAMES_COLOR, fontSize: 10.5, padding: "2px 8px" }}>
                             {GAME_SUBCATEGORIES[g.subcategory].label}
                           </span>
                         </span>
@@ -128,7 +132,7 @@ export default function GamesBrowser() {
                         )}
                         <div className="bookact">
                           <button type="button" className="b-btn b-where" onClick={where}>
-                            <Pin /> Where is it?
+                            <Pin /> Show me where
                           </button>
                         </div>
                       </div>

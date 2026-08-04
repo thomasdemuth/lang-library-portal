@@ -6,6 +6,7 @@ import TagPicker, { TagPill } from "@/components/TagPicker";
 import UndoHint from "@/components/UndoHint";
 import { pushUndo } from "@/lib/undo";
 import { Check, Ic } from "@/components/icons";
+import { withBase } from "@/lib/base";
 
 type Book = {
   id: number;
@@ -37,7 +38,7 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
   const pageRef = useRef(0);
 
   const loadPage = useCallback(async (page: number) => {
-    const res = await fetch(`/api/admin/books?untagged=1&page=${page}`);
+    const res = await fetch(withBase(`/api/admin/books?untagged=1&page=${page}`));
     const data = await res.json();
     if (!res.ok) {
       setError(data.error ?? "Couldn't load untagged books.");
@@ -56,7 +57,7 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
     for (const book of queue.slice(idx, idx + 3)) {
       if (!suggestions.current.has(book.dedupe_key)) {
         suggestions.current.set(book.dedupe_key, "pending");
-        fetch(`/api/admin/books/suggest?key=${encodeURIComponent(book.dedupe_key)}`)
+        fetch(withBase(`/api/admin/books/suggest?key=${encodeURIComponent(book.dedupe_key)}`))
           .then((r) => r.json())
           .then((d) => suggestions.current.set(book.dedupe_key, d.suggestion ?? "none"))
           .catch(() => suggestions.current.set(book.dedupe_key, "none"))
@@ -64,7 +65,7 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
       }
       if (!descriptions.current.has(book.id)) {
         descriptions.current.set(book.id, "pending");
-        fetch(`/api/admin/books/${book.id}`)
+        fetch(withBase(`/api/admin/books/${book.id}`))
           .then((r) => r.json())
           .then((d) => descriptions.current.set(book.id, d.book?.description ?? null))
           .catch(() => descriptions.current.set(book.id, null))
@@ -84,7 +85,7 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
 
   /** Write a tag. No history — the shared step for do/undo/redo. */
   async function putTag(key: string, tag: CategoryId | null): Promise<boolean> {
-    const res = await fetch("/api/admin/books/tag", {
+    const res = await fetch(withBase("/api/admin/books/tag"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ book_key: key, category: tag }),
@@ -168,7 +169,7 @@ export default function TagReviewPanel({ onDone }: { onDone: () => void }) {
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 className="scan-cover"
-                src={`/api/admin/books/cover?isbn=${book.isbn13}`}
+                src={withBase(`/api/admin/books/cover?isbn=${book.isbn13}`)}
                 alt=""
                 onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
               />

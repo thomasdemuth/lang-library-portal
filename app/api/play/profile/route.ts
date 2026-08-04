@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guarded, requireSession } from "@/lib/guards";
-import { AVATAR_ITEMS, DEFAULT_AVATAR, ITEM_BY_ID, ownsItem, type Avatar } from "@/lib/play";
 
 function migrationPending(message: string | undefined): boolean {
   return /student_profiles|reading_log|relation|does not exist/i.test(message ?? "");
@@ -10,30 +9,32 @@ function migrationPending(message: string | undefined): boolean {
 
 type ProfileRow = {
   email: string;
-  avatar: Avatar;
-  owned: string[];
-  points: number;
   public_id?: string;
   hidden?: boolean;
+  photo_url?: string | null;
 };
 
 async function loadProfile(email: string): Promise<ProfileRow | "missing-table" | null> {
-  // public_id / hidden arrive with migrations 0012/0013 — retry without them
+  // public_id / hidden / photo_url arrive with migrations 0012/0013/0020 —
+  // peel columns off the select until the schema matches.
   let { data, error } = await db()
     .from("student_profiles")
-    .select("email, avatar, owned, points, public_id, hidden")
+    .select("email, public_id, hidden, photo_url")
     .eq("email", email)
     .maybeSingle();
-  if (error && /public_id|hidden/i.test(error.message ?? "")) {
+  if (error && /photo_url/i.test(error.message ?? "")) {
     ({ data, error } = await db()
       .from("student_profiles")
-      .select("email, avatar, owned, points")
+      .select("email, public_id, hidden")
       .eq("email", email)
       .maybeSingle());
   }
+  if (error && /public_id|hidden/i.test(error.message ?? "")) {
+    ({ data, error } = await db().from("student_profiles").select("email").eq("email", email).maybeSingle());
+  }
   if (error) return migrationPending(error.message) ? "missing-table" : null;
   if (data) return data as ProfileRow;
-  const fresh = { email, avatar: DEFAULT_AVATAR, owned: [], points: 0 };
+  const fresh = { email };
   const { error: insErr } = await db().from("student_profiles").insert(fresh);
   if (insErr && !/duplicate/i.test(insErr.message ?? "")) {
     return migrationPending(insErr.message) ? "missing-table" : null;
@@ -41,39 +42,44 @@ async function loadProfile(email: string): Promise<ProfileRow | "missing-table" 
   return fresh;
 }
 
-/** My profile: avatar, owned items, points, and books-read count. */
+// One reader's own data — private, and brief enough that a fresh read
+// shows up in the counts straight away.
+const CACHE = { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" };
+
+/** My profile basics (display identity, privacy flag) + reading counts. */
 export const GET = guarded(async (req: NextRequest) => {
   const session = await requireSession(req);
   const profile = await loadProfile(session.email);
   if (profile === "missing-table") {
-    return NextResponse.json({ profile: null, migrationPending: true });
+    return NextResponse.json({ profile: null, migrationPending: true }, { headers: CACHE });
   }
   if (!profile) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
+  const now = new Date();
+  const yearStart = new Date(Date.UTC(now.getUTCFullYear(), 0, 1)).toISOString();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
   let booksRead = 0;
+  let booksThisYear = 0;
+  let booksThisMonth = 0;
   try {
-    const { count } = await db()
-      .from("reading_log")
-      .select("id", { count: "exact", head: true })
-      .eq("email", session.email);
-    booksRead = count ?? 0;
+    const base = () => db().from("reading_log").select("id", { count: "exact", head: true }).eq("email", session.email);
+    const [all, year, month] = await Promise.all([
+      base(),
+      base().gte("created_at", yearStart),
+      base().gte("created_at", monthStart),
+    ]);
+    booksRead = all.count ?? 0;
+    booksThisYear = year.count ?? 0;
+    booksThisMonth = month.count ?? 0;
   } catch {
     /* pre-migration */
   }
-  return NextResponse.json({ profile, booksRead, catalog: AVATAR_ITEMS });
+  return NextResponse.json({ profile, booksRead, booksThisYear, booksThisMonth }, { headers: CACHE });
 });
 
-const Body = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("buy"), id: z.string().max(40) }),
-  z.object({
-    action: z.literal("equip"),
-    slot: z.enum(["bg", "legs", "body", "outfit", "head", "face", "hat"]),
-    id: z.string().max(40).nullable(),
-  }),
-  z.object({ action: z.literal("privacy"), hidden: z.boolean() }),
-]);
+const Body = z.object({ action: z.literal("privacy"), hidden: z.boolean() });
 
-/** Buy an item with stars, or equip/unequip an owned one. */
+/** Toggle profile privacy (hidden profiles vanish from classmates' views). */
 export const POST = guarded(async (req: NextRequest) => {
   const session = await requireSession(req);
   const parsed = Body.safeParse(await req.json().catch(() => null));
@@ -81,55 +87,19 @@ export const POST = guarded(async (req: NextRequest) => {
 
   const profile = await loadProfile(session.email);
   if (profile === "missing-table") {
-    return NextResponse.json({ error: "The game needs a pending database migration (0011)." }, { status: 409 });
+    return NextResponse.json({ error: "This needs a pending database migration (0011)." }, { status: 409 });
   }
   if (!profile) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-  if (parsed.data.action === "buy") {
-    const item = ITEM_BY_ID.get(parsed.data.id);
-    if (!item) return NextResponse.json({ error: "No such item" }, { status: 400 });
-    if (ownsItem(profile.owned, item)) return NextResponse.json({ error: "Already owned" }, { status: 400 });
-    if (profile.points < item.price) {
-      return NextResponse.json({ error: `You need ${item.price - profile.points} more stars for that.` }, { status: 400 });
+  const { error } = await db()
+    .from("student_profiles")
+    .update({ hidden: parsed.data.hidden })
+    .eq("email", session.email);
+  if (error) {
+    if (/hidden|schema cache/i.test(error.message ?? "")) {
+      return NextResponse.json({ error: "Profile privacy unlocks after the next library update!" }, { status: 409 });
     }
-    const owned = [...profile.owned, item.id];
-    const points = profile.points - item.price;
-    const { error } = await db()
-      .from("student_profiles")
-      .update({ owned, points })
-      .eq("email", session.email)
-      .eq("points", profile.points); // no double-spend on rapid taps
-    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
-    return NextResponse.json({ ok: true, owned, points });
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
-
-  if (parsed.data.action === "privacy") {
-    const { error } = await db()
-      .from("student_profiles")
-      .update({ hidden: parsed.data.hidden })
-      .eq("email", session.email);
-    if (error) {
-      if (/hidden|schema cache/i.test(error.message ?? "")) {
-        return NextResponse.json({ error: "Profile privacy unlocks after the next library update!" }, { status: 409 });
-      }
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
-    return NextResponse.json({ ok: true, hidden: parsed.data.hidden });
-  }
-
-  // equip
-  const { slot, id } = parsed.data;
-  if (id !== null) {
-    const item = ITEM_BY_ID.get(id);
-    if (!item || item.slot !== slot) return NextResponse.json({ error: "No such item" }, { status: 400 });
-    if (!ownsItem(profile.owned, item)) return NextResponse.json({ error: "Not owned yet" }, { status: 400 });
-  }
-  if (id === null && ["bg", "legs", "body", "head"].includes(slot)) {
-    return NextResponse.json({ error: "That part can't come off — pick a different one instead." }, { status: 400 });
-  }
-  const avatar: Avatar = { ...profile.avatar, [slot]: id ?? undefined };
-  if (slot === "head") delete avatar.base; // retire the legacy key once a head is chosen
-  const { error } = await db().from("student_profiles").update({ avatar }).eq("email", session.email);
-  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
-  return NextResponse.json({ ok: true, avatar });
+  return NextResponse.json({ ok: true, hidden: parsed.data.hidden });
 });
