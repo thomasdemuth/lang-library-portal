@@ -6,6 +6,7 @@ import LetterAvatar from "@/components/LetterAvatar";
 import { displayName } from "@/lib/play";
 import { type CategoryId } from "@/lib/categories";
 import { Ic } from "@/components/icons";
+import { withBase } from "@/lib/base";
 
 /**
  * The rotation the "Keep exploring" grid walks through. Every entry
@@ -43,7 +44,7 @@ export default function StudentHome({ email }: { email: string }) {
   const sentinel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch("/api/play/profile")
+    fetch(withBase("/api/play/profile"))
       .then((r) => r.json())
       .then((d) => {
         if (d.profile) {
@@ -93,10 +94,10 @@ export default function StudentHome({ email }: { email: string }) {
           </span>
         </div>
         <div className="play-links">
-          <a href="/me"><Ic name="smile" size={16} /> My Page</a>
-          <a href="/search"><Ic name="search" size={16} /> Find a Book</a>
-          <a href="/map"><Ic name="map" size={16} /> Library Map</a>
-          <a href="/feedback"><Ic name="feedback" size={16} /> Feedback</a>
+          <a href={withBase("/me")}><Ic name="smile" size={16} /> My Page</a>
+          <a href={withBase("/search")}><Ic name="search" size={16} /> Find a Book</a>
+          <a href={withBase("/map")}><Ic name="map" size={16} /> Library Map</a>
+          <a href={withBase("/feedback")}><Ic name="feedback" size={16} /> Feedback</a>
         </div>
       </div>
 
@@ -113,7 +114,7 @@ export default function StudentHome({ email }: { email: string }) {
       {/* v8: these link to OUR pages, which set expectations (OverDrive,
           library card, "ask your teacher") before anyone leaves the site. */}
       <div className="cards" style={{ marginTop: 18 }}>
-        <a className="card navcard" href="/ebooks">
+        <a className="card navcard" href={withBase("/ebooks")}>
           <h2>
             <span className="navcard-icon" style={{ background: "#7c4dbc" }}>
               <Ic name="tablet" size={17} />
@@ -123,7 +124,7 @@ export default function StudentHome({ email }: { email: string }) {
           </h2>
           <p>Read on a screen — see how to borrow digital books for free.</p>
         </a>
-        <a className="card navcard" href="/audiobooks">
+        <a className="card navcard" href={withBase("/audiobooks")}>
           <h2>
             <span className="navcard-icon" style={{ background: "#c2417f" }}>
               <Ic name="headphones" size={17} />
@@ -164,7 +165,7 @@ export default function StudentHome({ email }: { email: string }) {
       )}
       {extraRows >= MAX_ROWS && (
         <p className="explore-end">
-          That&rsquo;s the whole shelf! <a href="/search">Find a Book →</a>
+          That&rsquo;s the whole shelf! <a href={withBase("/search")}>Find a Book →</a>
         </p>
       )}
     </div>

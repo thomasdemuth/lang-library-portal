@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import LetterAvatar from "@/components/LetterAvatar";
 import { Heart, Ic } from "@/components/icons";
 import { announce } from "@/components/Announcer";
+import { withBase } from "@/lib/base";
 
 type Fav = { book_key: string; title: string; isbn13: string | null };
 type Collection = { id: number; name: string; books: Fav[] };
@@ -25,7 +26,7 @@ export default function StudentProfile({ id }: { id: string }) {
   const [friendMsg, setFriendMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/play/student?id=${encodeURIComponent(id)}`)
+    fetch(withBase(`/api/play/student?id=${encodeURIComponent(id)}`))
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => {
         if (d.name) {
@@ -39,7 +40,7 @@ export default function StudentProfile({ id }: { id: string }) {
   async function toggleFriend() {
     if (!data) return;
     const action = data.isFriend ? "remove" : "add";
-    const res = await fetch("/api/play/friends", {
+    const res = await fetch(withBase("/api/play/friends"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, action }),
@@ -61,7 +62,7 @@ export default function StudentProfile({ id }: { id: string }) {
     return (
       <div className="wrap student-theme">
         <h1>Hmm…</h1>
-        <div className="notice">We couldn't find that reader's page. <a href="/">Back to the library →</a></div>
+        <div className="notice">We couldn't find that reader's page. <a href={withBase("/")}>Back to the library →</a></div>
       </div>
     );
 
@@ -99,10 +100,10 @@ export default function StudentProfile({ id }: { id: string }) {
             {covers.length > 0 && (
               <div className="fav-wall">
                 {covers.map((f) => (
-                  <a key={f.book_key} className="fav-cover" href={`/search?q=${encodeURIComponent(f.title)}`} title={f.title}>
+                  <a key={f.book_key} className="fav-cover" href={withBase(`/search?q=${encodeURIComponent(f.title)}`)} title={f.title}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={`/api/catalog/cover?isbn=${f.isbn13}`}
+                      src={withBase(`/api/catalog/cover?isbn=${f.isbn13}`)}
                       alt={f.title}
                       loading="lazy"
                       onError={() => setHidden((cur) => new Set(cur).add(f.book_key))}
@@ -113,7 +114,7 @@ export default function StudentProfile({ id }: { id: string }) {
             )}
             <div className="leader-rows" style={{ marginTop: covers.length > 0 ? 12 : 0 }}>
               {data.favorites.map((f) => (
-                <a key={f.book_key} className="leader-row" href={`/search?q=${encodeURIComponent(f.title)}`}>
+                <a key={f.book_key} className="leader-row" href={withBase(`/search?q=${encodeURIComponent(f.title)}`)}>
                   <Heart filled size={14} />
                   <b style={{ flex: 1 }}>{f.title}</b>
                 </a>
@@ -136,10 +137,10 @@ export default function StudentProfile({ id }: { id: string }) {
             {colCovers.length > 0 && (
               <div className="fav-wall">
                 {colCovers.map((b) => (
-                  <a key={b.book_key} className="fav-cover" href={`/search?q=${encodeURIComponent(b.title)}`} title={b.title}>
+                  <a key={b.book_key} className="fav-cover" href={withBase(`/search?q=${encodeURIComponent(b.title)}`)} title={b.title}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={`/api/catalog/cover?isbn=${b.isbn13}`}
+                      src={withBase(`/api/catalog/cover?isbn=${b.isbn13}`)}
                       alt={b.title}
                       loading="lazy"
                       onError={() => setHidden((cur) => new Set(cur).add(b.book_key))}
@@ -150,7 +151,7 @@ export default function StudentProfile({ id }: { id: string }) {
             )}
             <div className="leader-rows" style={{ marginTop: colCovers.length > 0 ? 12 : 0 }}>
               {col.books.map((b) => (
-                <a key={b.book_key} className="leader-row" href={`/search?q=${encodeURIComponent(b.title)}`}>
+                <a key={b.book_key} className="leader-row" href={withBase(`/search?q=${encodeURIComponent(b.title)}`)}>
                   <Ic name="book" size={14} />
                   <b style={{ flex: 1 }}>{b.title}</b>
                 </a>
@@ -161,7 +162,7 @@ export default function StudentProfile({ id }: { id: string }) {
       })}
 
       <p className="hint" style={{ textAlign: "center" }}>
-        <a href="/">← Back to the library</a> · <a href="/me">My Page</a>
+        <a href={withBase("/")}>← Back to the library</a> · <a href={withBase("/me")}>My Page</a>
       </p>
     </div>
   );

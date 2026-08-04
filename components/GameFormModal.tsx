@@ -4,6 +4,7 @@ import { useState } from "react";
 import Modal from "@/components/Modal";
 import CopyStepper, { clampCopies } from "@/components/CopyStepper";
 import { GAME_SUBCATEGORIES, GAME_SUBCATEGORY_IDS, type Game, type GameSubcategory } from "@/lib/games";
+import { withBase } from "@/lib/base";
 
 /**
  * Add or edit a game. Mirrors BookEditModal's layout/patterns. `game` null
@@ -61,7 +62,7 @@ export default function GameFormModal({
       available,
     };
     try {
-      const res = await fetch(isNew ? "/api/admin/games" : `/api/admin/games/${game!.id}`, {
+      const res = await fetch(withBase(isNew ? "/api/admin/games" : `/api/admin/games/${game!.id}`), {
         method: isNew ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -79,7 +80,7 @@ export default function GameFormModal({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/games/${game.id}`, { method: "DELETE" });
+      const res = await fetch(withBase(`/api/admin/games/${game.id}`), { method: "DELETE" });
       if (!res.ok) return setError((await res.json().catch(() => ({}))).error ?? "Couldn't delete.");
       onDeleted(game.id);
     } finally {

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Ic, Pencil } from "@/components/icons";
 import { announce } from "@/components/Announcer";
 import { OFFLINE_MESSAGE, sessionExpired } from "@/lib/book-actions-client";
+import { withBase } from "@/lib/base";
 
 type CollectionBook = { book_key: string; title: string; isbn13: string | null };
 type Collection = { id: number; name: string; books: CollectionBook[] };
@@ -29,7 +30,7 @@ export default function Collections() {
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    fetch("/api/play/collections")
+    fetch(withBase("/api/play/collections"))
       .then((r) => r.json())
       .then((d) => {
         setCollections(d.collections ?? []);
@@ -48,7 +49,7 @@ export default function Collections() {
   async function post(body: Record<string, unknown>): Promise<Record<string, unknown> | null> {
     let res: Response;
     try {
-      res = await fetch("/api/play/collections", {
+      res = await fetch(withBase("/api/play/collections"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -117,7 +118,7 @@ export default function Collections() {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     if (!q.trim()) return setHits([]);
     searchTimer.current = setTimeout(() => {
-      fetch(`/api/catalog?q=${encodeURIComponent(q.trim())}`)
+      fetch(withBase(`/api/catalog?q=${encodeURIComponent(q.trim())}`))
         .then((r) => r.json())
         .then((d) => setHits(((d.books ?? []) as SearchHit[]).slice(0, 8)))
         .catch(() => {});
@@ -213,10 +214,10 @@ export default function Collections() {
                       {col.books
                         .filter((b) => b.isbn13 && !hiddenCovers.has(b.book_key))
                         .map((b) => (
-                          <a key={b.book_key} className="fav-cover" href={`/search?q=${encodeURIComponent(b.title)}`} title={b.title}>
+                          <a key={b.book_key} className="fav-cover" href={withBase(`/search?q=${encodeURIComponent(b.title)}`)} title={b.title}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
-                              src={`/api/catalog/cover?isbn=${b.isbn13}`}
+                              src={withBase(`/api/catalog/cover?isbn=${b.isbn13}`)}
                               alt={b.title}
                               loading="lazy"
                               onError={() => setHiddenCovers((cur) => new Set(cur).add(b.book_key))}

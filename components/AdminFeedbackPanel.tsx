@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { withBase } from "@/lib/base";
 
 type Feedback = {
   id: number;
@@ -31,7 +32,7 @@ export default function AdminFeedbackPanel({ canManage }: { canManage: boolean }
       if (offset > 0) params.set("offset", String(offset));
       const qs = params.toString();
       try {
-        const res = await fetch(`/api/admin/feedback${qs ? `?${qs}` : ""}`);
+        const res = await fetch(withBase(`/api/admin/feedback${qs ? `?${qs}` : ""}`));
         const data = await res.json();
         if (!res.ok) {
           setError(data.error ?? "Couldn't load feedback.");
@@ -56,7 +57,7 @@ export default function AdminFeedbackPanel({ canManage }: { canManage: boolean }
   async function setStatus(id: number, status: Feedback["status"]) {
     setError(null);
     try {
-      const res = await fetch(`/api/admin/feedback/${id}`, {
+      const res = await fetch(withBase(`/api/admin/feedback/${id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),

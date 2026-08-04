@@ -1,12 +1,13 @@
 import GateForm from "@/components/GateForm";
 import { studentUrl } from "@/lib/hosts";
+import { withBase } from "@/lib/base";
 
 export default function StaffGate() {
   return (
     <div className="wrap narrow">
       <div className="gate-hero">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="gate-logo" src="/icon-192.png" alt="Lang Library" width={76} height={76} />
+        <img className="gate-logo" src={withBase("/icon-192.png")} alt="Lang Library" width={76} height={76} />
         <h1>Staff portal</h1>
         <p className="sub">Enter your school email to come in.</p>
       </div>
@@ -16,7 +17,7 @@ export default function StaffGate() {
           Students: this is the staff site — <a href={studentUrl()}>go to the student site</a>.
         </p>
         <p className="hint" style={{ marginTop: 8 }}>
-          Library management: <a href="/admin/login">sign in here</a>.
+          Library management: <a href={withBase("/admin/login")}>sign in here</a>.
         </p>
       </div>
     </div>

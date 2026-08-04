@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import UserMenu from "@/components/UserMenu";
+import { stripBase, withBase } from "@/lib/base";
 
 /**
  * Which nav link is the page you're on?
@@ -42,14 +43,16 @@ export default function SiteHeader({
   // middleware rewrites mean the server-rendered path is the *internal* one,
   // so usePathname() would disagree with the address bar and mismatch on
   // hydration. Nothing is marked current until this lands — one frame later.
+  // (stripBase: under a subpath deployment the address bar carries the base
+  // prefix but `links`/`home` do not — compare in one coordinate system.)
   const [path, setPath] = useState("");
-  useEffect(() => setPath(window.location.pathname), []);
+  useEffect(() => setPath(stripBase(window.location.pathname)), []);
 
   return (
     <header className="topbar">
-      <a className="brand" href={home}>
+      <a className="brand" href={withBase(home)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="brand-mark" src="/icon-192.png" alt="" width={38} height={38} />
+        <img className="brand-mark" src={withBase("/icon-192.png")} alt="" width={38} height={38} />
         <span className="brand-tag">{tagline}</span>
       </a>
       <nav className="nav" aria-label="Main">
@@ -58,7 +61,7 @@ export default function SiteHeader({
           return (
             <a
               key={l.href}
-              href={l.href}
+              href={withBase(l.href)}
               className={current ? "active" : undefined}
               aria-current={current ? "page" : undefined}
             >

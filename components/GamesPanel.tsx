@@ -5,6 +5,7 @@ import GameFormModal from "@/components/GameFormModal";
 import { GAMES_COLOR, pillTextClass } from "@/lib/categories";
 import { GAME_SUBCATEGORIES, GAME_SUBCATEGORY_IDS, type Game, type GameSubcategory } from "@/lib/games";
 import { Ic } from "@/components/icons";
+import { withBase } from "@/lib/base";
 
 /**
  * Games management — mirrors the book Inventory patterns: search + a
@@ -25,7 +26,7 @@ export default function GamesPanel() {
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
     if (sub) params.set("subcategory", sub);
-    fetch(`/api/admin/games?${params}`)
+    fetch(withBase(`/api/admin/games?${params}`))
       .then((r) => r.json())
       .then((d) => {
         setGames(d.games ?? []);
@@ -70,7 +71,7 @@ export default function GamesPanel() {
     const ids = [...selected];
     setBulk({ busy: true, msg: null });
     try {
-      const res = await fetch("/api/admin/games/recategorize", {
+      const res = await fetch(withBase("/api/admin/games/recategorize"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids, subcategory: sub }),

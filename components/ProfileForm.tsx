@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { withBase } from "@/lib/base";
 
 export default function ProfileForm({ initialName }: { initialName: string }) {
   const [name, setName] = useState(initialName);
@@ -14,7 +15,7 @@ export default function ProfileForm({ initialName }: { initialName: string }) {
     setBusy(true);
     setMsg(null);
     try {
-      const res = await fetch("/api/admin/account", {
+      const res = await fetch(withBase("/api/admin/account"), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim() }),

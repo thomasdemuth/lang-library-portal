@@ -12,6 +12,7 @@ import AddBookModal, { type AddedBook } from "@/components/AddBookModal";
 import UndoHint from "@/components/UndoHint";
 import { clearUndo, pushUndo } from "@/lib/undo";
 import { Ic, Pencil, Pin } from "@/components/icons";
+import { withBase } from "@/lib/base";
 
 type Sync = {
   id: number;
@@ -317,7 +318,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   const visibleCols = cols.filter((c) => c.on);
 
   async function load() {
-    const res = await fetch("/api/admin/inventory/syncs");
+    const res = await fetch(withBase("/api/admin/inventory/syncs"));
     const data = await res.json();
     if (res.ok) {
       setActive(data.active);
@@ -408,7 +409,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     setProgress(0);
     setError(null);
     try {
-      const create = await fetch("/api/admin/inventory/syncs", {
+      const create = await fetch(withBase("/api/admin/inventory/syncs"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source_filename: parsed.filename }),
@@ -418,13 +419,13 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
 
       for (let i = 0; i < parsed.books.length; i += BATCH) {
         const rows = parsed.books.slice(i, i + BATCH).map(({ ...r }) => r);
-        const res = await fetch(`/api/admin/inventory/syncs/${sync_id}/rows`, {
+        const res = await fetch(withBase(`/api/admin/inventory/syncs/${sync_id}/rows`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ rows }),
         });
         if (!res.ok) {
-          await fetch(`/api/admin/inventory/syncs/${sync_id}`, { method: "DELETE" });
+          await fetch(withBase(`/api/admin/inventory/syncs/${sync_id}`), { method: "DELETE" });
           throw new Error((await res.json()).error ?? "Upload failed — import aborted.");
         }
         setProgress(Math.min(99, Math.round(((i + rows.length) / parsed.books.length) * 100)));
@@ -435,7 +436,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
       // import; the dialog just shows a plain warning instead of numbers.
       let preview: SyncPreview | null = null;
       try {
-        const res = await fetch(`/api/admin/inventory/syncs/${sync_id}/preview`);
+        const res = await fetch(withBase(`/api/admin/inventory/syncs/${sync_id}/preview`));
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.preview) preview = data.preview as SyncPreview;
       } catch {
@@ -455,7 +456,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     setCommitting(true);
     setError(null);
     try {
-      const commit = await fetch(`/api/admin/inventory/syncs/${confirming.syncId}/commit`, {
+      const commit = await fetch(withBase(`/api/admin/inventory/syncs/${confirming.syncId}/commit`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ row_count: parsed.rawRows, merged_count: parsed.books.length }),
@@ -481,7 +482,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     const id = confirming.syncId;
     setConfirming(null);
     try {
-      await fetch(`/api/admin/inventory/syncs/${id}`, { method: "DELETE" });
+      await fetch(withBase(`/api/admin/inventory/syncs/${id}`), { method: "DELETE" });
     } catch {
       /* stale pending syncs are also swept when the next import starts */
     }
@@ -494,7 +495,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     setError(null);
     setNotice(null);
     try {
-      const res = await fetch(`/api/admin/inventory/syncs/${id}/restore`, { method: "POST" });
+      const res = await fetch(withBase(`/api/admin/inventory/syncs/${id}/restore`), { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         showError(data.error ?? "Couldn't restore that catalog.");
@@ -517,7 +518,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     e?.preventDefault();
     setTagError(null);
     const tag = tagOverride === undefined ? filter : tagOverride;
-    const res = await fetch(`/api/admin/books?q=${encodeURIComponent(qOverride ?? q)}${filterParam(tag)}`);
+    const res = await fetch(withBase(`/api/admin/books?q=${encodeURIComponent(qOverride ?? q)}${filterParam(tag)}`));
     const data = await res.json();
     if (res.ok) {
       setResults(data.books);
@@ -560,7 +561,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   /** Apply (or clear) a tag on every selected book at once. */
   /** Write one tag across many books. No history — the do/undo/redo step. */
   async function putBulk(keys: string[], tag: CategoryId | null): Promise<boolean> {
-    const res = await fetch("/api/admin/books/tag/bulk", {
+    const res = await fetch(withBase("/api/admin/books/tag/bulk"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ book_keys: keys, category: tag }),
@@ -664,7 +665,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
 
   /** Load enrichment progress for the status line (lazy, when settings open). */
   const loadEnrichProgress = useCallback(() => {
-    fetch("/api/admin/inventory/enrich")
+    fetch(withBase("/api/admin/inventory/enrich"))
       .then((r) => r.json())
       .then((d) => setEnrichProg({ total: d.total ?? 0, withDescription: d.withDescription ?? 0 }))
       .catch(() => {});
@@ -691,7 +692,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     setLoadingMore(true);
     try {
       const res = await fetch(
-        `/api/admin/books?q=${encodeURIComponent(q)}&page=${page + 1}${filterParam(filter)}`
+        withBase(`/api/admin/books?q=${encodeURIComponent(q)}&page=${page + 1}${filterParam(filter)}`)
       );
       const data = await res.json();
       if (res.ok) {
@@ -708,11 +709,11 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
     setFinding(b.id);
     setTagError(null);
     try {
-      const res = await fetch(`/api/admin/books/where?key=${encodeURIComponent(b.dedupe_key)}`);
+      const res = await fetch(withBase(`/api/admin/books/where?key=${encodeURIComponent(b.dedupe_key)}`));
       const data = await res.json();
       if (data.found && data.shelves?.length) {
         if (data.ranged || data.shelves.length === 1) {
-          window.location.href = `/admin/map?shelf=${data.shelves[0].id}`;
+          window.location.href = withBase(`/admin/map?shelf=${data.shelves[0].id}`);
           return;
         }
         showTagError(
@@ -733,7 +734,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   /** Write one book's tag. No history — the shared step for do/undo/redo. */
   async function putTag(book: Book, tag: CategoryId | null): Promise<boolean> {
     setTagError(null);
-    const res = await fetch("/api/admin/books/tag", {
+    const res = await fetch(withBase("/api/admin/books/tag"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ book_key: book.dedupe_key, category: tag }),
@@ -765,7 +766,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   function toggleExpand(b: Book) {
     setExpanded((cur) => (cur === b.id ? null : b.id));
     if (details[b.id]) return;
-    fetch(`/api/admin/books/${b.id}`)
+    fetch(withBase(`/api/admin/books/${b.id}`))
       .then((res) => res.json())
       .then((data) => {
         setDetails((cur) => ({
@@ -1190,7 +1191,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                 onClick={async () => {
                   setReindex({ busy: true, msg: null });
                   try {
-                    const res = await fetch("/api/admin/inventory/reindex-authors", { method: "POST" });
+                    const res = await fetch(withBase("/api/admin/inventory/reindex-authors"), { method: "POST" });
                     const data = await res.json().catch(() => ({}));
                     const msg = res.ok
                       ? `Sorted ${(data.updated ?? 0).toLocaleString()} books by author.`
@@ -1362,7 +1363,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                                 {coverIsbn && (
                                   <img
                                     className="bookcover"
-                                    src={`/api/admin/books/cover?isbn=${coverIsbn}`}
+                                    src={withBase(`/api/admin/books/cover?isbn=${coverIsbn}`)}
                                     alt={`Cover of ${b.title}`}
                                     onError={(e) => {
                                       e.currentTarget.style.display = "none";

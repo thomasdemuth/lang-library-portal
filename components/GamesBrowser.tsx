@@ -5,6 +5,7 @@ import { GAMES_COLOR } from "@/lib/categories";
 import { GAME_SUBCATEGORIES, GAME_SUBCATEGORY_IDS, type Game, type GameSubcategory } from "@/lib/games";
 import { Ic, Pin } from "@/components/icons";
 import { CARD_HIT_CSS } from "@/components/BookRow";
+import { withBase } from "@/lib/base";
 
 /**
  * The games collection, laid out like the student home shelves: one
@@ -20,7 +21,7 @@ export default function GamesBrowser() {
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/games")
+    fetch(withBase("/api/games"))
       .then((r) => r.json())
       .then((d) => {
         setGames(d.games ?? []);
@@ -47,8 +48,8 @@ export default function GamesBrowser() {
 
   async function where(e: React.MouseEvent) {
     e.stopPropagation();
-    const res = await fetch("/api/games/where").then((r) => r.json()).catch(() => null);
-    if (res?.found) window.location.href = `/map?shelf=${res.shelfId}`;
+    const res = await fetch(withBase("/api/games/where")).then((r) => r.json()).catch(() => null);
+    if (res?.found) window.location.href = withBase(`/map?shelf=${res.shelfId}`);
     else say("The games area isn't marked on the map yet.");
   }
 

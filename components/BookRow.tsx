@@ -7,6 +7,7 @@ import { Check, Heart, Pin } from "@/components/icons";
 import { announce } from "@/components/Announcer";
 import { getFavorites, isFavorite, onFavoritesChange, toggleFavorite } from "@/lib/favorites-client";
 import { fetchDetail, findShelf, logRead, removeRead, shelfMapHref, type DetailResult, type NoteKind } from "@/lib/book-actions-client";
+import { withBase } from "@/lib/base";
 
 type Book = { id: number; title: string; creators: string | null; isbn13: string | null; dedupe_key: string; tag: CategoryId | null };
 
@@ -107,7 +108,7 @@ export default function BookRow({
     const params = new URLSearchParams({ kind });
     if (tag) params.set("tag", tag);
     if (index !== undefined) params.set("i", String(index));
-    fetch(`/api/catalog/row?${params}`)
+    fetch(withBase(`/api/catalog/row?${params}`))
       .then((r) => r.json())
       .then((d) => {
         setBooks((d.books ?? []).filter((b: Book) => b.isbn13));
@@ -272,7 +273,7 @@ export default function BookRow({
                 <span className="bc-cover">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`/api/catalog/cover?isbn=${coverIsbn}`}
+                    src={withBase(`/api/catalog/cover?isbn=${coverIsbn}`)}
                     alt=""
                     loading="lazy"
                     onLoad={updateChev}

@@ -1,11 +1,13 @@
 "use client";
 
+
 /**
  * One shared collections cache for every book card on the page — the
  * "Add to list" buttons all ask "which of my lists is this book in?" so
  * we fetch the lists once and keep them in sync as books are added.
  */
 
+import { withBase } from "./base";
 export type ClientCollection = { id: number; name: string; bookKeys: string[] };
 export type CollectBook = { book_key: string; title: string; isbn13?: string | null };
 
@@ -32,7 +34,7 @@ type ApiCollection = { id: number; name: string; books: { book_key: string }[] }
 export async function getCollections(): Promise<ClientCollection[]> {
   if (cache) return cache;
   if (!inflight) {
-    inflight = fetch("/api/play/collections")
+    inflight = fetch(withBase("/api/play/collections"))
       .then((r) => r.json())
       .then((d) => {
         migrationPending = Boolean(d.migrationPending);
@@ -56,7 +58,7 @@ export async function createCollection(
   name: string,
   book?: CollectBook
 ): Promise<{ collection: ClientCollection } | { error: string }> {
-  const res = await fetch("/api/play/collections", {
+  const res = await fetch(withBase("/api/play/collections"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "create", name }),
@@ -75,7 +77,7 @@ export async function createCollection(
 
 /** Add a book to a list (no-op if it's already there). */
 export async function addToCollection(id: number, book: CollectBook): Promise<{ ok: true } | { error: string }> {
-  const res = await fetch("/api/play/collections", {
+  const res = await fetch(withBase("/api/play/collections"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "add", id, book }),
@@ -92,7 +94,7 @@ export async function addToCollection(id: number, book: CollectBook): Promise<{ 
 
 /** Remove a book from a list. */
 export async function removeFromCollection(id: number, book_key: string): Promise<{ ok: true } | { error: string }> {
-  const res = await fetch("/api/play/collections", {
+  const res = await fetch(withBase("/api/play/collections"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "remove", id, book_key }),

@@ -6,6 +6,7 @@
  * lib/favorites-client (they carry their own shared cache).
  */
 import { CATEGORIES, type CategoryId } from "./categories";
+import { withBase } from "./base";
 
 export type ActionBook = { title: string; dedupe_key: string; isbn13: string | null };
 
@@ -17,7 +18,7 @@ export const OFFLINE_MESSAGE = "Can't reach the library right now — check the 
 /** A 401 means the session expired — send the visitor back to sign-in. */
 export function sessionExpired(res: Response): boolean {
   if (res.status !== 401) return false;
-  window.location.href = "/";
+  window.location.href = withBase("/");
   return true;
 }
 
@@ -26,7 +27,7 @@ export async function logRead(
   b: ActionBook
 ): Promise<{ id: number | null; message: string } | { error: string; kind: "warn" | "err" }> {
   try {
-    const res = await fetch("/api/play/read", {
+    const res = await fetch(withBase("/api/play/read"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ book_key: b.dedupe_key, title: b.title }),
@@ -44,7 +45,7 @@ export async function logRead(
 /** Remove one of my reading-log rows (the undo/removal half of logRead). */
 export async function removeRead(id: number): Promise<{ ok: true } | { error: string; kind: "warn" | "err" }> {
   try {
-    const res = await fetch(`/api/play/read?id=${id}`, { method: "DELETE" });
+    const res = await fetch(withBase(`/api/play/read?id=${id}`), { method: "DELETE" });
     if (sessionExpired(res)) return { error: "Signed out — sign in again.", kind: "err" };
     if (res.ok) return { ok: true };
     const data = await res.json().catch(() => ({}));
@@ -82,7 +83,7 @@ export function shelfAreaMessage(area: CategoryId | null): string {
 /** Which shelf a book lives on — where to fly to (and how sure we are), or a note. */
 export async function findShelf(b: ActionBook): Promise<ShelfResult> {
   try {
-    const res = await fetch(`/api/catalog/where?key=${encodeURIComponent(b.dedupe_key)}`);
+    const res = await fetch(withBase(`/api/catalog/where?key=${encodeURIComponent(b.dedupe_key)}`));
     if (sessionExpired(res)) return { message: "Signed out — sign in again.", kind: "err" };
     if (!res.ok) return { message: OFFLINE_MESSAGE, kind: "err" };
     const data = await res.json().catch(() => ({}));
@@ -113,7 +114,7 @@ export async function findShelf(b: ActionBook): Promise<ShelfResult> {
  * the uncertainty instead of the link.
  */
 export function shelfMapHref(hit: ShelfHit): string {
-  return `/map?shelf=${encodeURIComponent(hit.shelfId)}`;
+  return withBase(`/map?shelf=${encodeURIComponent(hit.shelfId)}`);
 }
 
 export type BookDetail = { isbn13: string | null; isbn10: string | null; description: string | null };
@@ -122,7 +123,7 @@ export type DetailResult = { book: BookDetail | null } | { error: string };
 /** Fetch a book's cover ISBNs + description on demand (for expanded cards). */
 export async function fetchDetail(key: string): Promise<DetailResult> {
   try {
-    const res = await fetch(`/api/catalog/detail?key=${encodeURIComponent(key)}`);
+    const res = await fetch(withBase(`/api/catalog/detail?key=${encodeURIComponent(key)}`));
     if (sessionExpired(res)) return { error: "Signed out — sign in again." };
     if (!res.ok) return { error: "Couldn't load the description — check the Wi-Fi." };
     const data = await res.json();

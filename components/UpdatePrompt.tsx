@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { announce } from "@/components/Announcer";
 import { Ic } from "@/components/icons";
+import { withBase } from "@/lib/base";
 
 const POLL_MS = 5 * 60 * 1000;
 // Tab switches can come in bursts — one version check a minute is plenty.
@@ -29,7 +30,7 @@ export default function UpdatePrompt() {
     async function check() {
       lastCheck = Date.now();
       try {
-        const { v } = await fetch("/api/version", { cache: "no-store" }).then((r) => r.json());
+        const { v } = await fetch(withBase("/api/version"), { cache: "no-store" }).then((r) => r.json());
         if (stop || !v || v === "dev") return;
         if (baseline.current === null) {
           baseline.current = v;

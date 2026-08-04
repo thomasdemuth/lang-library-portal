@@ -9,6 +9,7 @@ import { announce } from "@/components/Announcer";
 import { displayName } from "@/lib/play";
 import { logRead, removeRead, type NoteKind } from "@/lib/book-actions-client";
 import { toggleFavorite, type FavBook } from "@/lib/favorites-client";
+import { withBase } from "@/lib/base";
 
 type Profile = { public_id?: string; photo_url?: string | null };
 type LogRow = { id: number; book_key: string; title: string; created_at: string };
@@ -30,14 +31,14 @@ export default function MyPage({ email }: { email: string }) {
   const [migration, setMigration] = useState(false);
 
   const loadLog = useCallback(() => {
-    fetch("/api/play/read")
+    fetch(withBase("/api/play/read"))
       .then((r) => r.json())
       .then((d) => setLog(d.log ?? []))
       .catch(() => {});
   }, []);
 
   useEffect(() => {
-    fetch("/api/play/profile")
+    fetch(withBase("/api/play/profile"))
       .then((r) => r.json())
       .then((d) => {
         if (d.migrationPending) setMigration(true);
@@ -48,7 +49,7 @@ export default function MyPage({ email }: { email: string }) {
       })
       .catch(() => {});
     loadLog();
-    fetch("/api/play/favorites")
+    fetch(withBase("/api/play/favorites"))
       .then((r) => r.json())
       .then((d) => setFavs(d.favorites ?? []))
       .catch(() => {});
@@ -130,7 +131,7 @@ export default function MyPage({ email }: { email: string }) {
             Only you and the library team can see this page.
           </p>
           {profile.public_id && (
-            <a className="play-cta" href={`/students/${profile.public_id}`}>
+            <a className="play-cta" href={withBase(`/students/${profile.public_id}`)}>
               See my page like friends see it →
             </a>
           )}
@@ -198,10 +199,10 @@ export default function MyPage({ email }: { email: string }) {
                   {favs
                     .filter((f) => f.isbn13 && !hiddenCovers.has(f.book_key))
                     .map((f) => (
-                      <a key={f.book_key} className="fav-cover" href={`/search?q=${encodeURIComponent(f.title)}`} title={f.title}>
+                      <a key={f.book_key} className="fav-cover" href={withBase(`/search?q=${encodeURIComponent(f.title)}`)} title={f.title}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={`/api/catalog/cover?isbn=${f.isbn13}`}
+                          src={withBase(`/api/catalog/cover?isbn=${f.isbn13}`)}
                           alt={f.title}
                           loading="lazy"
                           onError={() => setHiddenCovers((cur) => new Set(cur).add(f.book_key))}

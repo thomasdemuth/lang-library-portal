@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import { PERMISSIONS, type PermKey } from "@/lib/permissions";
+import { withBase } from "@/lib/base";
 
 type Admin = {
   id: string;
@@ -106,8 +107,8 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
 
   async function load() {
     const [a, i] = await Promise.all([
-      fetch("/api/admin/admins").then((r) => r.json()),
-      fetch("/api/admin/invites").then((r) => r.json()),
+      fetch(withBase("/api/admin/admins")).then((r) => r.json()),
+      fetch(withBase("/api/admin/invites")).then((r) => r.json()),
     ]);
     if (a.admins) setAdmins(a.admins);
     if (i.invites) setInvites(i.invites);
@@ -121,7 +122,7 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
     setError(null);
     setNewLink(null);
     try {
-      const res = await fetch("/api/admin/invites", {
+      const res = await fetch(withBase("/api/admin/invites"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -148,7 +149,7 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
     setError(null);
     setConfirmRevoke(null);
     try {
-      const res = await fetch(`/api/admin/invites/${id}`, { method: "DELETE" });
+      const res = await fetch(withBase(`/api/admin/invites/${id}`), { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError(data.error ?? "Couldn't revoke that invite — try again.");
@@ -163,7 +164,7 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
     setError(null);
     setRegenLink(null);
     try {
-      const res = await fetch(`/api/admin/invites/${invite.id}`, { method: "POST" });
+      const res = await fetch(withBase(`/api/admin/invites/${invite.id}`), { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "Couldn't regenerate that invite.");
@@ -180,7 +181,7 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
     setError(null);
     setResetLink(null);
     try {
-      const res = await fetch(`/api/admin/admins/${a.id}/reset`, { method: "POST" });
+      const res = await fetch(withBase(`/api/admin/admins/${a.id}/reset`), { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "Couldn't create the reset link.");
@@ -194,7 +195,7 @@ export default function AdminsPanel({ selfId }: { selfId: string }) {
 
   async function patchAdmin(id: string, body: Record<string, unknown>) {
     setError(null);
-    const res = await fetch(`/api/admin/admins/${id}`, {
+    const res = await fetch(withBase(`/api/admin/admins/${id}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

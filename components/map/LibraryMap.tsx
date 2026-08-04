@@ -10,6 +10,7 @@ import {
   type MapCategoryId as CategoryId,
 } from "@/lib/categories";
 import { announce } from "@/components/Announcer";
+import { withBase } from "@/lib/base";
 
 export type Shelf = {
   id: string;
@@ -310,7 +311,7 @@ export default function LibraryMap({
   useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current); }, []);
 
   async function load() {
-    const res = await fetch("/api/map");
+    const res = await fetch(withBase("/api/map"));
     const data = await res.json();
     if (res.ok) {
       setSettings(data.settings);
@@ -712,7 +713,7 @@ export default function LibraryMap({
     setError(null);
     setConflict(false);
     try {
-      const res = await fetch("/api/admin/shelves", {
+      const res = await fetch(withBase("/api/admin/shelves"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -996,7 +997,7 @@ export default function LibraryMap({
               {hasPlan && (
                 <image
                   className="mapimg"
-                  href={`/api/map/floorplan?v=${encodeURIComponent(settings?.updated_at ?? "")}`}
+                  href={withBase(`/api/map/floorplan?v=${encodeURIComponent(settings?.updated_at ?? "")}`)}
                   x={0}
                   y={0}
                   width={W}

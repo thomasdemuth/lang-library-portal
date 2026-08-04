@@ -1,6 +1,7 @@
 "use client";
 
 import { OFFLINE_MESSAGE, sessionExpired } from "./book-actions-client";
+import { withBase } from "./base";
 
 /**
  * One shared favorites cache for every book card on the page — the rows
@@ -26,7 +27,7 @@ function notify() {
 export async function getFavorites(): Promise<Set<string>> {
   if (favSet) return favSet;
   if (!inflight) {
-    inflight = fetch("/api/play/favorites")
+    inflight = fetch(withBase("/api/play/favorites"))
       .then(async (r) => {
         if (!r.ok) throw new Error("favorites load failed");
         const d = await r.json();
@@ -47,7 +48,7 @@ export async function toggleFavorite(
 ): Promise<{ favorited: boolean } | { error: string; kind: "warn" | "err" }> {
   let res: Response;
   try {
-    res = await fetch("/api/play/favorites", {
+    res = await fetch(withBase("/api/play/favorites"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(book),

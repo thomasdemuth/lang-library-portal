@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { withBase } from "@/lib/base";
 
 export default function PasswordForm() {
   const [current, setCurrent] = useState("");
@@ -18,7 +19,7 @@ export default function PasswordForm() {
     setBusy(true);
     setMsg(null);
     try {
-      const res = await fetch("/api/admin/account/password", {
+      const res = await fetch(withBase("/api/admin/account/password"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ current, next }),

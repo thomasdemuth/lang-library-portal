@@ -7,6 +7,7 @@ import { upcAToEan13 } from "@/lib/isbn";
 import { CATEGORIES, type CategoryId } from "@/lib/categories";
 import TagPicker, { TagPill } from "@/components/TagPicker";
 import { Ic, Pin } from "@/components/icons";
+import { withBase } from "@/lib/base";
 
 type Book = {
   id: number;
@@ -54,7 +55,7 @@ function ShelfLine({ where }: { where: WhereHit }) {
       }`
     : `Somewhere in ${CATEGORIES[where.tag].label} — no letter range set`;
   return target ? (
-    <a className="scan-shelf" href={`/admin/map?shelf=${target.id}`}>
+    <a className="scan-shelf" href={withBase(`/admin/map?shelf=${target.id}`)}>
       <Pin size={13} /> {text} →
     </a>
   ) : (
@@ -101,7 +102,7 @@ export default function ScanPanel({
     if (!book?.tag) return;
     let stale = false;
     (async () => {
-      const res = await fetch(`/api/admin/books/where?key=${encodeURIComponent(book.dedupe_key)}`);
+      const res = await fetch(withBase(`/api/admin/books/where?key=${encodeURIComponent(book.dedupe_key)}`));
       const data = await res.json().catch(() => null);
       if (!stale && data?.found && data.shelves?.length) {
         setWhere({ ranged: Boolean(data.ranged), tag: data.tag, shelves: data.shelves });
@@ -120,7 +121,7 @@ export default function ScanPanel({
     if (!book || book.tag || !canImport) return;
     let stale = false;
     (async () => {
-      const res = await fetch(`/api/admin/books/suggest?key=${encodeURIComponent(book.dedupe_key)}`);
+      const res = await fetch(withBase(`/api/admin/books/suggest?key=${encodeURIComponent(book.dedupe_key)}`));
       const data = await res.json().catch(() => null);
       if (!stale && data?.suggestion) setSuggestion(data.suggestion);
     })();
@@ -149,13 +150,13 @@ export default function ScanPanel({
   }, []);
 
   const lookup = useCallback(async (code: string): Promise<Lookup | null> => {
-    const res = await fetch(`/api/admin/books/lookup?code=${encodeURIComponent(code)}`);
+    const res = await fetch(withBase(`/api/admin/books/lookup?code=${encodeURIComponent(code)}`));
     if (!res.ok) return null;
     return res.json();
   }, []);
 
   const tagBook = useCallback(async (book_key: string, category: CategoryId | null): Promise<boolean> => {
-    const res = await fetch("/api/admin/books/tag", {
+    const res = await fetch(withBase("/api/admin/books/tag"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ book_key, category }),
@@ -230,7 +231,7 @@ export default function ScanPanel({
           announce(`${book.title} — no tag yet, tag it first.`, true);
           return;
         }
-        const res = await fetch(`/api/admin/books/where?key=${encodeURIComponent(book.dedupe_key)}`);
+        const res = await fetch(withBase(`/api/admin/books/where?key=${encodeURIComponent(book.dedupe_key)}`));
         const whereData = await res.json().catch(() => null);
         if (whereData?.found && whereData.shelves?.length) {
           // A category-only match is a hint, not an answer — beep it as one.
@@ -411,7 +412,7 @@ export default function ScanPanel({
   async function adjustCopies(delta: 1 | -1) {
     if (!result?.book || busy) return;
     setBusy(true);
-    const res = await fetch(`/api/admin/books/${result.book.id}`, {
+    const res = await fetch(withBase(`/api/admin/books/${result.book.id}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ delta }),
@@ -422,7 +423,7 @@ export default function ScanPanel({
     } else if (data.removed) {
       const gone = result.book;
       say(true, "Removed from the catalog.", async () => {
-        const back = await fetch("/api/admin/books/add", {
+        const back = await fetch(withBase("/api/admin/books/add"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -446,7 +447,7 @@ export default function ScanPanel({
       const bookId = data.book.id;
       setResult({ ...result, book: data.book });
       say(true, delta > 0 ? "Copy added." : "Copy removed.", async () => {
-        const rev = await fetch(`/api/admin/books/${bookId}`, {
+        const rev = await fetch(withBase(`/api/admin/books/${bookId}`), {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ delta: -delta }),
@@ -468,7 +469,7 @@ export default function ScanPanel({
   async function addExternal() {
     if (!result?.external || busy) return;
     setBusy(true);
-    const res = await fetch("/api/admin/books/add", {
+    const res = await fetch(withBase("/api/admin/books/add"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(result.external),
@@ -487,7 +488,7 @@ export default function ScanPanel({
         data.clamped
           ? undefined
           : async () => {
-              const rev = await fetch(`/api/admin/books/${data.book.id}`, {
+              const rev = await fetch(withBase(`/api/admin/books/${data.book.id}`), {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ delta: -1 }),
@@ -545,7 +546,7 @@ export default function ScanPanel({
             </button>
           ) : (
             // Unlinked on desktop, but a typed URL shouldn't be a trap
-            <a className="scan-close desk-only" href="/admin" aria-label="Leave scanner">
+            <a className="scan-close desk-only" href={withBase("/admin")} aria-label="Leave scanner">
               ✕
             </a>
           )}
@@ -605,7 +606,7 @@ export default function ScanPanel({
                     {putaway.where.shelves[0].shelf_number ? putaway.where.shelves[0].label : ""}
                     {putaway.where.shelves[0].letter_range ? ` · ${putaway.where.shelves[0].letter_range}` : ""}
                   </div>
-                  <a className="pa-map" href={`/admin/map?shelf=${putaway.where.shelves[0].id}`}>
+                  <a className="pa-map" href={withBase(`/admin/map?shelf=${putaway.where.shelves[0].id}`)}>
                     Show on map →
                   </a>
                 </>
@@ -617,7 +618,7 @@ export default function ScanPanel({
                   <div className="pa-sub">Somewhere in {CATEGORIES[putaway.where.tag].label}</div>
                   <div className="pa-hint">no letter range set for these shelves</div>
                   {putaway.where.shelves.length === 1 && (
-                    <a className="pa-map" href={`/admin/map?shelf=${putaway.where.shelves[0].id}`}>
+                    <a className="pa-map" href={withBase(`/admin/map?shelf=${putaway.where.shelves[0].id}`)}>
                       Show on map →
                     </a>
                   )}
@@ -676,7 +677,7 @@ export default function ScanPanel({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     className="scan-cover"
-                    src={`/api/admin/books/cover?isbn=${isbnFor}`}
+                    src={withBase(`/api/admin/books/cover?isbn=${isbnFor}`)}
                     alt=""
                     onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
                   />
@@ -730,7 +731,7 @@ export default function ScanPanel({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     className="scan-cover"
-                    src={`/api/admin/books/cover?isbn=${isbnFor}`}
+                    src={withBase(`/api/admin/books/cover?isbn=${isbnFor}`)}
                     alt=""
                     onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
                   />

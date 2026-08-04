@@ -9,6 +9,7 @@ import {
 import { classifyEmail } from "@/lib/gate";
 import { homePathFor } from "@/lib/unified";
 import { safeNextPath } from "@/lib/safe-next";
+import { withBase } from "@/lib/base";
 import { SESSION_COOKIE, sessionCookieOptions, signSession, type Session } from "@/lib/session";
 import { db, dbConfigured } from "@/lib/db";
 
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 /** Redirect back to the sign-in page with a machine-readable error tag. */
 function fail(req: NextRequest, error: string) {
-  const res = NextResponse.redirect(new URL(`/?error=${error}`, req.url));
+  const res = NextResponse.redirect(new URL(withBase(`/?error=${error}`), req.url));
   res.cookies.delete(GOOGLE_STATE_COOKIE);
   return res;
 }
@@ -87,7 +88,7 @@ export async function GET(req: NextRequest) {
   const token = await signSession(session);
   const dest = safeNextPath(saved.next, homePathFor(session));
 
-  const res = NextResponse.redirect(new URL(dest, req.url));
+  const res = NextResponse.redirect(new URL(withBase(dest), req.url));
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(result.aud));
   res.cookies.delete(GOOGLE_STATE_COOKIE);
   return res;

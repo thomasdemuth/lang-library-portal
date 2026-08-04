@@ -2,6 +2,7 @@ import InventoryPanel from "@/components/InventoryPanel";
 import { requireAdminPage } from "@/lib/server";
 import { canDo } from "@/lib/permissions";
 import { redirect } from "next/navigation";
+import { withBase } from "@/lib/base";
 
 export default async function InventoryPage() {
   const admin = await requireAdminPage();
@@ -18,7 +19,7 @@ export default async function InventoryPage() {
       <p className="sub">
         The book catalog. Book requests are matched against whatever is live here.
       </p>
-      <a className="btn brand mobile-only" style={{ width: "100%", textAlign: "center", marginBottom: 14 }} href="/admin/requests">
+      <a className="btn brand mobile-only" style={{ width: "100%", textAlign: "center", marginBottom: 14 }} href={withBase("/admin/requests")}>
         Manage Book Requests
       </a>
       <InventoryPanel canImport={canImport} />

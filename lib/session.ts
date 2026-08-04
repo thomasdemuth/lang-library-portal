@@ -26,6 +26,15 @@ export type Session = {
    * keeping the long-lived student cookie small.
    */
   picture?: string;
+  /**
+   * Staging reviewer flag — set ONLY by /api/preview (which requires the
+   * staging-only PREVIEW_KEY env var) on the synthetic admin session. The
+   * claim is inert unless the running server ALSO has PREVIEW_KEY set: every
+   * consumer (lib/guards.ts, lib/server.ts) checks that first. In production
+   * PREVIEW_KEY is unset, so no such token is ever minted and a forged claim
+   * changes nothing.
+   */
+  preview?: boolean;
 };
 
 const encoder = new TextEncoder();
@@ -65,6 +74,7 @@ export async function verifySessionToken(token: string | undefined): Promise<Ses
       name: typeof payload.name === "string" ? payload.name : undefined,
       v: typeof payload.v === "number" ? payload.v : undefined,
       picture: typeof payload.picture === "string" ? payload.picture : undefined,
+      preview: payload.preview === true ? true : undefined,
     };
   } catch {
     return null;

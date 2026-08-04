@@ -7,6 +7,7 @@ import NotificationPrefs from "@/components/NotificationPrefs";
 import PasswordForm from "@/components/PasswordForm";
 import ProfileForm from "@/components/ProfileForm";
 import DeleteAccountForm from "@/components/DeleteAccountForm";
+import { withBase } from "@/lib/base";
 
 type View =
   | "root"
@@ -108,7 +109,7 @@ function Row({
     </>
   );
   return href ? (
-    <a className="settings-row" href={href}>{inner}</a>
+    <a className="settings-row" href={withBase(href)}>{inner}</a>
   ) : (
     <button type="button" className="settings-row" onClick={onClick}>{inner}</button>
   );
@@ -195,9 +196,9 @@ export default function MobileSettings({
 
   async function signOut() {
     try {
-      await fetch("/api/logout", { method: "POST" });
+      await fetch(withBase("/api/logout"), { method: "POST" });
     } finally {
-      window.location.href = "/gate";
+      window.location.href = withBase("/gate");
     }
   }
 
@@ -358,7 +359,7 @@ export default function MobileSettings({
         <div className="settings-group">
           <p className="settings-title">Developer</p>
           <div className="settings-rows">
-            <Row icon={I.bell} bg="var(--brand-blue)" label="Updates" href="/admin/updates" />
+            <Row icon={I.bell} bg="var(--brand-blue)" label="Updates" href={withBase("/admin/updates")} />
           </div>
         </div>
       )}
@@ -390,7 +391,7 @@ function ManageAdmins({ selfId }: { selfId: string }) {
   const [resetLink, setResetLink] = useState<{ id: string; url: string } | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/admin/admins");
+    const res = await fetch(withBase("/api/admin/admins"));
     const data = await res.json();
     if (res.ok) setAdmins(data.admins);
   }, []);
@@ -400,7 +401,7 @@ function ManageAdmins({ selfId }: { selfId: string }) {
 
   async function patch(id: string, body: Record<string, unknown>) {
     setError(null);
-    const res = await fetch(`/api/admin/admins/${id}`, {
+    const res = await fetch(withBase(`/api/admin/admins/${id}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -413,7 +414,7 @@ function ManageAdmins({ selfId }: { selfId: string }) {
     setError(null);
     setResetLink(null);
     try {
-      const res = await fetch(`/api/admin/admins/${a.id}/reset`, { method: "POST" });
+      const res = await fetch(withBase(`/api/admin/admins/${a.id}/reset`), { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "Couldn't create the reset link.");
@@ -583,7 +584,7 @@ function InviteAdmin() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/invites", {
+      const res = await fetch(withBase("/api/admin/invites"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

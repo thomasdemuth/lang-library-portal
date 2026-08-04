@@ -3,6 +3,8 @@
  * two *.vercel.app URLs and swap to real school subdomains later with no code
  * changes (STUDENT_HOST / STAFF_HOST).
  */
+import { serverBase } from "./base";
+
 export const STUDENT_EMAIL_DOMAIN = "students.thelangschool.org";
 export const STAFF_EMAIL_DOMAIN = "thelangschool.org";
 
@@ -44,25 +46,33 @@ function proto(host: string): "http" | "https" {
   return host.includes("localhost") ? "http" : "https";
 }
 
+/**
+ * These three return the absolute PREFIX every server-composed link is built
+ * on ("<origin>" normally, "<origin>/new2" on a subpath deployment — see
+ * lib/base.ts). Callers always append a path, so appending the base path here
+ * fixes every email deep link, OAuth redirect_uri, and cross-host handoff in
+ * one place. With APP_BASE_PATH unset serverBase() is "" and these are
+ * bare origins exactly as before.
+ */
 export function studentUrl(): string {
   const h = unifiedHost() ?? studentHost();
-  return `${proto(h)}://${h}`;
+  return `${proto(h)}://${h}${serverBase()}`;
 }
 
 export function staffUrl(): string {
   const h = unifiedHost() ?? staffHost();
-  return `${proto(h)}://${h}`;
+  return `${proto(h)}://${h}${serverBase()}`;
 }
 
 /**
- * Absolute origin of the unified host — used to build the Google OAuth
- * redirect URI so it needs no hardcoding: http://localhost:4173 in dev,
- * https://library.thelangschool.org in prod. Falls back to the staff host
- * when UNIFIED_HOST is unset (dual-host dev).
+ * Absolute origin (+ base path) of the unified host — used to build the
+ * Google OAuth redirect URI so it needs no hardcoding:
+ * http://localhost:4173 in dev, https://library.thelangschool.org in prod.
+ * Falls back to the staff host when UNIFIED_HOST is unset (dual-host dev).
  */
 export function unifiedUrl(): string {
   const h = unifiedHost() ?? staffHost();
-  return `${proto(h)}://${h}`;
+  return `${proto(h)}://${h}${serverBase()}`;
 }
 
 /**

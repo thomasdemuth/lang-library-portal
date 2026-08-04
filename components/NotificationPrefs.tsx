@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import PushToggle from "@/components/PushToggle";
+import { withBase } from "@/lib/base";
 
 export default function NotificationPrefs({
   isChief,
@@ -21,7 +22,7 @@ export default function NotificationPrefs({
 
   async function save(patch: { notify_requests?: boolean; notify_weekly?: boolean; notify_updates?: boolean }) {
     setMsg(null);
-    const res = await fetch("/api/admin/account/notifications", {
+    const res = await fetch(withBase("/api/admin/account/notifications"), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),

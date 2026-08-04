@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { STATUS_LABELS } from "@/lib/labels";
 import type { NoteKind } from "@/lib/book-actions-client";
+import { withBase } from "@/lib/base";
 
 export { STATUS_LABELS };
 
@@ -86,7 +87,7 @@ export default function RequestsPanel() {
   }
 
   async function load() {
-    const res = await fetch("/api/requests/mine");
+    const res = await fetch(withBase("/api/requests/mine"));
     const data = await res.json();
     if (res.ok) setMine(data.requests);
   }
@@ -97,7 +98,7 @@ export default function RequestsPanel() {
   async function deleteRequest(id: number) {
     setDeleting(id);
     try {
-      const res = await fetch(`/api/requests/${id}`, { method: "DELETE" });
+      const res = await fetch(withBase(`/api/requests/${id}`), { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         say(data.error ?? "Couldn't delete that request.", res.status === 409 ? "warn" : "err");
@@ -116,7 +117,7 @@ export default function RequestsPanel() {
     setBusy(true);
     setNote(null);
     try {
-      const res = await fetch("/api/requests", {
+      const res = await fetch(withBase("/api/requests"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

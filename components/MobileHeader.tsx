@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { stripBase } from "@/lib/base";
 
 const TITLES: [string, string][] = [
   ["/admin/scan", "Scan"],
@@ -19,7 +20,7 @@ const TITLES: [string, string][] = [
 export default function MobileHeader() {
   const [title, setTitle] = useState("Lang Library");
   useEffect(() => {
-    const p = window.location.pathname;
+    const p = stripBase(window.location.pathname);
     setTitle(TITLES.find(([href]) => p.startsWith(href))?.[1] ?? "Dashboard");
   }, []);
   // An <h1>, not a <div>: on phones this bar IS the page's title. No reset

@@ -18,6 +18,7 @@ import {
   type NoteKind,
   type ShelfResult,
 } from "@/lib/book-actions-client";
+import { withBase } from "@/lib/base";
 
 type Book = {
   id: number;
@@ -91,7 +92,7 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
     setNote(null);
     setExpandedId(null);
     const tag = tagOverride === undefined ? filter : tagOverride;
-    const res = await fetch(`/api/catalog?q=${encodeURIComponent(q)}${tag ? `&tag=${tag}` : ""}`);
+    const res = await fetch(withBase(`/api/catalog?q=${encodeURIComponent(q)}${tag ? `&tag=${tag}` : ""}`));
     const data = await res.json();
     if (res.ok) {
       setResults(data.books);
@@ -111,7 +112,7 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
     const preset = new URLSearchParams(window.location.search).get("q");
     if (preset) {
       setQ(preset);
-      fetch(`/api/catalog?q=${encodeURIComponent(preset)}`)
+      fetch(withBase(`/api/catalog?q=${encodeURIComponent(preset)}`))
         .then((r) => r.json())
         .then((d) => {
           setResults(d.books);
@@ -129,7 +130,7 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
     setLoadingMore(true);
     try {
       const res = await fetch(
-        `/api/catalog?q=${encodeURIComponent(q)}&page=${page + 1}${filter ? `&tag=${filter}` : ""}`
+        withBase(`/api/catalog?q=${encodeURIComponent(q)}&page=${page + 1}${filter ? `&tag=${filter}` : ""}`)
       );
       const data = await res.json();
       if (res.ok) {
@@ -308,7 +309,7 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             className="bookcover"
-                            src={`/api/catalog/cover?isbn=${coverIsbn}`}
+                            src={withBase(`/api/catalog/cover?isbn=${coverIsbn}`)}
                             alt=""
                             onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
                           />
@@ -351,7 +352,7 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
                               <AddToCollection book={{ book_key: b.dedupe_key, title: b.title, isbn13: b.isbn13 }} />
                             )}
                             {role === "guest" && (
-                              <a className="hint" style={{ margin: 0, alignSelf: "center" }} href="/api/auth/google/start">
+                              <a className="hint" style={{ margin: 0, alignSelf: "center" }} href={withBase("/api/auth/google/start")}>
                                 Sign in with Google to save favorites
                               </a>
                             )}

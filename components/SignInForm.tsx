@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { safeNextPath } from "@/lib/safe-next";
+import { withBase } from "@/lib/base";
 
 /**
  * Sign-in options on the unified host:
@@ -56,7 +57,7 @@ export default function SignInForm({ google, devLogin }: { google: boolean; devL
       {error && <div className="error">{error}</div>}
 
       {google && (
-        <a className="btn brand" href={`/api/auth/google/start${nextQS}`} style={BOX}>
+        <a className="btn brand" href={withBase(`/api/auth/google/start${nextQS}`)} style={BOX}>
           <GoogleG /> Sign in with Google
         </a>
       )}
@@ -64,13 +65,13 @@ export default function SignInForm({ google, devLogin }: { google: boolean; devL
       <p className="hint signin-caption">Use your school Google account</p>
 
       <p className="signin-guestrow">
-        <a className="signin-guest" href="/api/auth/guest">
+        <a className="signin-guest" href={withBase("/api/auth/guest")}>
           Browse as a guest
         </a>
       </p>
 
       <p className="signin-alt">
-        <a href="/admin/login">Library management sign-in</a>
+        <a href={withBase("/admin/login")}>Library management sign-in</a>
       </p>
 
       {devLogin && <DevEmailForm />}
@@ -89,7 +90,7 @@ function DevEmailForm() {
     setBusy(true);
     setErr(null);
     try {
-      const res = await fetch("/api/gate", {
+      const res = await fetch(withBase("/api/gate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -100,7 +101,8 @@ function DevEmailForm() {
         return;
       }
       const next = new URLSearchParams(window.location.search).get("next");
-      window.location.href = safeNextPath(next, data.redirect ?? "/");
+      // withBase passes absolute URLs (the cross-host handoff) through untouched.
+      window.location.href = withBase(safeNextPath(next, data.redirect ?? "/"));
     } catch {
       setErr("Couldn't reach the server — try again.");
     } finally {

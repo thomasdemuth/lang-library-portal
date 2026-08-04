@@ -1,4 +1,5 @@
 import { Ic } from "@/components/icons";
+import { withBase } from "@/lib/base";
 
 export const metadata = { title: "E-Books — Lang Library" };
 
@@ -29,7 +30,7 @@ export default function EbooksPage() {
         >
           Open OverDrive (new tab) <span aria-hidden>↗</span>
         </a>
-        <a className="btn" href="/search">Find a paper book instead</a>
+        <a className="btn" href={withBase("/search")}>Find a paper book instead</a>
       </div>
     </div>
   );

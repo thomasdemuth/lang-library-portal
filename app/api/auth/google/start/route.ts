@@ -8,6 +8,7 @@ import {
   signState,
 } from "@/lib/google-oauth";
 import { safeNextPath } from "@/lib/safe-next";
+import { withBase } from "@/lib/base";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +20,9 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
   if (!googleConfigured()) {
-    return NextResponse.redirect(new URL("/?error=google_unconfigured", req.url));
+    // new URL(absolutePath, base) replaces the whole path, so basePath has
+    // to be re-applied by hand — Next only prefixes Link/router targets.
+    return NextResponse.redirect(new URL(withBase("/?error=google_unconfigured"), req.url));
   }
 
   const state = randomToken();

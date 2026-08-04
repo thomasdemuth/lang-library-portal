@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import LetterAvatar from "@/components/LetterAvatar";
 import { displayNameFull } from "@/lib/play";
 import { Ic } from "@/components/icons";
+import { withBase } from "@/lib/base";
 
 /**
  * The top-right identity chip: the person's real name (school emails are
@@ -29,7 +30,7 @@ export default function UserMenu({
 
   useEffect(() => {
     if (audience !== "student") return;
-    fetch("/api/play/profile")
+    fetch(withBase("/api/play/profile"))
       .then((r) => r.json())
       .then((d) => {
         if (d.profile) {
@@ -51,7 +52,7 @@ export default function UserMenu({
 
   async function togglePrivacy() {
     const next = !hidden;
-    const res = await fetch("/api/play/profile", {
+    const res = await fetch(withBase("/api/play/profile"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "privacy", hidden: next }),
@@ -68,9 +69,9 @@ export default function UserMenu({
 
   async function signOut() {
     try {
-      await fetch("/api/logout", { method: "POST" });
+      await fetch(withBase("/api/logout"), { method: "POST" });
     } finally {
-      window.location.href = "/gate";
+      window.location.href = withBase("/gate");
     }
   }
 
@@ -103,7 +104,7 @@ export default function UserMenu({
           </div>
           {audience === "student" && (
             <>
-              <a className="usermenu-item" href="/me">
+              <a className="usermenu-item" href={withBase("/me")}>
                 <Ic name="smile" size={15} /> My Page
               </a>
               <button type="button" className="usermenu-item" onClick={togglePrivacy}>

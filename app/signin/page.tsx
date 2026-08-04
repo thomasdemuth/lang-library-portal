@@ -1,5 +1,6 @@
 import SignInForm from "@/components/SignInForm";
 import { googleConfigured } from "@/lib/google-oauth";
+import { withBase } from "@/lib/base";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export default function SignInPage() {
     <div className="wrap narrow">
       <div className="gate-hero signin-hero">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="gate-logo" src="/icon-192.png" alt="Lang Library" width={76} height={76} />
+        <img className="gate-logo" src={withBase("/icon-192.png")} alt="Lang Library" width={76} height={76} />
         <h1>Lang Library</h1>
       </div>
       <div className="card">

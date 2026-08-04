@@ -6,6 +6,7 @@ import { type CategoryId } from "@/lib/categories";
 import Modal from "@/components/Modal";
 import TagPicker from "@/components/TagPicker";
 import CopyStepper from "@/components/CopyStepper";
+import { withBase } from "@/lib/base";
 
 /** A freshly-added catalog row (shape the inventory list expects). */
 export type AddedBook = {
@@ -60,7 +61,7 @@ export default function AddBookModal({
     setError(null);
     setWarn(null);
     try {
-      const res = await fetch("/api/admin/books/add", {
+      const res = await fetch(withBase("/api/admin/books/add"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -87,7 +88,7 @@ export default function AddBookModal({
       const book = data.book as AddedBook;
       // Tag lives in book_tags (keyed by dedupe_key), applied after insert.
       if (tag) {
-        const tagRes = await fetch("/api/admin/books/tag", {
+        const tagRes = await fetch(withBase("/api/admin/books/tag"), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ book_key: book.dedupe_key, category: tag }),
@@ -107,7 +108,7 @@ export default function AddBookModal({
           {coverIsbn ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={`/api/admin/books/cover?isbn=${encodeURIComponent(coverIsbn)}`}
+              src={withBase(`/api/admin/books/cover?isbn=${encodeURIComponent(coverIsbn)}`)}
               alt=""
               onError={(e) => (e.currentTarget.style.visibility = "hidden")}
             />

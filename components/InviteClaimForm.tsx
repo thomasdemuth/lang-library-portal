@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { withBase } from "@/lib/base";
 
 /**
  * Claims a one-time link. Two modes, one endpoint (/api/invite/claim decides
@@ -33,7 +34,7 @@ export default function InviteClaimForm({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/invite/claim", {
+      const res = await fetch(withBase("/api/invite/claim"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(reset ? { token, password } : { token, name, email, username, password }),
@@ -43,7 +44,7 @@ export default function InviteClaimForm({
         setError(data.error ?? "Something went wrong.");
         return;
       }
-      window.location.href = "/admin";
+      window.location.href = withBase("/admin");
     } catch {
       setError("Couldn't reach the server — try again.");
     } finally {

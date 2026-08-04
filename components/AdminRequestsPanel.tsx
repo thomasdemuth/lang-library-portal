@@ -10,6 +10,7 @@ import {
   transitionError,
   type RequestStatus,
 } from "@/lib/request-status";
+import { withBase } from "@/lib/base";
 
 type AdminRequest = {
   id: number;
@@ -90,7 +91,7 @@ export default function AdminRequestsPanel({ canDelete }: { canDelete: boolean }
   const load = useCallback(async () => {
     // The board always shows every status; the filter belongs to the table.
     const qs = view === "table" && filter !== "all" ? `?status=${filter}` : "";
-    const res = await fetch(`/api/admin/requests${qs}`);
+    const res = await fetch(withBase(`/api/admin/requests${qs}`));
     const data = await res.json();
     if (res.ok) {
       setRequests(data.requests);
@@ -106,7 +107,7 @@ export default function AdminRequestsPanel({ canDelete }: { canDelete: boolean }
     setNote(null);
     setSaving(id);
     try {
-      const res = await fetch(`/api/admin/requests/${id}`, {
+      const res = await fetch(withBase(`/api/admin/requests/${id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -152,7 +153,7 @@ export default function AdminRequestsPanel({ canDelete }: { canDelete: boolean }
   async function deleteRequest(id: number) {
     setSaving(id);
     try {
-      const res = await fetch(`/api/admin/requests/${id}`, { method: "DELETE" });
+      const res = await fetch(withBase(`/api/admin/requests/${id}`), { method: "DELETE" });
       if (!res.ok) {
         say((await res.json().catch(() => ({}))).error ?? "Couldn't delete the request.", "err");
         return;

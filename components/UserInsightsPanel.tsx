@@ -5,6 +5,7 @@ import LetterAvatar from "@/components/LetterAvatar";
 import { displayNameFull } from "@/lib/play";
 import { STATUS_LABELS } from "@/lib/labels";
 import { Heart, Ic } from "@/components/icons";
+import { withBase } from "@/lib/base";
 
 type Tab = "students" | "teachers";
 
@@ -95,7 +96,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
 
   const loadList = useCallback((t: Tab) => {
     setLoaded(false);
-    fetch(`/api/admin/users?tab=${t}`)
+    fetch(withBase(`/api/admin/users?tab=${t}`))
       .then((r) => r.json())
       .then((d) => {
         setRows(d.users ?? []);
@@ -120,7 +121,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
     setOpenEmail(email);
     setDetail(null);
     setNoteDraft("");
-    fetch(`/api/admin/users/detail?email=${encodeURIComponent(email)}`)
+    fetch(withBase(`/api/admin/users/detail?email=${encodeURIComponent(email)}`))
       .then((r) => r.json())
       .then((d) => setDetail(d))
       .catch(() => {});
@@ -132,7 +133,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
   }
 
   async function moderate(email: string, action: "hide" | "unhide") {
-    const res = await fetch("/api/admin/users/moderate", {
+    const res = await fetch(withBase("/api/admin/users/moderate"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, action }),
@@ -149,7 +150,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
   async function addNote(email: string) {
     const body = noteDraft.trim();
     if (!body) return;
-    const res = await fetch("/api/admin/users/notes", {
+    const res = await fetch(withBase("/api/admin/users/notes"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, body }),
@@ -162,7 +163,7 @@ export default function UserInsightsPanel({ studentBase }: { studentBase: string
   }
 
   async function deleteNote(email: string, id: number) {
-    const res = await fetch(`/api/admin/users/notes?id=${id}`, { method: "DELETE" });
+    const res = await fetch(withBase(`/api/admin/users/notes?id=${id}`), { method: "DELETE" });
     if (!res.ok) return say(false, "Couldn't delete the note.");
     if (detail) setDetail({ ...detail, notes: detail.notes.filter((n) => n.id !== id) });
     setRows((cur) => cur.map((r) => (r.email === email ? { ...r, notes: Math.max(0, r.notes - 1) } : r)));

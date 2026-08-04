@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import LetterAvatar from "@/components/LetterAvatar";
 import { Ic } from "@/components/icons";
+import { withBase } from "@/lib/base";
 
 type Friend = { id: string; name: string; booksRead: number; photoUrl?: string | null };
 
@@ -13,7 +14,7 @@ export default function FriendsCard() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/play/friends")
+    fetch(withBase("/api/play/friends"))
       .then((r) => r.json())
       .then((d) => {
         setFriends(d.friends ?? []);
@@ -24,7 +25,7 @@ export default function FriendsCard() {
   }, []);
 
   async function remove(f: Friend) {
-    const res = await fetch("/api/play/friends", {
+    const res = await fetch(withBase("/api/play/friends"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: f.id, action: "remove" }),
@@ -49,7 +50,7 @@ export default function FriendsCard() {
         <div className="friend-grid">
           {friends.map((f) => (
             <div key={f.id} className="friend-tile">
-              <a href={`/students/${f.id}`} title={`Visit ${f.name}'s page`}>
+              <a href={withBase(`/students/${f.id}`)} title={`Visit ${f.name}'s page`}>
                 <LetterAvatar name={f.name} size={56} src={f.photoUrl ?? undefined} />
                 <b>{f.name}</b>
                 <span className="hint" style={{ margin: 0 }}>

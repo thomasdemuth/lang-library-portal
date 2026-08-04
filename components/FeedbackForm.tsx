@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { withBase } from "@/lib/base";
 
 export default function FeedbackForm({ audience }: { audience: "student" | "staff" }) {
   const [message, setMessage] = useState("");
@@ -13,7 +14,7 @@ export default function FeedbackForm({ audience }: { audience: "student" | "staf
     setBusy(true);
     setMsg(null);
     try {
-      const res = await fetch("/api/feedback", {
+      const res = await fetch(withBase("/api/feedback"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message, name: name || undefined }),

@@ -24,6 +24,40 @@ function deny(status: number, error: string): GuardError {
   return new GuardError(NextResponse.json({ error }, { status }));
 }
 
+/**
+ * Staging reviewer bypass (see app/preview + lib/preview.ts). Returns a
+ * synthetic Chief Admin identity ONLY when BOTH hold:
+ *   1. the running server has the staging-only PREVIEW_KEY env var set
+ *      (never true in production — the first line returns null before the
+ *      session is even looked at, so this is dead code there), AND
+ *   2. the session is an admin token carrying the preview:true claim, which
+ *      only /api/preview mints (itself 404 without PREVIEW_KEY).
+ * The identity is entirely synthetic — no admins row exists for it — so the
+ * DB revalidation (existence / disabled_at / session_v) is skipped: there is
+ * nothing to revalidate against, and the token's own signature + 14-day
+ * expiry are the whole credential.
+ */
+export function previewAdminIdentity(session: Session): AdminIdentity | null {
+  if (!process.env.PREVIEW_KEY) return null; // production: hard off, always
+  if (session.preview !== true || session.aud !== "admin") return null;
+  return {
+    // There is no admins row for the synthetic reviewer, and every audit
+    // column that records an acting admin (updated_by, handled_by,
+    // status_updated_by, started_by, created_by, admin_id) is a uuid FK to
+    // admins.id — a fake uuid would violate the FK. `id: null` makes those
+    // writes record NULL (all nullable) and id-keyed lookups match nothing.
+    // The human-readable identity is the synthetic email/name below.
+    id: null as unknown as string,
+    username: "preview-admin",
+    email: "preview-admin@thelangschool.org",
+    name: "Preview Admin",
+    session_v: 0,
+    notify_requests: false,
+    role: "chief",
+    permissions: {},
+  };
+}
+
 /** Any signed-in session on this host (middleware already enforced audience). */
 export async function requireSession(req: NextRequest): Promise<Session> {
   const session = await verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
@@ -45,6 +79,9 @@ export async function requireStaff(req: NextRequest): Promise<Session> {
  */
 export async function requireAdmin(req: NextRequest): Promise<AdminIdentity> {
   const session = await requireSession(req);
+  // Staging-only reviewer bypass — null in production (PREVIEW_KEY unset).
+  const preview = previewAdminIdentity(session);
+  if (preview) return preview;
   if (session.aud !== "admin" || !session.sub) throw deny(401, "Admin sign-in required");
 
   const full = "id, username, email, name, session_v, notify_requests, disabled_at, role, permissions";

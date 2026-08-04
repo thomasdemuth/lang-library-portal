@@ -5,6 +5,7 @@ import { type CategoryId } from "@/lib/categories";
 import Modal from "@/components/Modal";
 import TagPicker from "@/components/TagPicker";
 import CopyStepper, { clampCopies } from "@/components/CopyStepper";
+import { withBase } from "@/lib/base";
 
 export type EditableBook = {
   id: number;
@@ -69,7 +70,7 @@ export default function BookEditModal({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/books/${book.id}`, {
+      const res = await fetch(withBase(`/api/admin/books/${book.id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -91,7 +92,7 @@ export default function BookEditModal({
       }
       // Tag lives in book_tags (keyed by dedupe_key), saved separately.
       if (tag !== book.tag) {
-        const tagRes = await fetch("/api/admin/books/tag", {
+        const tagRes = await fetch(withBase("/api/admin/books/tag"), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ book_key: book.dedupe_key, category: tag }),
@@ -121,7 +122,7 @@ export default function BookEditModal({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/books/${book.id}`, { method: "DELETE" });
+      const res = await fetch(withBase(`/api/admin/books/${book.id}`), { method: "DELETE" });
       if (!res.ok) {
         setError((await res.json().catch(() => ({}))).error ?? "Couldn't delete.");
         return;
@@ -139,7 +140,7 @@ export default function BookEditModal({
           {coverIsbn ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={`/api/admin/books/cover?isbn=${encodeURIComponent(coverIsbn)}`}
+              src={withBase(`/api/admin/books/cover?isbn=${encodeURIComponent(coverIsbn)}`)}
               alt=""
               onError={(e) => (e.currentTarget.style.visibility = "hidden")}
             />
