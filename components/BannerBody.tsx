@@ -40,9 +40,7 @@ export default function BannerBody({
   );
 
   return (
-    // nb-preview opts the admin preview out of the rule that keeps the real
-    // banner from nagging Management (app/globals.css).
-    <div className={`newsbanner tone-${banner.tone}${preview ? " nb-preview" : ""}`}>
+    <div className={`newsbanner tone-${banner.tone}`}>
       <div className="nb-inner">
         <span className="nb-spark">
           <Ic name={banner.icon} size={19} />

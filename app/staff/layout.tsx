@@ -34,9 +34,8 @@ export default async function StaffLayout({ children }: { children: React.ReactN
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      {/* Management pages nest inside this layout; .newsbanner is hidden there
-          in CSS (body:has(.admin-grid)) rather than branched on here, because
-          the middleware rewrite means this layout can't see the real path. */}
+      {/* Management pages nest inside this layout, so the team sees the live
+          banner on their own screens too — same strip, same dismissal. */}
       {banner && <UpdateBanner banner={banner} />}
       <SiteHeader tagline="staff portal" email={session?.email} links={links} home={home} photoUrl={session?.picture} />
       <main id="main">{children}</main>

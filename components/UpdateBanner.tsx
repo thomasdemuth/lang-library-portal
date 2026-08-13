@@ -6,14 +6,11 @@ import { SENT_KEY } from "@/components/QuickFeedback";
 import { dismissStorageKey, isDismissed, type ClientBanner } from "@/lib/banners";
 
 /**
- * The live announcement strip, above the top bar on every student and teacher
- * page. Which banner this is, what it says, and where it points are the library
- * team's business now (Management → Banners); what's left here is the part only
- * the browser can decide — whether this person has already dismissed it.
- *
- * Management is excluded in CSS (`body:has(.admin-grid) .newsbanner`) rather
- * than here, because the middleware rewrite means the layout can't see the
- * real path.
+ * The live announcement strip, above the top bar on every student, teacher and
+ * management page. Which banner this is, what it says, and where it points are
+ * the library team's business now (Management → Site Tools); what's left here
+ * is the part only the browser can decide — whether this person has already
+ * dismissed it.
  */
 export default function UpdateBanner({ banner }: { banner: ClientBanner }) {
   // Starts hidden and appears on mount: localStorage doesn't exist during SSR,

@@ -181,9 +181,9 @@ html[data-theme="dark"] .newsbanner.tone-ok .nb-spark,
 html[data-theme="dark"] .newsbanner.tone-warn .nb-spark,
 html[data-theme="dark"] .newsbanner.tone-alert .nb-spark { color: inherit; }
 
-/* Management never gets nagged by the live banner — but the editor's preview
-   is the same component on purpose, so it opts back in. */
-body:has(.admin-grid) .newsbanner:not(.nb-preview) { display: none; }
+/* Management sees the live banner too, so the team reads what everyone else
+   is reading rather than trusting the editor preview. It stays dismissable
+   per person, so it never becomes a permanent strip on a working screen. */
 
 /* Management → Site Banner: the preview frame and the per-row state pills. */
 .banner-preview {
