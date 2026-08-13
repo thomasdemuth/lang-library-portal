@@ -1,4 +1,5 @@
 import SiteHeader from "@/components/SiteHeader";
+import UpdateBanner from "@/components/UpdateBanner";
 import { currentSession } from "@/lib/server";
 import { withBase } from "@/lib/base";
 
@@ -36,6 +37,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
         links={links}
       />
       <main id="main">
+        {session && <UpdateBanner isGuest={isGuest} />}
         {isGuest && (
           <div className="wrap" style={{ paddingTop: 12 }}>
             <div className="notice">

@@ -7,7 +7,8 @@ import { withBase } from "@/lib/base";
 const C_STUDENT = "#0FA48E";
 const C_STAFF = "#5565C6";
 
-type Day = { day: string; student: number; staff: number; uniques: number };
+/** `qr` = QR feedback posters scanned in the library; not a visit to either site. */
+type Day = { day: string; student: number; staff: number; qr?: number; uniques: number };
 type TopPath = { path: string; audience: string; views: number };
 
 /** Path with only the top corners rounded (data-end), anchored to the baseline. */
@@ -166,6 +167,7 @@ export default function AnalyticsPanel() {
               <b>{new Date(tip.day.day + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}</b>
               <div>Student site: {tip.day.student}</div>
               <div>Staff site: {tip.day.staff}</div>
+              {(tip.day.qr ?? 0) > 0 && <div>QR posters: {tip.day.qr}</div>}
               <div style={{ opacity: 0.75 }}>Total: {tip.day.student + tip.day.staff}</div>
             </div>
           )}

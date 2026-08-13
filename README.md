@@ -55,9 +55,25 @@ and publishing app updates — are restricted to the developer account.
   page (recent requests, a usage sparkline, an inventory search box…). Per device.
 - **User insights** — Management → *User Insights*: every student and teacher account with
   their activity, reading, requests, and admin-only notes; grant a student stars from here.
-- **Feedback** — Management → *Feedback*: mark read / archive.
+- **Feedback** — Management → *Feedback*: mark read / archive, and filter by
+  **Website** or **Library**. Most entries are now a star rating plus a few tapped
+  chips rather than prose; the line at the top averages the stars for each. Rows
+  marked *anonymous* came from a QR poster and have no email to reply to.
+- **Ask for feedback on the site** — every student and teacher page carries a one-line
+  banner ("We've updated the Lang Library…") pointing at the feedback form. It hides
+  itself once that person has left feedback, an **×** hides it for 30 days, and it never
+  appears in Management. To run the ask again later, bump `BANNER_VERSION` in
+  `components/UpdateBanner.tsx`; to retire it, drop `<UpdateBanner />` from the two
+  portal layouts.
+- **Print feedback QR posters** — Management → *Sign Maker* → **Feedback QR**. Pick a
+  spot (the new website, the library as a whole, or any zone from the Map Editor), then
+  *Add to sheet* for each and print. Scanning one opens a one-question page: no sign-in,
+  no app, a star and a couple of taps. Codes come from the zone names, so a zone renamed
+  after printing still collects feedback — it just files it under the library generally
+  rather than that zone, so re-print a zone's poster after renaming it.
 - **Site usage** — Management → *Site Usage*: daily views by site, unique visitors, top pages.
-- **Print signs** — Management → *Sign Maker* (the full sign generator, admin-only).
+- **Print signs** — Management → *Sign Maker* (the full sign generator, admin-only):
+  section tabs, banners, wayfinding, advisories, the color guide, and feedback QR posters.
 - **Change your password** — Management → *My Account* (signs out your other sessions).
 
 ## Development
@@ -120,4 +136,13 @@ No `NEXT_PUBLIC_*` vars exist — the browser never talks to Supabase directly.
 - Inventory is generational: each CSV import is a new `inventory_syncs` row whose books
   replace the old set atomically on commit (`activate_sync`).
 - The sign maker is served verbatim from `assets/sign-maker.html` behind admin auth —
-  it's still a double-clickable standalone file.
+  it's still a double-clickable standalone file. The one part that needs the server is
+  the feedback QR poster (zone list + code image come from `/api/admin/qr*`); opened off
+  disk it falls back to the static category list and draws a placeholder where the code
+  would be.
+- Feedback QR codes point at `/hi/<code>` — the one page in the app that is open to
+  everyone, signed in or not (`app/hi/[code]`). Its codes are derived from the map's
+  shelves by `lib/feedback-spots.ts`, never stored, and an unrecognized one resolves to
+  the library as a whole instead of 404ing. `lib/feedback.ts` holds the chip wording and
+  is imported by both the browser and the API, so a submitted chip is checked against
+  what was actually offered.

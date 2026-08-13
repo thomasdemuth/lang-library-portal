@@ -141,6 +141,58 @@ textarea.input { font-weight: 600; resize: vertical; min-height: 110px; line-hei
 .notice.err, html[data-theme="dark"] .notice.err { background: var(--err-bg); border-color: var(--err-bg); color: var(--err-ink); }
 .notice.info, html[data-theme="dark"] .notice.info { background: var(--info-bg); border-color: var(--info-bg); color: var(--info-ink); }
 
+/* ── Relaunch banner (student + staff portals) ───── */
+/* Not in .topbar on purpose: that bar is hidden on admin phones, which would
+   take the banner with it. Management is excluded here instead — the team
+   doesn't need to be asked what it thinks of its own site. */
+.newsbanner {
+  display: flex; align-items: center; gap: 11px;
+  background: var(--info-bg); color: var(--info-ink);
+  border: 1px solid transparent; border-radius: 13px;
+  padding: 10px 12px; margin-bottom: 4px;
+  font-size: 13.5px; font-weight: 600; line-height: 1.45;
+}
+.newsbanner .nb-spark { flex: none; display: flex; color: var(--brand-blue); }
+html[data-theme="dark"] .newsbanner .nb-spark { color: #9db1ee; }
+.newsbanner a { color: inherit; text-decoration: none; }
+.newsbanner a:hover .nb-cta { text-decoration: underline; }
+.nb-cta { font-weight: 800; white-space: nowrap; }
+.nb-close {
+  flex: none; margin-left: auto; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 17px; line-height: 1; color: inherit; opacity: .6;
+  padding: 4px 6px; border-radius: 8px;
+}
+.nb-close:hover { opacity: 1; }
+body:has(.admin-grid) .newsbanner { display: none; }
+
+/* ── Quick feedback (stars → chips → send) ───────── */
+.stars { display: flex; gap: 2px; margin: 2px 0 0 -8px; }
+.star {
+  border: 0; background: none; cursor: pointer; padding: 8px;
+  border-radius: 12px; line-height: 0; color: inherit;
+}
+.star:active { transform: scale(.92); }
+/* Hover preview: fill up to the star under the pointer, clear the ones after */
+.stars:hover .i-star { fill: #E8A317; stroke: #E8A317; }
+.stars .star:hover ~ .star .i-star { fill: transparent; stroke: #3b4048; }
+html[data-theme="dark"] .stars .star:hover ~ .star .i-star { stroke: #aeb6c2; }
+.stars-cap { margin: 0 0 20px 2px; min-height: 17px; }
+
+.chipset { border: 0; padding: 0; margin: 0 0 16px; display: flex; flex-wrap: wrap; gap: 7px; }
+.chipset .lbl { width: 100%; margin-bottom: 2px; padding: 0; }
+.chip.on { background: var(--brand-blue); border-color: var(--brand-blue); color: #fff; }
+html[data-theme="dark"] .chip.on { background: var(--brand-blue); border-color: var(--brand-blue); color: #fff; }
+.qfb-send { font-size: 15px; padding: 12px 30px; }
+
+/* ── QR landing page (/hi/<code>) — signed out, on a phone ── */
+.hi-hero { text-align: center; padding: 34px 0 18px; }
+.hi-logo { border-radius: 18px; }
+.hi-hero h1 { margin: 14px 0 4px; font-size: 23px; line-height: 1.25; }
+.hi-zone {
+  display: inline-block; color: #fff; font-weight: 800; font-size: 11.5px;
+  letter-spacing: .4px; border-radius: 999px; padding: 4px 12px; margin-bottom: 4px;
+}
+
 /* ── Gate ───────────────────────────────────────── */
 .gate-hero { text-align: center; padding: 46px 0 22px; }
 .gate-hero .mark {
@@ -1158,6 +1210,12 @@ html[data-theme="dark"] .b-btn { background: var(--panel-2); }
 .i-check.on { stroke: var(--brand-green); }
 html[data-theme="dark"] .i-heart:not(.on) { stroke: #aeb6c2; }
 html[data-theme="dark"] .i-check:not(.on) { stroke: #aeb6c2; }
+/* Rating stars stay gold everywhere — a zone's own color on a star reads as
+   decoration, not as "this many out of five". The zone color is carried by
+   the heading pill on the QR page instead. */
+.i-star { fill: transparent; stroke: #3b4048; transition: fill .2s ease, stroke .18s ease; }
+.i-star.on { fill: #E8A317; stroke: #E8A317; }
+html[data-theme="dark"] .i-star:not(.on) { stroke: #aeb6c2; }
 
 /* Catalog search: tap a row to open its cover + description + actions */
 .catlist { display: flex; flex-direction: column; }

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import SiteHeader from "@/components/SiteHeader";
 import LaunchRedirect from "@/components/LaunchRedirect";
+import UpdateBanner from "@/components/UpdateBanner";
 import { currentSession } from "@/lib/server";
 import { isUnifiedHost } from "@/lib/hosts";
 import { portalHomeFor } from "@/lib/unified";
@@ -32,7 +33,13 @@ export default async function StaffLayout({ children }: { children: React.ReactN
         Skip to content
       </a>
       <SiteHeader tagline="staff portal" email={session?.email} links={links} home={home} photoUrl={session?.picture} />
-      <main id="main">{children}</main>
+      {/* Management pages nest inside this layout; .newsbanner is hidden there
+          in CSS (body:has(.admin-grid)) rather than branched on here, because
+          the middleware rewrite means this layout can't see the real path. */}
+      <main id="main">
+        {session && <UpdateBanner />}
+        {children}
+      </main>
     </>
   );
 }

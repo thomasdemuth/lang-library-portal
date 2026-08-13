@@ -33,18 +33,22 @@ export const GET = guarded(async (req: NextRequest) => {
   const rows = (summary.data ?? []) as Row[];
 
   // One entry per calendar day, split by site audience
-  const byDay = new Map<string, { student: number; staff: number; uniques: number }>();
+  const byDay = new Map<string, { student: number; staff: number; qr: number; uniques: number }>();
   for (let i = 0; i < days; i++) {
     byDay.set(isoDay(fromMs + i * 24 * 3600 * 1000), {
       student: 0,
       staff: 0,
+      qr: 0,
       uniques: 0,
     });
   }
   for (const r of rows) {
     const day = byDay.get(String(r.day).slice(0, 10));
     if (!day) continue;
+    // "public" = a QR feedback poster scanned in the library. It isn't a visit
+    // to either site, so it gets its own count instead of padding the staff one.
     if (r.audience === "student") day.student += Number(r.views);
+    else if (r.audience === "public") day.qr += Number(r.views);
     else day.staff += Number(r.views);
     day.uniques += Number(r.uniques); // approximate: summed across audience/role groups
   }
