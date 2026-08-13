@@ -59,7 +59,7 @@ and publishing app updates — are restricted to the developer account.
   **Website** or **Library**. Most entries are now a star rating plus a few tapped
   chips rather than prose; the line at the top averages the stars for each. Rows
   marked *anonymous* came from a QR poster and have no email to reply to.
-- **The banner across the top** — Management → *Site Banner*. The strip above the top bar
+- **The banner across the top** — Management → *Site Tools*. The strip above the top bar
   on every student and teacher page (never in Management). Write the message, the link
   words, and where the link goes; choose who sees it (everyone / students / teachers), a
   color and an icon, and how long an **×** hides it for. New banners start switched off so

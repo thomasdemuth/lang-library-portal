@@ -14,7 +14,7 @@ const TITLES: [string, string][] = [
   ["/admin/feedback", "Feedback"],
   ["/admin/analytics", "Site Usage"],
   ["/admin/updates", "Updates"],
-  ["/admin/banners", "Site Banner"],
+  ["/admin/site-tools", "Site Tools"],
 ];
 
 /** The colored app bar on phones: brand gradient + the current page title. */

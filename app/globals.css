@@ -80,7 +80,9 @@ h1::after {
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
 a.card { display: block; text-decoration: none; transition: border-color .12s, box-shadow .12s; }
 a.card:hover { border-color: var(--brand-blue); box-shadow: 0 3px 12px rgba(46, 80, 200, .1); }
-.card h2 { margin: 0 0 6px; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 10px; color: var(--brand-blue-deep); }
+/* h3 too: a card inside a page that already has an h2 section heading keeps
+   the outline honest without looking any different. */
+.card h2, .card h3 { margin: 0 0 6px; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 10px; color: var(--brand-blue-deep); }
 .card p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
 .dot { width: 12px; height: 12px; border-radius: 4px; display: inline-block; flex-shrink: 0; }
 

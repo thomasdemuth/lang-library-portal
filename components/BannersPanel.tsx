@@ -110,7 +110,8 @@ export default function BannersPanel() {
       )}
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginBottom: 10 }}>Showing right now</h2>
+        {/* h3: this panel sits under the page's "Banner" h2 (Site Tools). */}
+        <h3 style={{ marginBottom: 10 }}>Showing right now</h3>
         {liveNow.length > 0 ? (
           liveNow.map(({ row, who }) => (
             <div key={row.id} style={{ marginBottom: 8 }}>
@@ -131,7 +132,9 @@ export default function BannersPanel() {
 
       <div className="card">
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <h2 style={{ margin: 0, flex: 1 }}>All banners</h2>
+          <h3 style={{ margin: 0, flex: 1 }}>
+            All banners
+          </h3>
           <button className="gearbtn addbtn" onClick={() => setEditing("new")} aria-label="Write a new banner">
             +
           </button>
