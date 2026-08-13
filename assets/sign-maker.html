@@ -56,6 +56,11 @@
   input[type=text]:focus{ border-color:#6c7ff2; }
   #shelfText{ width:110px; }
   #advSub,#advBody{ width:320px; }
+  #qrTitle,#qrSub{ width:300px; }
+  .qr-select{
+    font:inherit; font-size:14px; font-weight:600; padding:9px 10px; width:260px;
+    border:1.5px solid var(--line); border-radius:9px; background:#fff; color:var(--ink);
+  }
 
   .actions{ display:flex; gap:9px; align-items:center; padding-top:19px; }
   .btn{
@@ -231,6 +236,36 @@
   #guideCatChecks{ display:flex; flex-direction:column; gap:6px; }
   #guideCatChecks i{ width:11px; height:11px; border-radius:3px; display:inline-block; }
 
+  /* Feedback QR poster — hangs at a shelf end or on the catalog computer.
+     The QR is fetched from /api/admin/qr (SVG, so it prints sharp); the whole
+     poster is sized so two fit on one landscape Letter page. */
+  /* Square corners, unlike the letter tabs: the colored header runs to the top
+     edge here, and a rounded corner leaves a white sliver between it and the
+     border. It also cuts straighter with a guillotine. */
+  .qr{ background:#fff; border:8px solid var(--c); width:720px; padding:0; overflow:hidden; }
+  .qr-head{ background:var(--c); color:#fff; padding:14px 22px 15px; }
+  .qr-zone{
+    display:inline-block; font-size:13px; font-weight:700; letter-spacing:1.4px;
+    text-transform:uppercase; opacity:.9; margin-bottom:4px;
+  }
+  .qr-title{ font-size:37px; font-weight:800; line-height:1.1; overflow-wrap:break-word; }
+  .qr-body{ display:flex; align-items:center; gap:22px; padding:20px 22px 16px; }
+  .qr-img{ flex:none; width:230px; height:230px; }
+  .qr-img img, .qr-img svg{ width:100%; height:100%; display:block; }
+  .qr-missing{
+    width:100%; height:100%; border:3px dashed #c6cdda; border-radius:12px;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    padding:14px; font-size:13px; font-weight:600; color:var(--muted); box-sizing:border-box;
+  }
+  .qr-copy{ flex:1; display:flex; flex-direction:column; gap:9px; min-width:0; }
+  .qr-sub{ font-size:26px; font-weight:800; line-height:1.15; overflow-wrap:break-word; }
+  .qr-steps{ font-size:15px; font-weight:600; color:#3c4453; }
+  .qr-url{
+    font-size:12.5px; font-weight:600; color:#5a6474; word-break:break-all;
+    border-top:1.5px solid #e2e6ee; padding-top:8px;
+  }
+  .qr .brand{ align-items:flex-start; text-align:left; margin-top:auto; }
+
   /* ── Print ──────────────────────────────────── */
   @page{ size:letter landscape; margin:0.35in; }
   @media print{
@@ -262,7 +297,21 @@
       <button type="button" data-sign="wayfinding">Wayfinding</button>
       <button type="button" data-sign="advisory">General Advisory</button>
       <button type="button" data-sign="guide">Color Guide</button>
+      <button type="button" data-sign="feedback">Feedback QR</button>
     </div>
+  </div>
+
+  <div class="fg" id="fQrSpot" hidden>
+    <label for="qrSpot">Where is this poster going?</label>
+    <select id="qrSpot" class="qr-select"></select>
+    <span class="hint" id="qrSpotHint">Zones come from the Map Editor.</span>
+  </div>
+
+  <div class="fg" id="fQrText" hidden>
+    <label for="qrTitle">Headline</label>
+    <input type="text" id="qrTitle" placeholder="How&rsquo;s the new library?" autocomplete="off" spellcheck="false">
+    <label for="qrSub" style="margin-top:5px">Under the code</label>
+    <input type="text" id="qrSub" placeholder="Scan to tell us what you think." autocomplete="off" spellcheck="false">
   </div>
 
   <div class="fg" id="fCat">
@@ -373,8 +422,55 @@ const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
 const DEFAULT_GUIDE_CATS = ['fiction','comics','nonfiction','young','drama'];
-let state = { sign:'section', cat:'fiction', secText:'', subText:'', shelf:'', msgText:'', showSub:true, tabOnly:false, advTitle:'', advSub:'', advBody:'', otherLabel:'', guideTitle:'', guideBoxes:true, guideCats:DEFAULT_GUIDE_CATS.slice() };
+let state = { sign:'section', cat:'fiction', secText:'', subText:'', shelf:'', msgText:'', showSub:true, tabOnly:false, advTitle:'', advSub:'', advBody:'', otherLabel:'', guideTitle:'', guideBoxes:true, guideCats:DEFAULT_GUIDE_CATS.slice(), qrSpot:'library', qrTitle:'', qrSub:'' };
 let queue = [];
+
+/* ── Feedback QR posters ──────────────────────────────────────────────────
+   This file is still a double-clickable standalone tool, but the QR posters
+   need the server: the zone list comes from /api/admin/qr/spots and the code
+   image from /api/admin/qr (both admin-only). Opened from the management
+   dashboard everything works; opened straight off disk the picker falls back
+   to the static category list and each code renders as a placeholder box.
+   BASE is the deployment's base path ("" normally, "/new2" on the subpath
+   staging deployment) — this page is served at <base>/admin/sign-maker/frame. */
+const BASE = (typeof location !== 'undefined' ? location.pathname : '')
+  .replace(/\/admin\/sign-maker\/frame\/?$/, '');
+
+const FALLBACK_SPOTS = [
+  { code:'site',    label:'the new website', heading:"How's the new library website?", topic:'website', color:'#2e50c8', url:'' },
+  { code:'library', label:'the library',     heading:"How's the new library?",         topic:'library', color:'#2e50c8', url:'' },
+].concat(Object.entries(CATS).map(([id, c]) => (
+  { code:id, label:c.label, heading:"How's the " + c.label + " area?", topic:'library', color:c.color, url:'' }
+)));
+
+let spots = FALLBACK_SPOTS;
+let spotsLive = false;
+
+const spotByCode = code => spots.find(s => s.code === code) || spots[1] || spots[0];
+
+async function loadSpots(){
+  try {
+    const res = await fetch(BASE + '/api/admin/qr/spots', { credentials:'same-origin' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || !Array.isArray(data.spots) || !data.spots.length) return;
+    spots = data.spots;
+    spotsLive = true;
+  } catch(e){ /* standalone file or offline — keep the fallback list */ }
+  buildSpotPicker();
+  syncControls();
+  renderPreview();
+  renderQueue();
+}
+
+function buildSpotPicker(){
+  $('#qrSpot').innerHTML = spots.map(s =>
+    '<option value="' + esc(s.code) + '">' + esc(s.label) + '</option>'
+  ).join('');
+  $('#qrSpotHint').textContent = spotsLive
+    ? 'Zones come from the Map Editor.'
+    : 'Not connected — open this from Management → Sign Maker to get real zone codes.';
+}
 
 const ADV_PRESETS = {
   reach: {
@@ -442,6 +538,25 @@ function signHTML(d){
       (sub ? '<span class="adv-sub">' + fmt(sub) + '</span>' : '') +
       (body ? ' <span class="adv-body">' + fmt(body) + '</span>' : '') +
       '</div>' + brand('') + '</div></div>';
+  }
+  if (d.sign === 'feedback'){
+    const spot = spotByCode(d.qrSpot);
+    const title = (d.qrTitle || '').trim() || spot.heading;
+    const sub = (d.qrSub || '').trim() || 'Scan to tell us what you think.';
+    const img = '<img src="' + esc(BASE + '/api/admin/qr?spot=' + encodeURIComponent(spot.code)) + '"' +
+      ' alt="" onerror="this.outerHTML=\'<div class=&quot;qr-missing&quot;>The code loads when this tool is opened from the management dashboard.</div>\'">';
+    return '<div class="sign qr" style="--c:' + spot.color + '">' +
+      '<div class="qr-head">' +
+      (spot.topic === 'library' && spot.code !== 'library'
+        ? '<div class="qr-zone">' + fmt(spot.label) + '</div>' : '') +
+      '<div class="qr-title">' + fmt(title) + '</div></div>' +
+      '<div class="qr-body">' +
+      '<div class="qr-img">' + img + '</div>' +
+      '<div class="qr-copy">' +
+      '<div class="qr-sub">' + fmt(sub) + '</div>' +
+      '<div class="qr-steps">A few seconds · anonymous · no sign-in needed</div>' +
+      (spot.url ? '<div class="qr-url">' + esc(spot.url) + '</div>' : '') +
+      brand('') + '</div></div></div>';
   }
   if (d.sign === 'guide'){
     const title = (d.guideTitle || '').trim() || 'Library Color Legend';
@@ -567,8 +682,20 @@ function restore(){
 function syncControls(){
   $$('#signSeg button').forEach(b => b.classList.toggle('on', b.dataset.sign === state.sign));
   $$('#catSeg button').forEach(b => b.classList.toggle('on', b.dataset.cat === state.cat));
-  $('#fCat').hidden = state.sign === 'advisory' || state.sign === 'guide';
-  $('#fOtherLabel').hidden = state.cat !== 'other' || state.sign === 'advisory' || state.sign === 'continuation' || state.sign === 'guide';
+  // Feedback posters take their color and wording from the chosen spot.
+  $('#fCat').hidden = state.sign === 'advisory' || state.sign === 'guide' || state.sign === 'feedback';
+  $('#fOtherLabel').hidden = state.cat !== 'other' || state.sign === 'advisory' || state.sign === 'continuation' || state.sign === 'guide' || state.sign === 'feedback';
+  $('#fQrSpot').hidden = $('#fQrText').hidden = state.sign !== 'feedback';
+  const spotSel = $('#qrSpot');
+  spotSel.value = state.qrSpot || 'library';
+  // A code saved before the zone was renamed is no longer in the list — land
+  // on the first option rather than leaving the picker blank.
+  if (!spotSel.value && spotSel.options.length) {
+    state.qrSpot = spotSel.options[0].value;
+    spotSel.value = state.qrSpot;
+  }
+  $('#qrTitle').value = state.qrTitle || '';
+  $('#qrSub').value = state.qrSub || '';
   $('#fGuideTitle').hidden = $('#fGuideCats').hidden = state.sign !== 'guide';
   $('#fSection').hidden = state.sign !== 'section' && state.sign !== 'continuation';
   $('#tabOnlyWrap').hidden = state.sign !== 'section';
@@ -623,7 +750,12 @@ $('#catSeg').addEventListener('click', e => {
   syncControls(); renderPreview(); persist();
 });
 
-[['secText','secText'],['subText','subText'],['shelfText','shelf'],['msgText','msgText'],['advTitle','advTitle'],['advSub','advSub'],['advBody','advBody'],['otherLabelText','otherLabel'],['guideTitle','guideTitle']].forEach(([id, key]) => {
+$('#qrSpot').addEventListener('change', () => {
+  state.qrSpot = $('#qrSpot').value;
+  renderPreview(); persist();
+});
+
+[['secText','secText'],['subText','subText'],['shelfText','shelf'],['msgText','msgText'],['advTitle','advTitle'],['advSub','advSub'],['advBody','advBody'],['otherLabelText','otherLabel'],['guideTitle','guideTitle'],['qrTitle','qrTitle'],['qrSub','qrSub']].forEach(([id, key]) => {
   const el = $('#' + id);
   el.addEventListener('input', () => { state[key] = el.value; renderPreview(); persist(); });
   el.addEventListener('keydown', e => {
@@ -662,9 +794,11 @@ window.addEventListener('beforeprint', () => {
 });
 
 restore();
+buildSpotPicker();
 syncControls();
 renderPreview();
 renderQueue();
+loadSpots(); // swaps in the real zones, then re-renders
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { renderPreview(); renderQueue(); });
 </script>
 </body>

@@ -173,6 +173,7 @@ export default async function AdminDashboard() {
     { id: "inventory", show: can("inventory_view") || can("inventory_import"), href: "/admin/inventory", icon: "book", badge: 0, title: "Inventory", desc: "Scan, tag, and search the catalog." },
     { id: "map", show: can("map_edit") || can("map_floorplan"), href: "/admin/map", icon: "map", badge: 0, title: "Map Editor", desc: "Place shelves, set categories, keep internal notes." },
     { id: "signmaker", show: can("signmaker"), href: "/admin/sign-maker", icon: "sign", badge: 0, title: "Sign Maker", desc: "Print shelf tabs, banners, and wayfinding signs." },
+    { id: "site-tools", show: can("banners"), href: "/admin/site-tools", icon: "sparkle", badge: 0, title: "Site Tools", desc: "The banner at the top of student and teacher pages." },
     { id: "analytics", show: can("analytics"), href: "/admin/analytics", icon: "chart", badge: 0, title: "Site Usage", desc: "Visits and activity across both sites." },
     { id: "users", show: can("users"), href: "/admin/users", icon: "users", badge: 0, title: "User Insights", desc: "Student & teacher accounts, activity, and notes." },
     { id: "admins", show: Boolean(isChief), href: "/admin/admins", icon: "users", badge: 0, title: "Admins & Invites", desc: "Add admins, set their powers, and manage invites." },

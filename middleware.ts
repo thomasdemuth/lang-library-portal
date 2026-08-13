@@ -51,6 +51,16 @@ const COMMON_OPEN = new Set(["/gate", "/api/gate", "/api/logout", "/api/version"
 // Additional open paths on the staff host
 const STAFF_OPEN = new Set(["/admin/login", "/api/admin/login", "/api/invite/claim", "/api/cron/daily"]);
 const STAFF_OPEN_PREFIXES = ["/admin/invite/"];
+/**
+ * The QR feedback posters in the library (app/hi/[code] + its submit API).
+ * Open to everyone, signed in or not: they are scanned by whoever is standing
+ * at the shelf, and a sign-in wall there would collect nothing. The route is
+ * write-only into `feedback` and reads no personal data — see the API for what
+ * stands in for a session (required rating, honeypot, per-IP cap, and the
+ * spot/topic being resolved server-side rather than taken from the body).
+ */
+const PUBLIC_FEEDBACK_API = "/api/feedback/public";
+const isPublicSpotPage = (pathname: string) => pathname.startsWith("/hi/");
 // Open API paths on the unified host
 const UNIFIED_OPEN_API = new Set([
   "/api/gate",
@@ -59,6 +69,7 @@ const UNIFIED_OPEN_API = new Set([
   "/api/cron/daily",
   "/api/invite/claim",
   "/api/admin/login",
+  PUBLIC_FEEDBACK_API,
   ...AUTH_OPEN,
 ]);
 // Pages/APIs a guest (no account) may reach: Find a Book + the Library Map.
@@ -154,6 +165,12 @@ function routeUnified(
   session: Session | null
 ): { rewrite: string; logAudience: string } | NextResponse {
   const { pathname } = req.nextUrl;
+
+  // QR feedback posters: open to everyone and never rewritten into a portal
+  // tree (the page lives at app/hi/[code], outside both). Returned as a
+  // self-rewrite rather than NextResponse.next() so scans still flow through
+  // the usage logging at the end of the middleware.
+  if (isPublicSpotPage(pathname)) return { rewrite: pathname, logAudience: "public" };
 
   // APIs: same wall shape as the staff host — /api/admin/* needs an admin
   // session, everything non-open needs some session. Handlers re-check.
@@ -338,6 +355,8 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
     ({ rewrite: rewritePath, logAudience } = routed);
   } else {
     const isOpen =
+      isPublicSpotPage(pathname) ||
+      pathname === PUBLIC_FEEDBACK_API ||
       COMMON_OPEN.has(pathname) ||
       (audience === "staff" &&
         (STAFF_OPEN.has(pathname) || STAFF_OPEN_PREFIXES.some((p) => pathname.startsWith(p))));
@@ -365,8 +384,14 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
     if (pathname.startsWith("/api/")) {
       return applyHeaders(NextResponse.next());
     }
-    rewritePath = `/${audience}${pathname === "/" ? "" : pathname}`;
-    logAudience = audience as string;
+    // The QR posters' page is host-neutral and belongs to neither tree.
+    if (isPublicSpotPage(pathname)) {
+      rewritePath = pathname;
+      logAudience = "public";
+    } else {
+      rewritePath = `/${audience}${pathname === "/" ? "" : pathname}`;
+      logAudience = audience as string;
+    }
   }
 
   // ── 5. Rewrite to the internal tree ───────────────────────────────────

@@ -16,6 +16,7 @@ export const PERMISSIONS = [
   { key: "inventory_import", label: "Manage inventory imports", group: "Inventory", desc: "Replace the catalog via Libib CSV." },
   { key: "games", label: "Games inventory", group: "Games", desc: "Add, edit, categorize, and remove games." },
   { key: "signmaker", label: "Sign maker", group: "Tools", desc: "Use the sign generator." },
+  { key: "banners", label: "Site tools", group: "Tools", desc: "Write the banner at the top of student & teacher pages." },
   { key: "analytics", label: "Site usage", group: "Tools", desc: "View the analytics dashboard." },
   { key: "users", label: "User insights", group: "Tools", desc: "See student & teacher accounts, activity, and notes." },
 ] as const;

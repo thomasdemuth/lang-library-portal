@@ -1,5 +1,7 @@
 import SiteHeader from "@/components/SiteHeader";
+import UpdateBanner from "@/components/UpdateBanner";
 import { currentSession } from "@/lib/server";
+import { activeBannerFor } from "@/lib/banners-store";
 import { withBase } from "@/lib/base";
 
 // v8: five items, not six — Feedback lives on the home screen's quick links
@@ -23,13 +25,16 @@ export default async function StudentLayout({ children }: { children: React.Reac
   const session = await currentSession();
   const isGuest = session?.aud === "guest";
   const links = !session ? [] : isGuest ? GUEST_LINKS : STUDENT_LINKS;
+  const banner = session ? await activeBannerFor({ audience: "student", isGuest }) : null;
 
   return (
     <>
-      {/* First tabbable thing on every student page — see .skip-link. */}
+      {/* First tabbable thing on every student page — see .skip-link. It stays
+          ahead of the banner, so "Skip to content" is still the first stop. */}
       <a className="skip-link" href="#main">
         Skip to content
       </a>
+      {banner && <UpdateBanner banner={banner} />}
       <SiteHeader
         tagline={isGuest ? "guest" : "student portal"}
         email={session?.email}

@@ -80,7 +80,9 @@ h1::after {
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
 a.card { display: block; text-decoration: none; transition: border-color .12s, box-shadow .12s; }
 a.card:hover { border-color: var(--brand-blue); box-shadow: 0 3px 12px rgba(46, 80, 200, .1); }
-.card h2 { margin: 0 0 6px; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 10px; color: var(--brand-blue-deep); }
+/* h3 too: a card inside a page that already has an h2 section heading keeps
+   the outline honest without looking any different. */
+.card h2, .card h3 { margin: 0 0 6px; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 10px; color: var(--brand-blue-deep); }
 .card p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
 .dot { width: 12px; height: 12px; border-radius: 4px; display: inline-block; flex-shrink: 0; }
 
@@ -140,6 +142,92 @@ textarea.input { font-weight: 600; resize: vertical; min-height: 110px; line-hei
 .notice.warn, html[data-theme="dark"] .notice.warn { background: var(--warn-bg); border-color: var(--warn-bg); color: var(--warn-ink); }
 .notice.err, html[data-theme="dark"] .notice.err { background: var(--err-bg); border-color: var(--err-bg); color: var(--err-ink); }
 .notice.info, html[data-theme="dark"] .notice.info { background: var(--info-bg); border-color: var(--info-bg); color: var(--info-ink); }
+
+/* ── Site banner (the strip above the top bar) ───── */
+/* A full-bleed strip, not a card: it sits flush on top of .topbar, so its
+   inner row copies that bar's 26px gutter rather than .wrap's centered column.
+   Deliberately not rendered INSIDE .topbar — that bar is hidden on admin
+   phones, which would silently take the banner with it. */
+.newsbanner {
+  background: var(--info-bg); color: var(--info-ink);
+  font-size: 13.5px; font-weight: 600; line-height: 1.45;
+}
+.nb-inner { display: flex; align-items: center; gap: 11px; padding: 9px 26px; }
+.newsbanner .nb-spark { flex: none; display: flex; color: var(--brand-blue); }
+html[data-theme="dark"] .newsbanner .nb-spark { color: #9db1ee; }
+.newsbanner a { color: inherit; text-decoration: none; }
+.newsbanner a:hover .nb-cta { text-decoration: underline; }
+.nb-cta { font-weight: 800; white-space: nowrap; }
+.nb-close {
+  flex: none; margin-left: auto; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 17px; line-height: 1; color: inherit; opacity: .6;
+  padding: 4px 6px; border-radius: 8px;
+}
+.nb-close:hover { opacity: 1; }
+@media (max-width: 640px) { .nb-inner { padding: 9px 16px; } }
+
+/* Tones, on the status tokens the .notice variants already use. The base is
+   the info tone, so an untoned banner looks exactly as it always has. */
+.newsbanner.tone-ok, html[data-theme="dark"] .newsbanner.tone-ok { background: var(--ok-bg); color: var(--ok-ink); }
+.newsbanner.tone-warn, html[data-theme="dark"] .newsbanner.tone-warn { background: var(--warn-bg); color: var(--warn-ink); }
+.newsbanner.tone-alert, html[data-theme="dark"] .newsbanner.tone-alert { background: var(--err-bg); color: var(--err-ink); }
+/* Brand blue only reads right on the info tint; elsewhere the icon takes the
+   tone's own ink. Repeated under the dark selector to out-specify the rule
+   above it. */
+.newsbanner.tone-ok .nb-spark,
+.newsbanner.tone-warn .nb-spark,
+.newsbanner.tone-alert .nb-spark,
+html[data-theme="dark"] .newsbanner.tone-ok .nb-spark,
+html[data-theme="dark"] .newsbanner.tone-warn .nb-spark,
+html[data-theme="dark"] .newsbanner.tone-alert .nb-spark { color: inherit; }
+
+/* Management never gets nagged by the live banner — but the editor's preview
+   is the same component on purpose, so it opts back in. */
+body:has(.admin-grid) .newsbanner:not(.nb-preview) { display: none; }
+
+/* Management → Site Banner: the preview frame and the per-row state pills. */
+.banner-preview {
+  border: 1px dashed var(--line-strong); border-radius: 14px;
+  padding: 10px; background: var(--bg); overflow: hidden;
+}
+.banner-preview .newsbanner { border-radius: 8px; }
+.banner-preview .nb-inner { padding: 9px 12px; }
+.bstate {
+  display: inline-block; border-radius: 999px; padding: 3px 10px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .3px; white-space: nowrap;
+}
+.bstate.live { background: var(--ok-bg); color: var(--ok-ink); }
+.bstate.scheduled { background: var(--info-bg); color: var(--info-ink); }
+.bstate.waiting { background: var(--warn-bg); color: var(--warn-ink); }
+.bstate.ended, .bstate.off { background: var(--panel-2); color: var(--muted); }
+
+/* ── Quick feedback (stars → chips → send) ───────── */
+.stars { display: flex; gap: 2px; margin: 2px 0 0 -8px; }
+.star {
+  border: 0; background: none; cursor: pointer; padding: 8px;
+  border-radius: 12px; line-height: 0; color: inherit;
+}
+.star:active { transform: scale(.92); }
+/* Hover preview: fill up to the star under the pointer, clear the ones after */
+.stars:hover .i-star { fill: #E8A317; stroke: #E8A317; }
+.stars .star:hover ~ .star .i-star { fill: transparent; stroke: #3b4048; }
+html[data-theme="dark"] .stars .star:hover ~ .star .i-star { stroke: #aeb6c2; }
+.stars-cap { margin: 0 0 20px 2px; min-height: 17px; }
+
+.chipset { border: 0; padding: 0; margin: 0 0 16px; display: flex; flex-wrap: wrap; gap: 7px; }
+.chipset .lbl { width: 100%; margin-bottom: 2px; padding: 0; }
+.chip.on { background: var(--brand-blue); border-color: var(--brand-blue); color: #fff; }
+html[data-theme="dark"] .chip.on { background: var(--brand-blue); border-color: var(--brand-blue); color: #fff; }
+.qfb-send { font-size: 15px; padding: 12px 30px; }
+
+/* ── QR landing page (/hi/<code>) — signed out, on a phone ── */
+.hi-hero { text-align: center; padding: 34px 0 18px; }
+.hi-logo { border-radius: 18px; }
+.hi-hero h1 { margin: 14px 0 4px; font-size: 23px; line-height: 1.25; }
+.hi-zone {
+  display: inline-block; color: #fff; font-weight: 800; font-size: 11.5px;
+  letter-spacing: .4px; border-radius: 999px; padding: 4px 12px; margin-bottom: 4px;
+}
 
 /* ── Gate ───────────────────────────────────────── */
 .gate-hero { text-align: center; padding: 46px 0 22px; }
@@ -1197,6 +1285,12 @@ html[data-theme="dark"] .b-btn { background: var(--panel-2); }
 .i-check.on { stroke: var(--brand-green); }
 html[data-theme="dark"] .i-heart:not(.on) { stroke: #aeb6c2; }
 html[data-theme="dark"] .i-check:not(.on) { stroke: #aeb6c2; }
+/* Rating stars stay gold everywhere — a zone's own color on a star reads as
+   decoration, not as "this many out of five". The zone color is carried by
+   the heading pill on the QR page instead. */
+.i-star { fill: transparent; stroke: #3b4048; transition: fill .2s ease, stroke .18s ease; }
+.i-star.on { fill: #E8A317; stroke: #E8A317; }
+html[data-theme="dark"] .i-star:not(.on) { stroke: #aeb6c2; }
 
 /* Catalog search: tap a row to open its cover + description + actions */
 .catlist { display: flex; flex-direction: column; }

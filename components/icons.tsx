@@ -72,6 +72,24 @@ export function Heart({ filled = false, size = 17 }: { filled?: boolean; size?: 
   );
 }
 
+/** Feedback rating star. Colors/fill are CSS-driven (.i-star / .i-star.on). */
+export function Star({ filled = false, size = 30 }: { filled?: boolean; size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      className={`i-star${filled ? " on" : ""}`}
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.44 6.19 20.5 7.3 14.03 2.6 9.45l6.5-.95L12 2.6z" />
+    </svg>
+  );
+}
+
 /** Read check: grey-black tick when unread, green ticked-in-a-circle when logged. */
 export function Check({ done = false, size = 15 }: { done?: boolean; size?: number }) {
   return (

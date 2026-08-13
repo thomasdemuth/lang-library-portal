@@ -55,9 +55,35 @@ and publishing app updates — are restricted to the developer account.
   page (recent requests, a usage sparkline, an inventory search box…). Per device.
 - **User insights** — Management → *User Insights*: every student and teacher account with
   their activity, reading, requests, and admin-only notes; grant a student stars from here.
-- **Feedback** — Management → *Feedback*: mark read / archive.
+- **Feedback** — Management → *Feedback*: mark read / archive, and filter by
+  **Website** or **Library**. Most entries are now a star rating plus a few tapped
+  chips rather than prose; the line at the top averages the stars for each. Rows
+  marked *anonymous* came from a QR poster and have no email to reply to.
+- **The banner across the top** — Management → *Site Tools*. The strip above the top bar
+  on every student and teacher page (never in Management). Write the message, the link
+  words, and where the link goes; choose who sees it (everyone / students / teachers), a
+  color and an icon, and how long an **×** hides it for. New banners start switched off so
+  you can get the wording right before anyone sees it. Changes reach the whole site within
+  a minute.
+  - **One shows at a time.** Give a banner a start date and it takes over by itself when
+    that time comes — no need to switch the old one off first. The list says which one is
+    live, which is *Scheduled*, and which is *Waiting* (on, but another banner is winning).
+  - Rewriting a banner's message or link shows it again to people who had dismissed it;
+    switching it off and on, or fixing a date, does not. There's a checkbox to force it.
+  - **Signed-out visitors** only reach Find a Book and the Library Map, so a banner
+    linking anywhere else needs a second link for them — leave that blank and guests
+    simply aren't shown it.
+  - The relaunch banner ("We've updated the Lang Library…") is already in the list, live,
+    and can be edited or switched off from here.
+- **Print feedback QR posters** — Management → *Sign Maker* → **Feedback QR**. Pick a
+  spot (the new website, the library as a whole, or any zone from the Map Editor), then
+  *Add to sheet* for each and print. Scanning one opens a one-question page: no sign-in,
+  no app, a star and a couple of taps. Codes come from the zone names, so a zone renamed
+  after printing still collects feedback — it just files it under the library generally
+  rather than that zone, so re-print a zone's poster after renaming it.
 - **Site usage** — Management → *Site Usage*: daily views by site, unique visitors, top pages.
-- **Print signs** — Management → *Sign Maker* (the full sign generator, admin-only).
+- **Print signs** — Management → *Sign Maker* (the full sign generator, admin-only):
+  section tabs, banners, wayfinding, advisories, the color guide, and feedback QR posters.
 - **Change your password** — Management → *My Account* (signs out your other sessions).
 
 ## Development
@@ -120,4 +146,21 @@ No `NEXT_PUBLIC_*` vars exist — the browser never talks to Supabase directly.
 - Inventory is generational: each CSV import is a new `inventory_syncs` row whose books
   replace the old set atomically on commit (`activate_sync`).
 - The sign maker is served verbatim from `assets/sign-maker.html` behind admin auth —
-  it's still a double-clickable standalone file.
+  it's still a double-clickable standalone file. The one part that needs the server is
+  the feedback QR poster (zone list + code image come from `/api/admin/qr*`); opened off
+  disk it falls back to the static category list and draws a placeholder where the code
+  would be.
+- Feedback QR codes point at `/hi/<code>` — the one page in the app that is open to
+  everyone, signed in or not (`app/hi/[code]`). Its codes are derived from the map's
+  shelves by `lib/feedback-spots.ts`, never stored, and an unrecognized one resolves to
+  the library as a whole instead of 404ing. `lib/feedback.ts` holds the chip wording and
+  is imported by both the browser and the API, so a submitted chip is checked against
+  what was actually offered.
+- The site banner renders on every page of both portals, so `lib/banners-store.ts` keeps
+  the rows in a module-level cache with a 60-second TTL rather than querying per render
+  (the repo uses no Next caching APIs — everything is `force-dynamic`). Each serverless
+  instance caches separately, so an admin edit is live at once on the instance that
+  handled the write and within a minute everywhere else. Which banner wins is decided by
+  the pure, unit-tested `pickActiveBanner` in `lib/banners.ts`; `components/BannerBody.tsx`
+  is rendered both by the live banner and by the editor's preview so the two can't drift.
+  If the table is missing the site simply shows no banner rather than erroring.
