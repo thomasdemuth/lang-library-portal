@@ -1,68 +1,54 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Ic } from "@/components/icons";
+import BannerBody from "@/components/BannerBody";
 import { SENT_KEY } from "@/components/QuickFeedback";
-import { withBase } from "@/lib/base";
+import { dismissStorageKey, isDismissed, type ClientBanner } from "@/lib/banners";
 
 /**
- * The relaunch banner: one line at the top of every student and teacher page
- * pointing at the feedback form. Management is excluded in CSS
- * (`body:has(.admin-grid) .newsbanner`) — the team doesn't need to be asked
- * what it thinks of its own site.
+ * The live announcement strip, above the top bar on every student and teacher
+ * page. Which banner this is, what it says, and where it points are the library
+ * team's business now (Management → Banners); what's left here is the part only
+ * the browser can decide — whether this person has already dismissed it.
  *
- * It stops asking once someone has actually left feedback, and an × hides it
- * for 30 days. Bump BANNER_VERSION to start a fresh round of asking: the
- * dismissal key changes with it, so everyone sees the new one.
+ * Management is excluded in CSS (`body:has(.admin-grid) .newsbanner`) rather
+ * than here, because the middleware rewrite means the layout can't see the
+ * real path.
  */
-const BANNER_VERSION = "v1";
-const DISMISS_KEY = `lang_banner_${BANNER_VERSION}_dismissed`;
-const DISMISS_DAYS = 30;
-
-export default function UpdateBanner({ isGuest = false }: { isGuest?: boolean }) {
+export default function UpdateBanner({ banner }: { banner: ClientBanner }) {
   // Starts hidden and appears on mount: localStorage doesn't exist during SSR,
-  // and rendering it server-side would flash the banner at people who dismissed
-  // it. Same reason components/UpdatePrompt.tsx returns null until it decides.
+  // and rendering it server-side would flash it at people who dismissed it.
   const [show, setShow] = useState(false);
 
   useEffect(() => {
+    const key = dismissStorageKey(banner);
     try {
-      if (localStorage.getItem(SENT_KEY)) return; // already told us — stop asking
-      const at = Number(localStorage.getItem(DISMISS_KEY) ?? 0);
-      if (at && Date.now() - at < DISMISS_DAYS * 24 * 3600 * 1000) return;
+      if (banner.hideWhenAnswered && localStorage.getItem(SENT_KEY)) return;
+
+      // One-release courtesy: the banner that shipped hardcoded remembered its
+      // dismissal under its own key. Adopt it once, then retire the old key so
+      // this only ever happens on the first visit after the upgrade.
+      if (banner.legacyKey) {
+        const legacy = localStorage.getItem(banner.legacyKey);
+        if (legacy && !localStorage.getItem(key)) localStorage.setItem(key, legacy);
+        if (legacy) localStorage.removeItem(banner.legacyKey);
+      }
+
+      if (isDismissed(banner, localStorage.getItem(key), Date.now())) return;
     } catch {
       /* private mode: no memory of dismissals, so just show it */
     }
     setShow(true);
-  }, []);
+  }, [banner]);
 
   if (!show) return null;
 
   function dismiss() {
     try {
-      localStorage.setItem(DISMISS_KEY, String(Date.now()));
+      localStorage.setItem(dismissStorageKey(banner), String(Date.now()));
     } catch {}
     setShow(false);
   }
 
-  // Guests can't reach /feedback — middleware confines them to Find a Book and
-  // the Library Map — so send them to the public form the QR posters use.
-  const href = withBase(isGuest ? "/hi/site" : "/feedback?src=banner");
-
-  return (
-    <div className="wrap" style={{ paddingTop: 12, paddingBottom: 0 }}>
-      <div className="newsbanner">
-        <span className="nb-spark">
-          <Ic name="sparkle" size={19} />
-        </span>
-        <a href={href}>
-          We&rsquo;ve updated the Lang Library and added new features to improve your
-          experience. <span className="nb-cta">Tell us what you think &rarr;</span>
-        </a>
-        <button className="nb-close" onClick={dismiss} aria-label="Hide this message">
-          &times;
-        </button>
-      </div>
-    </div>
-  );
+  return <BannerBody banner={banner} onDismiss={dismiss} />;
 }

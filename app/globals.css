@@ -141,17 +141,16 @@ textarea.input { font-weight: 600; resize: vertical; min-height: 110px; line-hei
 .notice.err, html[data-theme="dark"] .notice.err { background: var(--err-bg); border-color: var(--err-bg); color: var(--err-ink); }
 .notice.info, html[data-theme="dark"] .notice.info { background: var(--info-bg); border-color: var(--info-bg); color: var(--info-ink); }
 
-/* ── Relaunch banner (student + staff portals) ───── */
-/* Not in .topbar on purpose: that bar is hidden on admin phones, which would
-   take the banner with it. Management is excluded here instead — the team
-   doesn't need to be asked what it thinks of its own site. */
+/* ── Site banner (the strip above the top bar) ───── */
+/* A full-bleed strip, not a card: it sits flush on top of .topbar, so its
+   inner row copies that bar's 26px gutter rather than .wrap's centered column.
+   Deliberately not rendered INSIDE .topbar — that bar is hidden on admin
+   phones, which would silently take the banner with it. */
 .newsbanner {
-  display: flex; align-items: center; gap: 11px;
   background: var(--info-bg); color: var(--info-ink);
-  border: 1px solid transparent; border-radius: 13px;
-  padding: 10px 12px; margin-bottom: 4px;
   font-size: 13.5px; font-weight: 600; line-height: 1.45;
 }
+.nb-inner { display: flex; align-items: center; gap: 11px; padding: 9px 26px; }
 .newsbanner .nb-spark { flex: none; display: flex; color: var(--brand-blue); }
 html[data-theme="dark"] .newsbanner .nb-spark { color: #9db1ee; }
 .newsbanner a { color: inherit; text-decoration: none; }
@@ -163,7 +162,42 @@ html[data-theme="dark"] .newsbanner .nb-spark { color: #9db1ee; }
   padding: 4px 6px; border-radius: 8px;
 }
 .nb-close:hover { opacity: 1; }
-body:has(.admin-grid) .newsbanner { display: none; }
+@media (max-width: 640px) { .nb-inner { padding: 9px 16px; } }
+
+/* Tones, on the status tokens the .notice variants already use. The base is
+   the info tone, so an untoned banner looks exactly as it always has. */
+.newsbanner.tone-ok, html[data-theme="dark"] .newsbanner.tone-ok { background: var(--ok-bg); color: var(--ok-ink); }
+.newsbanner.tone-warn, html[data-theme="dark"] .newsbanner.tone-warn { background: var(--warn-bg); color: var(--warn-ink); }
+.newsbanner.tone-alert, html[data-theme="dark"] .newsbanner.tone-alert { background: var(--err-bg); color: var(--err-ink); }
+/* Brand blue only reads right on the info tint; elsewhere the icon takes the
+   tone's own ink. Repeated under the dark selector to out-specify the rule
+   above it. */
+.newsbanner.tone-ok .nb-spark,
+.newsbanner.tone-warn .nb-spark,
+.newsbanner.tone-alert .nb-spark,
+html[data-theme="dark"] .newsbanner.tone-ok .nb-spark,
+html[data-theme="dark"] .newsbanner.tone-warn .nb-spark,
+html[data-theme="dark"] .newsbanner.tone-alert .nb-spark { color: inherit; }
+
+/* Management never gets nagged by the live banner — but the editor's preview
+   is the same component on purpose, so it opts back in. */
+body:has(.admin-grid) .newsbanner:not(.nb-preview) { display: none; }
+
+/* Management → Site Banner: the preview frame and the per-row state pills. */
+.banner-preview {
+  border: 1px dashed var(--line-strong); border-radius: 14px;
+  padding: 10px; background: var(--bg); overflow: hidden;
+}
+.banner-preview .newsbanner { border-radius: 8px; }
+.banner-preview .nb-inner { padding: 9px 12px; }
+.bstate {
+  display: inline-block; border-radius: 999px; padding: 3px 10px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .3px; white-space: nowrap;
+}
+.bstate.live { background: var(--ok-bg); color: var(--ok-ink); }
+.bstate.scheduled { background: var(--info-bg); color: var(--info-ink); }
+.bstate.waiting { background: var(--warn-bg); color: var(--warn-ink); }
+.bstate.ended, .bstate.off { background: var(--panel-2); color: var(--muted); }
 
 /* ── Quick feedback (stars → chips → send) ───────── */
 .stars { display: flex; gap: 2px; margin: 2px 0 0 -8px; }

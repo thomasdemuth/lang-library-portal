@@ -34,6 +34,7 @@ export default async function AdminShell({ children }: { children: React.ReactNo
   ].filter((l) => l.show);
   const toolLinks = [
     { href: "/admin/sign-maker", label: "Sign Maker", icon: "sign", show: canDo(admin, "signmaker") },
+    { href: "/admin/banners", label: "Site Banner", icon: "sparkle", show: canDo(admin, "banners") },
     { href: "/admin/analytics", label: "Site Usage", icon: "chart", show: canDo(admin, "analytics") },
     { href: "/admin/users", label: "User Insights", icon: "users", show: canDo(admin, "users") },
     { href: "/admin/updates", label: "Updates", icon: "megaphone", show: canPublishUpdates(admin.email) },

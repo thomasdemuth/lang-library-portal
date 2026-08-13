@@ -59,12 +59,22 @@ and publishing app updates — are restricted to the developer account.
   **Website** or **Library**. Most entries are now a star rating plus a few tapped
   chips rather than prose; the line at the top averages the stars for each. Rows
   marked *anonymous* came from a QR poster and have no email to reply to.
-- **Ask for feedback on the site** — every student and teacher page carries a one-line
-  banner ("We've updated the Lang Library…") pointing at the feedback form. It hides
-  itself once that person has left feedback, an **×** hides it for 30 days, and it never
-  appears in Management. To run the ask again later, bump `BANNER_VERSION` in
-  `components/UpdateBanner.tsx`; to retire it, drop `<UpdateBanner />` from the two
-  portal layouts.
+- **The banner across the top** — Management → *Site Banner*. The strip above the top bar
+  on every student and teacher page (never in Management). Write the message, the link
+  words, and where the link goes; choose who sees it (everyone / students / teachers), a
+  color and an icon, and how long an **×** hides it for. New banners start switched off so
+  you can get the wording right before anyone sees it. Changes reach the whole site within
+  a minute.
+  - **One shows at a time.** Give a banner a start date and it takes over by itself when
+    that time comes — no need to switch the old one off first. The list says which one is
+    live, which is *Scheduled*, and which is *Waiting* (on, but another banner is winning).
+  - Rewriting a banner's message or link shows it again to people who had dismissed it;
+    switching it off and on, or fixing a date, does not. There's a checkbox to force it.
+  - **Signed-out visitors** only reach Find a Book and the Library Map, so a banner
+    linking anywhere else needs a second link for them — leave that blank and guests
+    simply aren't shown it.
+  - The relaunch banner ("We've updated the Lang Library…") is already in the list, live,
+    and can be edited or switched off from here.
 - **Print feedback QR posters** — Management → *Sign Maker* → **Feedback QR**. Pick a
   spot (the new website, the library as a whole, or any zone from the Map Editor), then
   *Add to sheet* for each and print. Scanning one opens a one-question page: no sign-in,
@@ -146,3 +156,11 @@ No `NEXT_PUBLIC_*` vars exist — the browser never talks to Supabase directly.
   the library as a whole instead of 404ing. `lib/feedback.ts` holds the chip wording and
   is imported by both the browser and the API, so a submitted chip is checked against
   what was actually offered.
+- The site banner renders on every page of both portals, so `lib/banners-store.ts` keeps
+  the rows in a module-level cache with a 60-second TTL rather than querying per render
+  (the repo uses no Next caching APIs — everything is `force-dynamic`). Each serverless
+  instance caches separately, so an admin edit is live at once on the instance that
+  handled the write and within a minute everywhere else. Which banner wins is decided by
+  the pure, unit-tested `pickActiveBanner` in `lib/banners.ts`; `components/BannerBody.tsx`
+  is rendered both by the live banner and by the editor's preview so the two can't drift.
+  If the table is missing the site simply shows no banner rather than erroring.
