@@ -226,7 +226,7 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
           type="search"
           enterKeyHint="search"
           aria-label="Search the library"
-          placeholder="Title or author…"
+          placeholder="Search every book — title or author…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -241,17 +241,21 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
         {CATEGORY_IDS.map((id) => {
           const active = filter === id;
           return (
+            // v8: the category pills carry the library's own shelf colors at
+            // all times — they are the color on this page. Picking one dims
+            // the rest and rings the chosen one, so filter state stays legible
+            // without draining the palette.
             <button
               key={id}
               type="button"
-              className={`tagchip${active ? ` active ${pillTextClass(id)}` : ""}`}
-              style={active ? { background: CATEGORIES[id].color, borderColor: CATEGORIES[id].color, color: "#fff" } : undefined}
+              aria-pressed={active}
+              className={`tagchip cat-chip ${pillTextClass(id)}${active ? " active" : ""}`}
+              style={{ background: CATEGORIES[id].color, borderColor: CATEGORIES[id].color }}
               onClick={() => {
                 setFilter(active ? null : id);
                 search(undefined, active ? null : id);
               }}
             >
-              {!active && <span className="dot" style={{ background: CATEGORIES[id].color }} />}
               {CATEGORIES[id].label}
             </button>
           );

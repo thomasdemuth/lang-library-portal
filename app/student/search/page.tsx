@@ -10,8 +10,9 @@ export default async function StudentSearchPage() {
   const session = await currentSession();
   return (
     <div className="wrap" style={{ maxWidth: 1280 }}>
-      <h1>Find a book</h1>
-      <p className="sub">Search every book in the library, then tap “Show me where” to see its shelf on the map.</p>
+      {/* v8: the search bar says it all — no stacked title + description above
+          it. The heading stays for screen readers and the page outline. */}
+      <h1 className="sr-only">Find a book</h1>
       <CatalogSearch role={session?.aud === "guest" ? "guest" : "student"} />
     </div>
   );

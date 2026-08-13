@@ -288,6 +288,16 @@ textarea.input { font-weight: 600; resize: vertical; min-height: 110px; line-hei
   border: 1.5px solid var(--line-strong); background: #fff; color: var(--ink);
 }
 .tagchip:disabled { opacity: .55; cursor: default; }
+
+/* Category filter pills (Find a Book): always painted in the shelf color.
+   .pill-dk supplies dark ink on the three light categories. Scoped to
+   .cat-chip so the admin tag pickers keep their neutral outline look.
+   Every pill keeps its full color whether or not it is selected — dimming
+   the others would drop their label below the contrast floor. The selected
+   one is marked with an ink ring instead (plus aria-pressed). */
+.cat-chip { color: #fff; padding: 6px 14px; }
+.cat-chip.active { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--ink); }
+@media (prefers-reduced-motion: no-preference) { .cat-chip { transition: box-shadow .12s; } }
 .tagbtn { border: 0; background: none; padding: 0; cursor: pointer; font: inherit; }
 .tag-none {
   font-size: 11.5px; font-weight: 700; color: var(--muted);
@@ -535,6 +545,24 @@ html[data-theme="dark"] .mapsvg .mapimg { filter: invert(1) hue-rotate(180deg); 
   .input, select.input, textarea.input { font-size: 16px; } /* stop iOS focus zoom */
   .btn { padding: 11px 16px; }
   .desk-only { display: none !important; }
+
+  /* Phone top bar: brand + account chip on one row, the nav on its own row
+     beneath as a single swipeable line. Without this the three flex children
+     fight for 390px and .nav collapses into a column that overlaps the
+     wordmark — the student portal's most-used screen on its most-used device. */
+  .topbar { flex-wrap: wrap; gap: 10px; row-gap: 6px; padding: 12px 16px 0; }
+  .brand { order: 1; flex: 1 1 auto; min-width: 0; gap: 10px; }
+  .whoami { order: 2; flex: none; }
+  .nav {
+    order: 3; flex: 1 0 100%;
+    flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain;
+    gap: 2px; margin: 0 -16px; padding: 0 16px 7px;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav a { flex: none; white-space: nowrap; }
+  .brand-tag { font-size: 14px; letter-spacing: 1.1px; }
+  .brand-mark { width: 32px; height: 32px; }
 
   /* The admin area becomes an app: tab bar instead of sidebar + site header */
   .side { display: none; }
@@ -1004,25 +1032,36 @@ html[data-theme="dark"] .explore-head { color: #9db1ee; }
 .newshelf-untitled .newshelf-row { min-height: 210px; }
 .row-toast-float { position: absolute; top: -2px; right: 4px; z-index: 3; margin: 0; }
 
+/* v8: the welcome banner is the one saturated surface on the student home —
+   school blue → school green, white type. Everything below it stays calm. */
 .play-hero {
   display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-  background: linear-gradient(120deg, var(--info-bg) 0%, #eaf5f0 100%);
-  border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px; margin-bottom: 18px;
+  background: linear-gradient(115deg, var(--brand-blue) 0%, #227da4 52%, var(--brand-green) 100%);
+  border: none; border-radius: 18px; padding: 20px 22px; margin-bottom: 18px;
+  color: #fff; box-shadow: 0 8px 24px rgba(35, 60, 140, .22);
 }
-html[data-theme="dark"] .play-hero { background: linear-gradient(120deg, #1c2438, #18251f); }
+html[data-theme="dark"] .play-hero {
+  background: linear-gradient(115deg, #24357e 0%, #1a5a72 52%, #12633f 100%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .34);
+}
 .play-me { display: flex; align-items: center; gap: 14px; text-decoration: none; color: inherit; }
-.play-me b { font-size: 19px; display: block; }
-.play-stats { display: block; font-size: 13px; color: var(--muted); font-weight: 600; margin-top: 3px; }
+.play-hero .letter-avatar { box-shadow: 0 0 0 3px rgba(255, 255, 255, .5); }
+.play-me b { font-size: 21px; display: block; letter-spacing: -.01em; }
+.play-stats { display: block; font-size: 13px; color: rgba(255, 255, 255, .88); font-weight: 600; margin-top: 3px; }
 .play-cta { display: block; font-size: 12px; color: var(--brand-blue); font-weight: 700; margin-top: 5px; }
 .play-links { display: flex; gap: 8px; flex-wrap: wrap; }
+/* Quick links sit ON the gradient, so they are white-on-translucent rather
+   than the usual bordered pill. Feedback lives here now that it is out of
+   the top nav — keep it in this row. */
 .play-links a {
   display: inline-flex; align-items: center; gap: 7px; text-decoration: none;
-  font-size: 13px; font-weight: 700; color: var(--ink); background: #fff;
-  border: 1px solid var(--line); border-radius: 999px; padding: 9px 15px;
-  transition: transform .12s, border-color .12s;
+  font-size: 13px; font-weight: 700; color: #fff; background: rgba(255, 255, 255, .16);
+  border: 1px solid rgba(255, 255, 255, .38); border-radius: 999px; padding: 9px 15px;
+  transition: transform .12s, background .12s;
 }
-.play-links a:hover { transform: translateY(-1px); border-color: var(--brand-blue); color: var(--brand-blue); }
-html[data-theme="dark"] .play-links a { background: var(--panel); color: var(--ink); }
+.play-links a:hover { transform: translateY(-1px); background: rgba(255, 255, 255, .28); color: #fff; }
+.play-hero :focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+html[data-theme="dark"] .play-links a { background: rgba(255, 255, 255, .13); color: #fff; }
 
 /* layered mixed-art avatar (SVG parts + emoji + PNG) */
 .pavatar {

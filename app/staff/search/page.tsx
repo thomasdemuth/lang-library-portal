@@ -6,8 +6,8 @@ export const metadata = { title: "Find a Book — Lang Library" };
 export default function StaffSearchPage() {
   return (
     <div className="wrap">
-      <h1>Find a book</h1>
-      <p className="sub">Search every book in the library, then tap “Show me where” to see its shelf on the map.</p>
+      {/* v8: the search bar says it all — see the student search page. */}
+      <h1 className="sr-only">Find a book</h1>
       <CatalogSearch role="staff" />
     </div>
   );

@@ -2,19 +2,20 @@ import SiteHeader from "@/components/SiteHeader";
 import { currentSession } from "@/lib/server";
 import { withBase } from "@/lib/base";
 
+// v8: five items, not six — Feedback lives on the home screen's quick links
+// and the phone tab bar, so the header stays scannable for younger readers.
 const STUDENT_LINKS = [
   { href: "/", label: "Home" },
   { href: "/search", label: "Find a Book" },
   { href: "/games", label: "Games" },
-  { href: "/map", label: "Library Map" },
+  { href: "/map", label: "Map" },
   { href: "/me", label: "My Page" },
-  { href: "/feedback", label: "Feedback" },
 ];
 
 // Guests (no account) get Find a Book + the Library Map, plus an upsell.
 const GUEST_LINKS = [
   { href: "/search", label: "Find a Book" },
-  { href: "/map", label: "Library Map" },
+  { href: "/map", label: "Map" },
   { href: "/api/auth/google/start", label: "Sign in with Google" },
 ];
 
