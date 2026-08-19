@@ -201,6 +201,25 @@ body:has(.admin-grid) .newsbanner:not(.nb-preview) { display: none; }
 .bstate.waiting { background: var(--warn-bg); color: var(--warn-ink); }
 .bstate.ended, .bstate.off { background: var(--panel-2); color: var(--muted); }
 
+/* ── Books for Teachers (staff home shelf) ───────── */
+.teachershelf {
+  display: flex; gap: 10px; overflow-x: auto; padding: 12px 2px 4px;
+  scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+}
+.teacherpick { flex: none; width: 76px; scroll-snap-align: start; text-decoration: none; }
+.teacherpick img {
+  width: 76px; height: 112px; object-fit: cover; border-radius: 7px;
+  background: var(--panel-2); box-shadow: 0 1px 4px rgba(16, 24, 40, .18);
+  transition: transform .12s ease;
+}
+.teacherpick:hover img { transform: translateY(-2px); }
+.teacherpick-all {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  height: 112px; border: 1.5px dashed var(--line-strong); border-radius: 7px;
+  font-size: 12px; font-weight: 700; color: var(--muted); padding: 0 6px;
+}
+.teacherpick-all:hover { color: var(--brand-blue); border-color: var(--brand-blue); }
+
 /* ── Quick feedback (stars → chips → send) ───────── */
 .stars { display: flex; gap: 2px; margin: 2px 0 0 -8px; }
 .star {

@@ -2,10 +2,10 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { mergeBooks, mergeCollisions, rowToBook, type BookRecord } from "@/lib/match";
-import { CATEGORIES, CATEGORY_IDS, pillTextClass, type CategoryId } from "@/lib/categories";
+import { CATEGORIES, CATEGORY_IDS, pillTextClass, TEACHERS_COLOR, type CategoryId } from "@/lib/categories";
 import { announce } from "@/components/Announcer";
 import Modal from "@/components/Modal";
-import TagPicker, { TagPill } from "@/components/TagPicker";
+import TagPicker, { TagPill, TeachersPill, TeachersToggle } from "@/components/TagPicker";
 import TagReviewPanel from "@/components/TagReviewPanel";
 import BookEditModal, { type EditableBook } from "@/components/BookEditModal";
 import AddBookModal, { type AddedBook } from "@/components/AddBookModal";
@@ -43,10 +43,13 @@ type Book = {
   group_name: string | null;
   dedupe_key: string;
   tag: CategoryId | null;
+  /** Marked for teachers — students never see this book. */
+  teachers?: boolean;
 };
 
 /** "untagged" narrows to books with no tag yet; null is no filter. */
-type TagFilter = CategoryId | "untagged" | null;
+/** "teachers" isn't a category — it's the books-for-teachers slice. */
+type TagFilter = CategoryId | "untagged" | "teachers" | null;
 
 type BookDetail = {
   isbn13: string | null;
@@ -512,7 +515,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   }
 
   const filterParam = (tag: TagFilter) =>
-    tag === "untagged" ? "&untagged=1" : tag ? `&tag=${tag}` : "";
+    tag === "untagged" ? "&untagged=1" : tag === "teachers" ? "&teachers=only" : tag ? `&tag=${tag}` : "";
 
   async function search(e?: React.FormEvent, tagOverride?: TagFilter, qOverride?: string) {
     e?.preventDefault();
@@ -732,19 +735,46 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   }
 
   /** Write one book's tag. No history — the shared step for do/undo/redo. */
-  async function putTag(book: Book, tag: CategoryId | null): Promise<boolean> {
+  async function putTag(book: Book, tag: CategoryId | null, teachers?: boolean): Promise<boolean> {
     setTagError(null);
     const res = await fetch(withBase("/api/admin/books/tag"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ book_key: book.dedupe_key, category: tag }),
+      // teachers omitted → the route keeps whatever the book already had, so
+      // changing a category never silently puts a book back in front of
+      // students (or takes it away from them).
+      body: JSON.stringify({ book_key: book.dedupe_key, category: tag, ...(teachers === undefined ? {} : { teachers }) }),
     });
     if (!res.ok) {
       showTagError((await res.json().catch(() => ({}))).error ?? "Couldn't save the tag.");
       return false;
     }
-    setResults((cur) => cur?.map((b) => (b.dedupe_key === book.dedupe_key ? { ...b, tag } : b)) ?? cur);
+    setResults(
+      (cur) =>
+        cur?.map((b) =>
+          b.dedupe_key === book.dedupe_key
+            ? { ...b, tag, ...(teachers === undefined ? {} : { teachers }) }
+            : b
+        ) ?? cur
+    );
     return true;
+  }
+
+  /** Hide a book from students, or put it back. Undoable like the tag itself. */
+  async function setTeachers(book: Book, next: boolean) {
+    const previous = book.teachers === true;
+    if (!(await putTag(book, book.tag, next))) return;
+    const label = next
+      ? `“${book.title}” is now for teachers only`
+      : `“${book.title}” is back in the students' library`;
+    pushUndo({
+      label,
+      undo: async () => void (await putTag(book, book.tag, previous)),
+      redo: async () => void (await putTag(book, book.tag, next)),
+    });
+    setTagNote(label);
+    announce(label);
+    setTimeout(() => setTagNote((cur) => (cur === label ? null : cur)), 8000);
   }
 
   async function setTag(book: Book, tag: CategoryId | null) {
@@ -793,7 +823,10 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
           >
             {canImport ? (
               tagOpen === b.id ? (
-                <TagPicker value={b.tag} onChange={(t) => setTag(b, t)} dots />
+                <>
+                  <TagPicker value={b.tag} onChange={(t) => setTag(b, t)} dots />
+                  <TeachersToggle value={b.teachers === true} onChange={(v) => setTeachers(b, v)} />
+                </>
               ) : (
                 <button
                   type="button"
@@ -801,11 +834,15 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                   onClick={() => setTagOpen(b.id)}
                   aria-label={`Change tag for ${b.title}`}
                 >
-                  {b.tag ? <TagPill tag={b.tag} /> : <span className="tag-none">+ tag</span>}
+                  {b.tag ? <TagPill tag={b.tag} /> : !b.teachers && <span className="tag-none">+ tag</span>}
+                  {b.teachers && <TeachersPill small />}
                 </button>
               )
-            ) : b.tag ? (
-              <TagPill tag={b.tag} />
+            ) : b.tag || b.teachers ? (
+              <>
+                {b.tag && <TagPill tag={b.tag} />}
+                {b.teachers && <TeachersPill small />}
+              </>
             ) : (
               "—"
             )}
@@ -1253,6 +1290,22 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
               </button>
             );
           })}
+          <button
+            type="button"
+            role="radio"
+            aria-checked={filter === "teachers"}
+            className={`tagchip${filter === "teachers" ? ` active ${pillTextClass("teachers")}` : ""}`}
+            style={
+              filter === "teachers"
+                ? { background: TEACHERS_COLOR, borderColor: TEACHERS_COLOR, color: "#fff" }
+                : undefined
+            }
+            onClick={() => setFilterAndSearch(filter === "teachers" ? null : "teachers")}
+            title="Books for Teachers — hidden from students"
+          >
+            {filter !== "teachers" && <span className="dot" style={{ background: TEACHERS_COLOR }} />}
+            <span className="tagchip-label">For Teachers</span>
+          </button>
           <button
             type="button"
             role="radio"

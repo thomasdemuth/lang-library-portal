@@ -6,7 +6,7 @@ The Lang School library's web interface: a **student site**, a **staff site**, a
 | Audience | Gets in with | Can do |
 |---|---|---|
 | Students | `@students.thelangschool.org` email (student site) | Find-a-book search, library map, a personal reading log, favorites, custom collections, friends, feedback |
-| Teachers | `@thelangschool.org` email (staff site) | Book requests (their own), library map, feedback |
+| Teachers | `@thelangschool.org` email (staff site) | Book requests (their own), library map, Books for Teachers, feedback |
 | Management | username + password (staff site → `/admin`) | Requests queue, inventory, map editor, feedback triage, user insights, site usage, sign maker, admin invites |
 
 The two sites live on **separate hostnames** (env-driven), sessions are host-only signed
@@ -30,6 +30,22 @@ and publishing app updates — are restricted to the developer account.
 - **Category tags** — each book can carry one of the map's color categories (Fiction,
   Non-Fiction, Comics, Young Reader, Drama, Other). Set them from a scan or from catalog
   search results; they show as colored pills on desktop and mobile.
+- **Books for Teachers** — a book can also be marked **Teachers** (dark silver), *on top of*
+  whatever category it has. Tag it from Management → *Inventory*: open a book's tag row and
+  tap **Teachers**. What that does:
+  - The book leaves the students' library completely — it stops appearing in their search,
+    their home-page rows, and their book cards, and "show me where" answers as though the
+    library doesn't own it. **Anything already in a student's reading log or favorites is
+    left alone** — nothing is deleted from someone's own record behind their back.
+  - Teachers and management get a **For Teachers** tab in the top nav listing the whole
+    collection, a row of them on the staff home page, and a **For Teachers** filter in
+    Management → *Inventory*.
+  - **Teachers** is also a map area type, so the physical shelf can be drawn in dark silver
+    in the Map Editor. That area shows on **every** map, students included — the shelf is
+    really there, and hiding it would send a student looking for a wall that has bookcases
+    against it. Only the books on it are hidden. A book marked Teachers is located by that
+    area, so "show me where" sends a teacher to the Teachers shelf rather than to Fiction.
+  - Needs migration `0026_teacher_books.sql`.
 - **Put it on your phone** — open the staff site in Safari → Share → **Add to Home Screen**.
   It opens full-screen like an app with the library icon; the scanner is one tap away.
 - **Book requests** — new requests email every Chief Admin and show whether the library
@@ -141,6 +157,11 @@ No `NEXT_PUBLIC_*` vars exist — the browser never talks to Supabase directly.
   checks, security headers, and zero-latency usage logging (`event.waitUntil`).
 - All database access is server-side via the service-role key (PostgREST over HTTP —
   no client bundles, no connection pools).
+- The **Teachers** flag lives on `book_tags` next to the category, never as a category
+  value — a book can be Fiction *and* for teachers. `hidesTeacherBooks()` in `lib/tags.ts`
+  is the single audience rule and fails closed (anything that isn't staff or management is
+  treated as a student). It is applied inside the search query, not after it, so page
+  counts and totals describe the results the caller actually gets.
 - `lib/match.ts` is the shared normalizer/matcher (CSV import + request tagging) — the
   most test-covered code; run `npm test` after touching it.
 - Inventory is generational: each CSV import is a new `inventory_syncs` row whose books

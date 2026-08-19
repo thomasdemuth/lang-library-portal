@@ -17,12 +17,20 @@ export const CATEGORY_IDS = Object.keys(CATEGORIES) as CategoryId[];
  *  games accents). Never hardcode this hex elsewhere. */
 export const GAMES_COLOR = "#4CAF50";
 
-/** Map area types = the book categories PLUS a Games area. Games areas exist
- *  only on the map (a physical spot for the games collection); "games" is a
- *  map category, never a book tag, so books and games stay separate. */
+/** Dark silver — the one place the Teachers color is defined (map areas,
+ *  legend, the Teachers pill). Chosen to carry white text (4.6:1), so it
+ *  behaves like the dark categories everywhere. Never hardcode this hex. */
+export const TEACHERS_COLOR = "#6E7681";
+
+/** Map area types = the book categories PLUS a Games area and a Teachers
+ *  area. Both exist only on the map (a physical spot for a collection).
+ *  "games" is never a book tag at all; "teachers" is a FLAG a book carries
+ *  alongside its category (see lib/tags.ts), never a category itself — so a
+ *  book can be Fiction and for teachers at once. */
 export const MAP_CATEGORIES = {
   ...CATEGORIES,
   games: { label: "Games", color: GAMES_COLOR },
+  teachers: { label: "Teachers", color: TEACHERS_COLOR },
 } as const;
 
 export type MapCategoryId = keyof typeof MAP_CATEGORIES;

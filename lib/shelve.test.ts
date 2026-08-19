@@ -94,6 +94,16 @@ describe("resolveShelf", () => {
   it("empty when the category has no shelves", () => {
     expect(resolveShelf("drama", "Anyone", shelves).shelves).toHaveLength(0);
   });
+  it("resolves the map-only Teachers area like any other", () => {
+    // A book marked for teachers is located by that area, not by its own
+    // category — the physical copy is kept with the teachers' collection.
+    const withTeachers: ShelfInfo[] = [
+      ...shelves,
+      { id: "t", label: "Staff Room", category: "teachers", letter_range: null, shelf_number: "10" },
+    ];
+    const m = resolveShelf("teachers", "Kinney, Jeff", withTeachers);
+    expect(m.shelves.map((s) => s.id)).toEqual(["t"]);
+  });
   it("does not read a hyphenated shelf name as a letter range", () => {
     const young: ShelfInfo[] = [
       { id: "e", label: "Easy-Readers", category: "young", letter_range: null, shelf_number: "01" },

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { CATEGORIES, CATEGORY_IDS, pillTextClass, type CategoryId } from "@/lib/categories";
-import { TagPill } from "@/components/TagPicker";
+import { TagPill, TeachersPill } from "@/components/TagPicker";
 import { Check, Heart, Pin } from "@/components/icons";
 import AddToCollection from "@/components/AddToCollection";
 import LibraryMap from "@/components/map/LibraryMap";
@@ -28,6 +28,8 @@ type Book = {
   copies: number;
   dedupe_key: string;
   tag: CategoryId | null;
+  /** Only ever true for staff and management — students never receive these. */
+  teachers?: boolean;
 };
 
 /**
@@ -38,8 +40,17 @@ type Book = {
  * only, and guests (no account) get the same plus a quiet sign-in nudge.
  * Everything else is identical.
  */
-export default function CatalogSearch({ role = "student" }: { role?: "student" | "staff" | "guest" }) {
+export default function CatalogSearch({
+  role = "student",
+  teachersOnly = false,
+}: {
+  role?: "student" | "staff" | "guest";
+  /** Books for Teachers: list ONLY the books marked for teachers. The API
+   *  refuses this for students, so it is never a way around the rule. */
+  teachersOnly?: boolean;
+}) {
   const isStudent = role === "student";
+  const scope = teachersOnly ? "&teachers=only" : "";
   // aria-expanded on its own leaves a screen reader to guess which region the
   // row controls — namespaced per instance so the id is unique even when two
   // catalogs render on one page.
@@ -92,7 +103,7 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
     setNote(null);
     setExpandedId(null);
     const tag = tagOverride === undefined ? filter : tagOverride;
-    const res = await fetch(withBase(`/api/catalog?q=${encodeURIComponent(q)}${tag ? `&tag=${tag}` : ""}`));
+    const res = await fetch(withBase(`/api/catalog?q=${encodeURIComponent(q)}${tag ? `&tag=${tag}` : ""}${scope}`));
     const data = await res.json();
     if (res.ok) {
       setResults(data.books);
@@ -130,7 +141,7 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
     setLoadingMore(true);
     try {
       const res = await fetch(
-        withBase(`/api/catalog?q=${encodeURIComponent(q)}&page=${page + 1}${filter ? `&tag=${filter}` : ""}`)
+        withBase(`/api/catalog?q=${encodeURIComponent(q)}&page=${page + 1}${filter ? `&tag=${filter}` : ""}${scope}`)
       );
       const data = await res.json();
       if (res.ok) {
@@ -297,6 +308,7 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
                       </span>
                     </span>
                     {b.tag && <TagPill tag={b.tag} small className={pillTextClass(b.tag)} />}
+                    {b.teachers && <TeachersPill small />}
                     <span className={`catrow-chev${open ? " open" : ""}`} aria-hidden>
                       ›
                     </span>

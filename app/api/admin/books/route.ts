@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guarded, requirePermission } from "@/lib/guards";
 import { isCategoryId } from "@/lib/tags";
-import { searchCatalog } from "@/lib/catalog";
+import { searchCatalog, type TeacherScope } from "@/lib/catalog";
 
 /** Search the active inventory generation, optionally filtered by tag. */
 export const GET = guarded(async (req: NextRequest) => {
@@ -14,6 +14,8 @@ export const GET = guarded(async (req: NextRequest) => {
     page,
     tag: isCategoryId(tagParam) ? tagParam : null,
     untagged: req.nextUrl.searchParams.get("untagged") === "1",
+    // "only" backs the Books for Teachers view; admins otherwise see everything.
+    teachers: (req.nextUrl.searchParams.get("teachers") === "only" ? "only" : "all") as TeacherScope,
     sort: "author", // admin inventory + tag-review queue order by author surname
   });
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
