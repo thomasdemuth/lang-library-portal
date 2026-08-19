@@ -563,11 +563,20 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
 
   /** Apply (or clear) a tag on every selected book at once. */
   /** Write one tag across many books. No history — the do/undo/redo step. */
-  async function putBulk(keys: string[], tag: CategoryId | null): Promise<boolean> {
+  /** One bulk write. Fields left undefined are deliberately not touched. */
+  async function putBulk(
+    keys: string[],
+    tag: CategoryId | null | undefined,
+    teachers?: boolean
+  ): Promise<boolean> {
     const res = await fetch(withBase("/api/admin/books/tag/bulk"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ book_keys: keys, category: tag }),
+      body: JSON.stringify({
+        book_keys: keys,
+        ...(tag === undefined ? {} : { category: tag }),
+        ...(teachers === undefined ? {} : { teachers }),
+      }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -577,8 +586,51 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
       return false;
     }
     const hit = new Set(keys);
-    setResults((cur) => cur?.map((b) => (hit.has(b.dedupe_key) ? { ...b, tag } : b)) ?? cur);
+    setResults(
+      (cur) =>
+        cur?.map((b) =>
+          hit.has(b.dedupe_key)
+            ? { ...b, ...(tag === undefined ? {} : { tag }), ...(teachers === undefined ? {} : { teachers }) }
+            : b
+        ) ?? cur
+    );
     return true;
+  }
+
+  /** Move every selected book in or out of the teachers' collection. */
+  async function bulkTeachers(next: boolean) {
+    if (!results || selected.size === 0) return;
+    const picked = results.filter((b) => selected.has(b.id));
+    const keys = picked.map((b) => b.dedupe_key);
+    // The selection is usually a mixed bag, so undo restores each group to
+    // what it was rather than blanket-flipping everything back.
+    const before = new Map<boolean, string[]>();
+    for (const b of picked) {
+      const was = b.teachers === true;
+      before.set(was, [...(before.get(was) ?? []), b.dedupe_key]);
+    }
+
+    setBulk({ busy: true, msg: null });
+    try {
+      if (!(await putBulk(keys, undefined, next))) return;
+      const n = `${keys.length} book${keys.length === 1 ? "" : "s"}`;
+      const label = next
+        ? `Marked ${n} for teachers — students can't see ${keys.length === 1 ? "it" : "them"}`
+        : `Returned ${n} to the students' library`;
+      pushUndo({
+        label,
+        undo: async () => {
+          for (const [was, group] of before) await putBulk(group, undefined, was);
+        },
+        redo: async () => void (await putBulk(keys, undefined, next)),
+      });
+      setBulk({ busy: false, msg: label });
+      announce(label);
+      setTimeout(() => setBulk((b) => ({ ...b, msg: null })), 5000);
+    } catch {
+      setBulk({ busy: false, msg: "Couldn't update tags." });
+      announce("Couldn't update tags.", true);
+    }
   }
 
   async function bulkTag(tag: CategoryId | null) {
@@ -616,7 +668,9 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   function onEdited(u: EditableBook) {
     setResults((cur) =>
       cur?.map((b) =>
-        b.id === u.id ? { ...b, title: u.title, creators: u.creators, isbn13: u.isbn13, copies: u.copies, tag: u.tag } : b
+        b.id === u.id
+          ? { ...b, title: u.title, creators: u.creators, isbn13: u.isbn13, copies: u.copies, tag: u.tag, teachers: u.teachers === true }
+          : b
       ) ?? cur
     );
     setDetails((cur) => ({ ...cur, [u.id]: { isbn13: u.isbn13, isbn10: u.isbn10, description: u.description, notes: u.notes } }));
@@ -648,7 +702,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
       const existing = cur.findIndex((b) => b.id === book.id);
       if (existing >= 0) {
         const next = [...cur];
-        next[existing] = { ...next[existing], copies: book.copies, tag: book.tag };
+        next[existing] = { ...next[existing], copies: book.copies, tag: book.tag, teachers: book.teachers === true };
         return next;
       }
       return [book, ...cur];
@@ -1335,6 +1389,26 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
             <b>{selected.size} selected</b>
             <span className="hint" style={{ margin: 0 }}>Set tag:</span>
             <TagPicker value={null} onChange={(t) => bulkTag(t)} dots disabled={bulk.busy} />
+            <button
+              type="button"
+              className="btn"
+              style={{ padding: "5px 10px", fontSize: 12, borderColor: TEACHERS_COLOR, color: TEACHERS_COLOR }}
+              disabled={bulk.busy}
+              onClick={() => bulkTeachers(true)}
+              title="Hide these from students; only teachers and management will see them"
+            >
+              For teachers
+            </button>
+            <button
+              type="button"
+              className="btn ghost"
+              style={{ padding: "5px 10px", fontSize: 12 }}
+              disabled={bulk.busy}
+              onClick={() => bulkTeachers(false)}
+              title="Put these back in the students' library"
+            >
+              Back to library
+            </button>
             <button type="button" className="btn ghost" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => setSelected(new Set())}>
               Deselect
             </button>
@@ -1455,6 +1529,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                                           description: d?.description ?? null,
                                           notes: d?.notes ?? null,
                                           tag: b.tag,
+                                          teachers: b.teachers === true,
                                           dedupe_key: b.dedupe_key,
                                         })
                                       }

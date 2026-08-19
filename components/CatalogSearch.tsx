@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { CATEGORIES, CATEGORY_IDS, pillTextClass, type CategoryId } from "@/lib/categories";
+import {
+  CATEGORIES,
+  CATEGORY_IDS,
+  pillTextClass,
+  TEACHERS_COLOR,
+  type CategoryId,
+} from "@/lib/categories";
 import { TagPill, TeachersPill } from "@/components/TagPicker";
 import { Check, Heart, Pin } from "@/components/icons";
 import AddToCollection from "@/components/AddToCollection";
@@ -50,13 +56,17 @@ export default function CatalogSearch({
   teachersOnly?: boolean;
 }) {
   const isStudent = role === "student";
-  const scope = teachersOnly ? "&teachers=only" : "";
+  // Staff can narrow a search to the teachers' collection. The chip is a
+  // sibling of the category chips rather than one of them: Teachers is a flag
+  // a book carries, not a seventh category, so a book can match both.
+  const canFilterTeachers = role === "staff" && !teachersOnly;
   // aria-expanded on its own leaves a screen reader to guess which region the
   // row controls — namespaced per instance so the id is unique even when two
   // catalogs render on one page.
   const uid = useId();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<CategoryId | null>(null);
+  const [teachersFilter, setTeachersFilter] = useState(false);
   const [results, setResults] = useState<Book[] | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -98,11 +108,17 @@ export default function CatalogSearch({
     return result;
   }
 
-  async function search(e?: React.FormEvent, tagOverride?: CategoryId | null) {
+  async function search(
+    e?: React.FormEvent,
+    tagOverride?: CategoryId | null,
+    teachersOverride?: boolean
+  ) {
     e?.preventDefault();
     setNote(null);
     setExpandedId(null);
     const tag = tagOverride === undefined ? filter : tagOverride;
+    const onlyTeachers = teachersOverride === undefined ? teachersFilter : teachersOverride;
+    const scope = teachersOnly || onlyTeachers ? "&teachers=only" : "";
     const res = await fetch(withBase(`/api/catalog?q=${encodeURIComponent(q)}${tag ? `&tag=${tag}` : ""}${scope}`));
     const data = await res.json();
     if (res.ok) {
@@ -141,7 +157,11 @@ export default function CatalogSearch({
     setLoadingMore(true);
     try {
       const res = await fetch(
-        withBase(`/api/catalog?q=${encodeURIComponent(q)}&page=${page + 1}${filter ? `&tag=${filter}` : ""}${scope}`)
+        withBase(
+          `/api/catalog?q=${encodeURIComponent(q)}&page=${page + 1}${filter ? `&tag=${filter}` : ""}${
+            teachersOnly || teachersFilter ? "&teachers=only" : ""
+          }`
+        )
       );
       const data = await res.json();
       if (res.ok) {
@@ -267,6 +287,27 @@ export default function CatalogSearch({
             </button>
           );
         })}
+        {canFilterTeachers && (
+          <button
+            type="button"
+            aria-pressed={teachersFilter}
+            className={`tagchip${teachersFilter ? ` active ${pillTextClass("teachers")}` : ""}`}
+            style={
+              teachersFilter
+                ? { background: TEACHERS_COLOR, borderColor: TEACHERS_COLOR, color: "#fff" }
+                : undefined
+            }
+            title="Only the books kept out of the students' library"
+            onClick={() => {
+              const next = !teachersFilter;
+              setTeachersFilter(next);
+              search(undefined, undefined, next);
+            }}
+          >
+            {!teachersFilter && <span className="dot" style={{ background: TEACHERS_COLOR }} />}
+            Teachers
+          </button>
+        )}
       </div>
 
       {note && (
@@ -283,7 +324,8 @@ export default function CatalogSearch({
       {results && (
         <>
           <p className="hint" style={{ marginTop: 10 }}>
-            {total.toLocaleString()} {q.trim() || filter ? `match${total === 1 ? "" : "es"}` : "books"}
+            {total.toLocaleString()}{" "}
+            {q.trim() || filter || teachersFilter ? `match${total === 1 ? "" : "es"}` : "books"}
             {total > results.length ? ` (showing ${results.length.toLocaleString()})` : ""}
           </p>
           <div className="catlist">

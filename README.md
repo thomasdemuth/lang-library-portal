@@ -38,8 +38,13 @@ and publishing app updates — are restricted to the developer account.
     library doesn't own it. **Anything already in a student's reading log or favorites is
     left alone** — nothing is deleted from someone's own record behind their back.
   - Teachers and management get a **For Teachers** tab in the top nav listing the whole
-    collection, a row of them on the staff home page, and a **For Teachers** filter in
-    Management → *Inventory*.
+    collection, a row of them on the staff home page, a **Teachers** filter chip on *Find a
+    Book*, and a **For Teachers** filter in Management → *Inventory*.
+  - Tag it from anywhere you already tag books: an Inventory row, a barcode scan, the
+    Add/Edit dialogs, or in bulk — select books and hit **For teachers** / **Back to
+    library**, or tick *Also mark every scan for teachers* to walk a whole shelf. Setting a
+    category never changes the Teachers flag, and vice versa; each is left alone unless you
+    touch it.
   - **Teachers** is also a map area type, so the physical shelf can be drawn in dark silver
     in the Map Editor. That area shows on **every** map, students included — the shelf is
     really there, and hiding it would send a student looking for a wall that has bookcases
