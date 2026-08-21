@@ -17,6 +17,7 @@ export default async function AdminShell({ children }: { children: React.ReactNo
   const libraryLinks = [
     { href: "/admin", label: "Dashboard", icon: "home", show: true },
     { href: "/admin/requests", label: "Book Requests", icon: "requests", show: canDo(admin, "requests") },
+    { href: "/admin/circulation", label: "Circulation", icon: "backpack", show: canDo(admin, "circulation") },
     { href: "/admin/feedback", label: "Feedback", icon: "feedback", show: canDo(admin, "feedback_view") },
     {
       href: "/admin/inventory",

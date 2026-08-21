@@ -10,6 +10,7 @@ export const PERMISSIONS = [
   { key: "map_edit", label: "Map editing", group: "Map", desc: "Build & edit shelves, categories, internal notes." },
   { key: "map_floorplan", label: "Upload floor plan", group: "Map", desc: "Replace the background floor-plan image." },
   { key: "requests", label: "Book requests", group: "Requests", desc: "View requests and set status/notes." },
+  { key: "circulation", label: "Circulation", group: "Circulation", desc: "See who has which book out, mark returns, and set checkout emails." },
   { key: "feedback_view", label: "Feedback viewing", group: "Feedback", desc: "Read student & teacher feedback." },
   { key: "feedback_manage", label: "Manage feedback status", group: "Feedback", desc: "Mark feedback read / archived." },
   { key: "inventory_view", label: "Inventory (search)", group: "Inventory", desc: "Search the catalog & see sync history." },

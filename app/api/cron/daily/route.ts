@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/db";
-import { notifyChiefEmails, sendEmail, weeklyDigestEmails } from "@/lib/email";
+import { libraryMailbox, notifyChiefEmails, sendEmail, weeklyDigestEmails } from "@/lib/email";
+import { DEFAULT_EMAIL_MODE, dueLabel, isEmailMode } from "@/lib/circulation";
+import { getSetting } from "@/lib/settings";
+import { displayNameFull } from "@/lib/play";
 import { staffUrl } from "@/lib/hosts";
 import { allowHit } from "@/lib/ratelimit";
 import { STATUS_LABELS } from "@/lib/labels";
@@ -133,6 +136,52 @@ function isoWeek(nyDate: string): number {
   firstThursday.setUTCDate(firstThursday.getUTCDate() - ftDay + 3);
   return 1 + Math.round((d.getTime() - firstThursday.getTime()) / (7 * 24 * 3600 * 1000));
 }
+/** The circulation daily summary. Returns "sent" | "skipped" | "empty" | "send-failed". */
+async function sendCirculationDigest(): Promise<string> {
+  const { date } = nyDateParts();
+  // One per NY calendar day, even across retries/forced runs.
+  if (!(await allowHit("circ_digest", date, 1, 20 * 3600))) return "skipped";
+
+  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const cols = "title, student_email, checked_out_by, checked_out_via, due_at, created_at, returned_at, returned_by";
+  const [outRes, backRes, overdueRes] = await Promise.all([
+    db().from("checkouts").select(cols).gte("created_at", since).order("created_at", { ascending: true }).limit(200),
+    db().from("checkouts").select(cols).gte("returned_at", since).order("returned_at", { ascending: true }).limit(200),
+    db().from("checkouts").select("title, student_email, due_at").is("returned_at", null).lt("due_at", new Date().toISOString()).order("due_at", { ascending: true }).limit(50),
+  ]);
+  if (outRes.error) return "empty"; // pre-migration or transient — try again tomorrow
+  const out = outRes.data ?? [];
+  const back = backRes.data ?? [];
+  const overdue = overdueRes.data ?? [];
+  if (out.length === 0 && back.length === 0 && overdue.length === 0) return "empty";
+
+  const who = (email: string) => `${displayNameFull(email)} <${email}>`;
+  const lines = [
+    out.length ? `Checked out (${out.length}):` : null,
+    ...out.map(
+      (c) =>
+        `• “${c.title}” — ${who(c.student_email)}${
+          c.checked_out_by !== c.student_email ? `, by ${displayNameFull(c.checked_out_by)} (${c.checked_out_via})` : ""
+        } — ${dueLabel(c.due_at)}`
+    ),
+    out.length ? "" : null,
+    back.length ? `Returned (${back.length}):` : null,
+    ...back.map((c) => `• “${c.title}” — ${who(c.student_email)}`),
+    back.length ? "" : null,
+    overdue.length ? `Still overdue (${overdue.length}):` : null,
+    ...overdue.map((c) => `• “${c.title}” — ${who(c.student_email)} — ${dueLabel(c.due_at)}`),
+    overdue.length ? "" : null,
+    `Circulation: ${staffUrl()}/admin/circulation`,
+  ].filter((l): l is string => l !== null);
+
+  const sent = await sendEmail(
+    [libraryMailbox()],
+    `Library circulation — ${out.length} out, ${back.length} back${overdue.length ? `, ${overdue.length} overdue` : ""}`,
+    lines.join("\n")
+  );
+  return sent ? "sent" : "send-failed";
+}
+
 /** Constant-time bearer check, so response timing can't leak the secret. */
 function authorized(header: string | null, secret: string | undefined): boolean {
   if (!secret || !header) return false;
@@ -197,6 +246,22 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Circulation daily digest ────────────────────────────────────────────
+  // Only when Management → Circulation has chosen "one daily summary email"
+  // instead of per-checkout mail. Covers the last 24h of checkouts and
+  // returns plus the standing overdue count; an empty day sends nothing.
+  // allowHit caps it at one send per NY calendar day even across forced runs.
+  let circDigest = "off";
+  try {
+    const mode = await getSetting<unknown>("circulation_email_mode", DEFAULT_EMAIL_MODE);
+    if (isEmailMode(mode) && mode === "daily_digest") {
+      circDigest = await sendCirculationDigest();
+    }
+  } catch {
+    circDigest = "error"; // never let circulation mail fail the cron
+  }
+  // ── end circulation digest ──────────────────────────────────────────────
+
   // Pruning
   const d = (days: number) => new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
   await db().from("rate_limit_hits").delete().lt("created_at", d(7));
@@ -240,5 +305,5 @@ export async function GET(req: NextRequest) {
     /* never let enrichment fail the cron */
   }
 
-  return NextResponse.json({ ok: true, reminded, reminderPending, weekly, prunedSyncs, enrich, ranAt: new Date().toISOString() });
+  return NextResponse.json({ ok: true, reminded, reminderPending, weekly, circDigest, prunedSyncs, enrich, ranAt: new Date().toISOString() });
 }

@@ -18,6 +18,8 @@ import {
   type NoteKind,
   type ShelfResult,
 } from "@/lib/book-actions-client";
+import { checkOut } from "@/lib/checkout-client";
+import StaffCheckout from "@/components/StaffCheckout";
 import { withBase } from "@/lib/base";
 
 type Book = {
@@ -53,6 +55,7 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [details, setDetails] = useState<Record<number, DetailResult>>({});
   const [logged, setLogged] = useState<Set<string>>(new Set());
+  const [borrowed, setBorrowed] = useState<Set<string>>(new Set());
   const [favTick, setFavTick] = useState(0);
   // `undo` is the notice's one action; `undoLabel` renames it when the action
   // isn't an undo (the "Show me where" answer offers the map instead).
@@ -185,6 +188,17 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
       return next;
     });
     say("Removed from your log", "info");
+  }
+
+  async function borrow(b: Book) {
+    const result = await checkOut(b);
+    if ("error" in result) {
+      // Already-out is still "you have it" — reflect that on the button.
+      if (result.kind === "warn") setBorrowed((cur) => new Set(cur).add(b.dedupe_key));
+      return say(result.error, result.kind);
+    }
+    setBorrowed((cur) => new Set(cur).add(b.dedupe_key));
+    say([result.message, ...result.warnings].join(" "), result.warnings.length ? "warn" : "ok");
   }
 
   async function heart(b: Book) {
@@ -349,11 +363,28 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
                                 <Check done={logged.has(b.dedupe_key)} /> {logged.has(b.dedupe_key) ? "Logged" : "I read this"}
                               </button>
                             )}
+                            {isStudent && (
+                              <button
+                                type="button"
+                                className={`b-btn b-read${borrowed.has(b.dedupe_key) ? " done" : ""}`}
+                                onClick={() => borrow(b)}
+                                disabled={borrowed.has(b.dedupe_key)}
+                              >
+                                <Check done={borrowed.has(b.dedupe_key)} />{" "}
+                                {borrowed.has(b.dedupe_key) ? "Checked out" : "Check out"}
+                              </button>
+                            )}
                             <button type="button" className="b-btn b-where" onClick={() => where(b)}>
                               <Pin /> Show me where
                             </button>
                             {isStudent && (
                               <AddToCollection book={{ book_key: b.dedupe_key, title: b.title, isbn13: b.isbn13 }} />
+                            )}
+                            {role === "staff" && (
+                              <StaffCheckout
+                                book={{ title: b.title, dedupe_key: b.dedupe_key, isbn13: b.isbn13 }}
+                                onNote={(text, kind) => say(text, kind)}
+                              />
                             )}
                             {role === "guest" && (
                               <a className="hint" style={{ margin: 0, alignSelf: "center" }} href={withBase("/api/auth/google/start")}>

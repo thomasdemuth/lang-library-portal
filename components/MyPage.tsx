@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Collections from "@/components/Collections";
 import FriendsCard from "@/components/FriendsCard";
+import MyBooksCard from "@/components/MyBooksCard";
 import LetterAvatar from "@/components/LetterAvatar";
 import { Heart, Ic } from "@/components/icons";
 import { announce } from "@/components/Announcer";
@@ -144,6 +145,7 @@ export default function MyPage({ email }: { email: string }) {
           favorites + lists on the right; one column below 900px. */}
       <div className="me-grid">
         <div className="me-col">
+          <MyBooksCard />
           <div className="card" style={{ marginBottom: 14 }}>
             <h2>
               <Ic name="book" size={16} /> My reading{counts ? ` · ${counts.year} this year` : ""}

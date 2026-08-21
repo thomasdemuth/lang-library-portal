@@ -28,6 +28,8 @@ const ALL: (NavShortcut & { allow: (a: AdminLike & { role: string }) => boolean 
   { key: "7", href: "/admin/users", label: "User Insights", allow: (a) => canDo(a, "users") },
   { key: "8", href: "/admin/admins", label: "Admins & Invites", allow: (a) => a.role === "chief" },
   { key: "9", href: "/admin/account", label: "My Account", allow: () => true },
+  // 1-9 were taken when Circulation arrived; 0 sits next to 9 on every layout.
+  { key: "0", href: "/admin/circulation", label: "Circulation", allow: (a) => canDo(a, "circulation") },
 ];
 
 /** The jumps this admin can actually use (the rest would just 403). */

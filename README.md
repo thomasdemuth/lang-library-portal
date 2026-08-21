@@ -36,6 +36,16 @@ and publishing app updates — are restricted to the developer account.
   has enough copies. Set the status on *Book Requests* (New → In progress / Ordered / Ready /
   Declined). Marking **Ready** or **Declined** emails the requesting teacher (with your note,
   if you left one). Anything still **New** after 72 hours triggers one reminder email.
+- **Circulation** — Management → *Circulation*: every book currently out (overdue first),
+  who has it, how long it's been gone, and what came back. Students check out from any book
+  card ("Check out" next to "I read this") and return from *My Page*; teachers use
+  "Check out for a student" on Find a Book — type a name or school email (kids who've never
+  signed in still work: "first last" becomes their school address). Loans run 2 weeks and the
+  usual limit is 3 books out, but **nothing is ever blocked** — a kid at the shelf with the
+  book wins; the tab just flags overdue rows, students over the limit, and titles with more
+  copies out than the catalog says we own. Mark rows returned there (or undo a mistaken
+  return). By default every checkout emails the library mailbox; switch to a daily summary
+  (or off) at the bottom of the tab. Requires migration `0026_circulation.sql`.
 - **Weekly summary** — every Friday morning, Chief Admins (and anyone who opts in) get an
   email digest: the week's requests, feedback, inventory imports, map changes, and traffic.
 - **Email preferences** — Management → *My Account* → Email notifications: mute new-request

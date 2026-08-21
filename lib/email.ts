@@ -35,6 +35,15 @@ function smtp(): Transporter | null {
 }
 
 /**
+ * The library's own inbox — where circulation notifications land. This is
+ * the same mailbox the app sends AS, so these mails are effectively
+ * self-addressed; the env fallback keeps dev-log mode legible.
+ */
+export function libraryMailbox(): string {
+  return process.env.GMAIL_USER?.trim() || "library@thelangschool.org";
+}
+
+/**
  * Send one message. Resolves true when the mail was handed off successfully
  * (dev-log mode counts as delivered — there is no SMTP to fail), false when
  * there was nobody to send to or the send threw. Never throws.

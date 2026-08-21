@@ -7,6 +7,7 @@ import { Check, Heart, Pin } from "@/components/icons";
 import { announce } from "@/components/Announcer";
 import { getFavorites, isFavorite, onFavoritesChange, toggleFavorite } from "@/lib/favorites-client";
 import { fetchDetail, findShelf, logRead, removeRead, shelfMapHref, type DetailResult, type NoteKind } from "@/lib/book-actions-client";
+import { checkOut } from "@/lib/checkout-client";
 import { withBase } from "@/lib/base";
 
 type Book = { id: number; title: string; creators: string | null; isbn13: string | null; dedupe_key: string; tag: CategoryId | null };
@@ -68,6 +69,7 @@ export default function BookRow({
   const [loaded, setLoaded] = useState(false);
   const [hidden, setHidden] = useState<Set<number>>(new Set());
   const [logged, setLogged] = useState<Set<string>>(new Set());
+  const [borrowed, setBorrowed] = useState<Set<string>>(new Set());
   const [favTick, setFavTick] = useState(0); // re-render when the shared heart set changes
   // `undo` is the toast's one action; `undoLabel` renames it when the action
   // isn't an undo (the "Show me where" answer offers the map instead).
@@ -171,6 +173,18 @@ export default function BookRow({
     });
     onLogged?.(-1);
     say("Removed from your log", "info");
+  }
+
+  async function borrow(e: React.MouseEvent, b: Book) {
+    e.stopPropagation();
+    const result = await checkOut(b);
+    if ("error" in result) {
+      // Already-out is still "you have it" — reflect that on the button.
+      if (result.kind === "warn") setBorrowed((cur) => new Set(cur).add(b.dedupe_key));
+      return say(result.error, result.kind);
+    }
+    setBorrowed((cur) => new Set(cur).add(b.dedupe_key));
+    say([result.message, ...result.warnings].join(" "), result.warnings.length ? "warn" : "ok");
   }
 
   async function heart(e: React.MouseEvent, b: Book) {
@@ -331,6 +345,14 @@ export default function BookRow({
                       onClick={(e) => markRead(e, b)}
                     >
                       <Check done={logged.has(b.dedupe_key)} /> {logged.has(b.dedupe_key) ? "Logged" : "I read this"}
+                    </button>
+                    <button
+                      type="button"
+                      className={`b-btn b-read${borrowed.has(b.dedupe_key) ? " done" : ""}`}
+                      onClick={(e) => borrow(e, b)}
+                      disabled={borrowed.has(b.dedupe_key)}
+                    >
+                      <Check done={borrowed.has(b.dedupe_key)} /> {borrowed.has(b.dedupe_key) ? "Checked out" : "Check out"}
                     </button>
                     <button type="button" className="b-btn b-where" onClick={(e) => where(e, b)}>
                       <Pin /> Show me where
