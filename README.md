@@ -40,9 +40,15 @@ and publishing app updates — are restricted to the developer account.
   who has it, how long it's been gone, and what came back. Students check out from any book
   card ("Check out" next to "I read this") or — built for the camera-less school computers —
   from the **Take a Book Home** tab: type the title, pick it from the type-ahead list, one
-  big button (returns live there and on *My Page*); teachers use
+  big button (returns live there and on *My Page*, and on a phone the same tab can **scan the
+  barcode** instead); teachers use
   "Check out for a student" on Find a Book — type a name or school email (kids who've never
-  signed in still work: "first last" becomes their school address). Loans run 2 weeks and the
+  signed in still work: "first last" becomes their school address). The **Checkout Desk**
+  (staff tab, and embedded at the top of Management → Circulation, with a **Desk** tab on the
+  phone app's bottom bar) is the frictionless path: scan the barcode with the phone camera (or
+  type the title), pick the student (recent students become one-tap chips), then one tap to
+  check out or in — any teacher can check in any book, and the desk lists everything currently
+  out. Loans run 2 weeks and the
   usual limit is 3 books out, but **nothing is ever blocked** — a kid at the shelf with the
   book wins; the tab just flags overdue rows, students over the limit, and titles with more
   copies out than the catalog says we own. Mark rows returned there (or undo a mistaken

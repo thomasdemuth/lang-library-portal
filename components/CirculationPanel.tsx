@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { announce } from "@/components/Announcer";
+import CirculationDesk from "@/components/CirculationDesk";
 import {
   DEFAULT_EMAIL_MODE,
   dueLabel,
@@ -149,6 +150,11 @@ export default function CirculationPanel() {
 
   return (
     <>
+      {/* The desk: scan/type → student → check out/in. Same component the
+          staff Checkout Desk tab renders; the table below is the status
+          view here, so the desk's own list is off. */}
+      <CirculationDesk showStatus={false} onChange={() => load()} />
+
       {stats && (
         <div className="cards" style={{ marginBottom: 16 }}>
           <div className="card">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import BarcodeOverlay from "@/components/BarcodeOverlay";
 import { announce } from "@/components/Announcer";
 import { Check, Ic } from "@/components/icons";
 import { checkOut, myCheckouts, returnCheckout, type MyCheckout } from "@/lib/checkout-client";
@@ -38,6 +39,7 @@ export default function TakeHomeKiosk() {
   const [searching, setSearching] = useState(false);
   // ── confirm / done ─────────────────────────────────────────────────────
   const [picked, setPicked] = useState<Suggestion | null>(null);
+  const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ title: string; message: string; warnings: string[] } | null>(null);
   const [note, setNote] = useState<{ text: string; kind: NoteKind } | null>(null);
@@ -94,6 +96,26 @@ export default function TakeHomeKiosk() {
     setOpenList(false);
     setNote(null);
     announce(`${b.title} selected — press Take this book home to finish.`, false);
+  }
+
+  /** Phone path: scan the barcode on the back instead of typing. */
+  async function onScanCode(code: string) {
+    try {
+      const res = await fetch(withBase(`/api/catalog/lookup?code=${encodeURIComponent(code)}`));
+      const data = await res.json().catch(() => ({}));
+      setScanning(false);
+      if (res.ok && data.found) {
+        pick(data.book);
+      } else {
+        const text = res.ok
+          ? "Hmm, that barcode isn't in our library — try typing the title instead."
+          : data.error ?? "Couldn't look that up — try typing the title.";
+        setNote({ text, kind: "warn" });
+        announce(text, false);
+      }
+    } catch {
+      setScanning(false);
+    }
   }
 
   function backToSearch(clear = false) {
@@ -172,6 +194,11 @@ export default function TakeHomeKiosk() {
           <p className="hint" style={{ marginTop: 2 }}>
             Start typing the title — then pick it from the list.
           </p>
+          {note && (
+            <div className={`notice${note.kind === "ok" ? "" : ` ${note.kind}`}`} role="status" aria-live="polite">
+              {note.text}
+            </div>
+          )}
           <div style={{ position: "relative" }}>
             <input
               ref={inputRef}
@@ -258,7 +285,20 @@ export default function TakeHomeKiosk() {
               </ul>
             )}
           </div>
+          {/* Phone path: no typing at all — point the camera at the back cover. */}
+          <div style={{ marginTop: 12 }}>
+            <button type="button" className="btn" onClick={() => setScanning(true)}>
+              <Ic name="camera" size={16} /> Scan the barcode instead
+            </button>
+            <p className="hint" style={{ margin: "6px 0 0" }}>
+              On a phone? Point the camera at the barcode on the back of the book.
+            </p>
+          </div>
         </div>
+      )}
+
+      {scanning && (
+        <BarcodeOverlay hint="Point at the barcode on the back" onCode={onScanCode} onClose={() => setScanning(false)} />
       )}
 
       {/* ── confirm ─────────────────────────────────────────────────── */}
@@ -331,11 +371,6 @@ export default function TakeHomeKiosk() {
           <h2>
             <Ic name="backpack" size={16} /> Books I have out · {mine.length}
           </h2>
-          {!picked && !done && note && (
-            <div className={`notice${note.kind === "ok" ? "" : ` ${note.kind}`}`} role="status" aria-live="polite">
-              {note.text}
-            </div>
-          )}
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
             {mine.map((c) => {
               const overdue = isOverdue(c.due_at);
