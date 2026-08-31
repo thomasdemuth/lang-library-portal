@@ -75,18 +75,6 @@ export function unifiedUrl(): string {
   return `${proto(h)}://${h}${serverBase()}`;
 }
 
-/**
- * Student-domain emails specifically exempted to ALSO sign in as management
- * (they must still be a registered admin account and enter its password).
- * This is the personal account the librarian-developer uses on the student
- * domain — a normal student email never reaches the password path.
- */
-const MANAGEMENT_EXEMPT_EMAILS = new Set(["thomas.demuth@students.thelangschool.org"]);
-
-export function isManagementExemptEmail(email: string): boolean {
-  return MANAGEMENT_EXEMPT_EMAILS.has(email.trim().toLowerCase());
-}
-
 /** Email domain rules per host-audience. */
 export function emailAllowedFor(audience: HostAudience, email: string): boolean {
   const e = email.toLowerCase();

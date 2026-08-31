@@ -4,6 +4,13 @@ import { useEffect, useState } from "react";
 import { stripBase, withBase } from "@/lib/base";
 
 const ICONS = {
+  desk: (
+    // the backpack from components/icons — borrowed books
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 6V5a3 3 0 0 1 6 0v1M7 6h10a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" />
+      <path d="M8 21v-6h8v6M8 11h8" />
+    </svg>
+  ),
   scan: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" />
@@ -31,6 +38,7 @@ const ICONS = {
 };
 
 const TABS = [
+  { href: "/admin/circulation", label: "Desk", icon: "desk", need: "circulation" },
   { href: "/admin/scan", label: "Scan", icon: "scan", need: "scan" },
   { href: "/admin/inventory", label: "Inventory", icon: "inventory", need: "inventory" },
   { href: "/admin/map", label: "Map", icon: "map", need: "map" },
@@ -45,15 +53,17 @@ export default function MobileTabBar({
   canScan,
   canInventory,
   canMap,
+  canCirculation,
 }: {
   canScan: boolean;
   canInventory: boolean;
   canMap: boolean;
+  canCirculation: boolean;
 }) {
   // Active tab from the real browser URL (rewrite-proof), set after mount.
   const [path, setPath] = useState("");
   useEffect(() => setPath(stripBase(window.location.pathname)), []);
-  const allowed = { scan: canScan, inventory: canInventory, map: canMap };
+  const allowed = { scan: canScan, inventory: canInventory, map: canMap, circulation: canCirculation };
 
   return (
     <nav className="tabbar" aria-label="App navigation">

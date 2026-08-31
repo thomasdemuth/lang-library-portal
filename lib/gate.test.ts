@@ -18,10 +18,12 @@ describe("classifyEmail", () => {
     });
   });
 
-  it("exempt student-domain account rides the staff portal (manages via /admin/login)", () => {
+  it("no student-domain address is special — every one lands in the student portal", () => {
+    // The old librarian-developer exemption is gone: management is reached
+    // only through /admin/login, whatever the Google account.
     expect(classifyEmail("thomas.demuth@students.thelangschool.org")).toEqual({
       kind: "portal",
-      aud: "staff",
+      aud: "student",
       email: "thomas.demuth@students.thelangschool.org",
     });
   });

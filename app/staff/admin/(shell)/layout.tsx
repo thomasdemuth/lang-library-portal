@@ -66,6 +66,7 @@ export default async function AdminShell({ children }: { children: React.ReactNo
         canScan={canDo(admin, "inventory_view") || canDo(admin, "inventory_import")}
         canInventory={canDo(admin, "inventory_view") || canDo(admin, "inventory_import")}
         canMap={canDo(admin, "map_edit") || canDo(admin, "map_floorplan")}
+        canCirculation={canDo(admin, "circulation")}
       />
     </div>
   );

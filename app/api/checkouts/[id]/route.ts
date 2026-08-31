@@ -3,10 +3,11 @@ import { db } from "@/lib/db";
 import { guarded, requireSession } from "@/lib/guards";
 
 /**
- * "I returned it" — close one checkout. Allowed for the student who has the
- * book and for the teacher who checked it out on their behalf. Management
- * marks returns through /api/admin/circulation (which can also undo one);
- * an admin session that personally made the checkout is covered here too.
+ * "I returned it" / a desk check-in — close one checkout. Allowed for the
+ * student who has the book, and for ANY teacher or management session (the
+ * desk records reality: whoever is holding the phone when a book comes back
+ * should be able to say so — decided with the library team). Management can
+ * additionally undo a return through /api/admin/circulation.
  */
 export const PATCH = guarded(
   async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
@@ -19,13 +20,14 @@ export const PATCH = guarded(
     }
 
     const me = session.email.toLowerCase();
+    const isStaff = session.aud === "staff" || session.aud === "admin";
     const { data: row, error: readErr } = await db()
       .from("checkouts")
       .select("id, student_email, checked_out_by, returned_at")
       .eq("id", checkoutId)
       .maybeSingle();
     if (readErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
-    if (!row || (row.student_email !== me && row.checked_out_by !== me)) {
+    if (!row || (!isStaff && row.student_email !== me && row.checked_out_by !== me)) {
       // Same shape for "missing" and "not yours": no probing for other
       // people's checkout ids.
       return NextResponse.json({ error: "That checkout isn't yours to return." }, { status: 404 });

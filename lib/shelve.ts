@@ -106,7 +106,7 @@ export type ShelfMatch = {
 };
 
 export function resolveShelf(
-  tag: CategoryId,
+  tag: MapCategoryId,
   creators: string | null,
   shelves: ShelfInfo[]
 ): ShelfMatch {

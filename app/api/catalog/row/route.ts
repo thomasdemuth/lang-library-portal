@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guarded, requireSession } from "@/lib/guards";
 import { getActiveSyncId } from "@/lib/active-sync";
-import { attachTags, isCategoryId } from "@/lib/tags";
+import { attachTags, hidesTeacherBooks, isCategoryId } from "@/lib/tags";
 import { surnameOf } from "@/lib/shelve";
 import { normalizeCreators } from "@/lib/match";
 import { sampleIds } from "@/lib/sample";
@@ -48,6 +48,17 @@ async function shelfRow(req: NextRequest): Promise<NextResponse> {
   const kind = req.nextUrl.searchParams.get("kind") ?? "random";
   const tagParam = req.nextUrl.searchParams.get("tag");
 
+  // Every row goes out through this, so a book marked for teachers can't
+  // reach a student through any of the five kinds. Filtering here rather than
+  // in each query keeps the rule in one place, and costs nothing: these rows
+  // are ~14 books and carry no totals to keep consistent. A row that loses a
+  // book to the filter is simply a little shorter.
+  const hide = hidesTeacherBooks(session.aud);
+  const visible = async <T extends { dedupe_key: string }>(rows: T[]) => {
+    const tagged = await attachTags(rows);
+    return hide ? tagged.filter((b) => !b.teachers) : tagged;
+  };
+
   const activeId = await getActiveSyncId();
   if (!activeId) return NextResponse.json({ books: [] });
 
@@ -59,7 +70,7 @@ async function shelfRow(req: NextRequest): Promise<NextResponse> {
       .not("isbn13", "is", null)
       .order("id", { ascending: false })
       .limit(ROW_SIZE);
-    return NextResponse.json({ books: await attachTags(data ?? []) });
+    return NextResponse.json({ books: await visible(data ?? []) });
   }
 
   if (kind === "tag" && isCategoryId(tagParam)) {
@@ -81,7 +92,7 @@ async function shelfRow(req: NextRequest): Promise<NextResponse> {
         .not("isbn13", "is", null)
         .order("title", { ascending: true })
         .range(offset, offset + ROW_SIZE - 1);
-      return NextResponse.json({ books: data ?? [] });
+      return NextResponse.json({ books: await visible(data ?? []) });
     } catch {
       return NextResponse.json({ books: [] }); // pre-0008: no tagged rows yet
     }
@@ -160,7 +171,7 @@ async function shelfRow(req: NextRequest): Promise<NextResponse> {
       if (unique.size === 0) return NextResponse.json({ books: [] });
       return NextResponse.json({
         seedTitle: seed.title,
-        books: await attachTags([...unique.values()]),
+        books: await visible([...unique.values()]),
       });
     } catch {
       return NextResponse.json({ books: [] }); // pre-0011/0012: no log yet
@@ -180,7 +191,7 @@ async function shelfRow(req: NextRequest): Promise<NextResponse> {
         .in("dedupe_key", topKeys);
       const byKey = new Map((data ?? []).map((b) => [b.dedupe_key, b]));
       const ordered = topKeys.map((k) => byKey.get(k)).filter((b): b is NonNullable<typeof b> => Boolean(b));
-      return NextResponse.json({ books: await attachTags(ordered) });
+      return NextResponse.json({ books: await visible(ordered) });
     } catch {
       return NextResponse.json({ books: [] }); // pre-0012: no favorites yet
     }
@@ -200,7 +211,7 @@ async function shelfRow(req: NextRequest): Promise<NextResponse> {
     .not("isbn13", "is", null)
     .in("id", ids)
     .limit(ROW_SIZE);
-  return NextResponse.json({ books: await attachTags(data ?? []) });
+  return NextResponse.json({ books: await visible(data ?? []) });
 }
 
 // "because" is seeded from the signed-in student's own reads and hearts, and
