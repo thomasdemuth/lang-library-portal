@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { type CategoryId } from "@/lib/categories";
 import Modal from "@/components/Modal";
-import TagPicker from "@/components/TagPicker";
+import TagPicker, { TeachersToggle } from "@/components/TagPicker";
 import CopyStepper, { clampCopies } from "@/components/CopyStepper";
 import { withBase } from "@/lib/base";
 
@@ -17,6 +17,7 @@ export type EditableBook = {
   description: string | null;
   notes: string | null;
   tag: CategoryId | null;
+  teachers?: boolean;
   dedupe_key: string;
 };
 
@@ -46,6 +47,7 @@ export default function BookEditModal({
   const [description, setDescription] = useState(book.description ?? "");
   const [notes, setNotes] = useState(book.notes ?? "");
   const [tag, setTag] = useState<CategoryId | null>(book.tag);
+  const [teachers, setTeachers] = useState(book.teachers === true);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +65,8 @@ export default function BookEditModal({
     copies !== clampCopies(book.copies) ||
     description !== (book.description ?? "") ||
     notes !== (book.notes ?? "") ||
-    tag !== book.tag;
+    tag !== book.tag ||
+    teachers !== (book.teachers === true);
 
   async function save() {
     const copyNum = clampCopies(copies);
@@ -90,12 +93,12 @@ export default function BookEditModal({
         setError(data.error ?? "Couldn't save.");
         return;
       }
-      // Tag lives in book_tags (keyed by dedupe_key), saved separately.
-      if (tag !== book.tag) {
+      // Tags live in book_tags (keyed by dedupe_key), saved separately.
+      if (tag !== book.tag || teachers !== (book.teachers === true)) {
         const tagRes = await fetch(withBase("/api/admin/books/tag"), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ book_key: book.dedupe_key, category: tag }),
+          body: JSON.stringify({ book_key: book.dedupe_key, category: tag, teachers }),
         });
         if (!tagRes.ok) {
           setError((await tagRes.json().catch(() => ({}))).error ?? "Saved the book, but the tag didn't stick.");
@@ -112,6 +115,7 @@ export default function BookEditModal({
         description: description.trim() || null,
         notes: notes.trim() || null,
         tag,
+        teachers,
       });
     } finally {
       setBusy(false);
@@ -176,6 +180,9 @@ export default function BookEditModal({
           <div className="field">
             <span className="lbl">Tag</span>
             <TagPicker value={tag} onChange={setTag} />
+            <div className="tagpicker" style={{ marginTop: 6 }}>
+              <TeachersToggle value={teachers} onChange={setTeachers} />
+            </div>
           </div>
           <label className="field">
             <span className="lbl">Description</span>

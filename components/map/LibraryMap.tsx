@@ -1,9 +1,13 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-// The map uses the full set of area types — the book categories plus the
-// map-only grass-green "games" area. (Book tag pickers keep the 6-category
-// CATEGORIES; only the map shows games.)
+// The map uses the full set of area types — the book categories plus the two
+// map-only areas: grass-green "games" and dark-silver "teachers". (Book tag
+// pickers keep the 6-category CATEGORIES; "games" is never a book tag at all,
+// and "teachers" is a flag a book carries, not a category.) The Teachers area
+// is drawn on EVERY map, students included: the shelf is physically there, and
+// leaving it off would send a student looking for a wall that has bookcases
+// against it. Only the books on it are hidden from them.
 import {
   MAP_CATEGORIES as CATEGORIES,
   MAP_CATEGORY_IDS as CATEGORY_IDS,

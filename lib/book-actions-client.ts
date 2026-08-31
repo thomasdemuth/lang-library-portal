@@ -5,7 +5,10 @@
  * finder, and on-demand detail (description). Favorites live in
  * lib/favorites-client (they carry their own shared cache).
  */
-import { CATEGORIES, type CategoryId } from "./categories";
+// MAP_CATEGORIES, not CATEGORIES: a book can resolve to the map-only Teachers
+// area, and narrowing against the six book categories would drop that to "one
+// of several shelves" when we know exactly which area it is.
+import { MAP_CATEGORIES, type MapCategoryId } from "./categories";
 import { withBase } from "./base";
 
 export type ActionBook = { title: string; dedupe_key: string; isbn13: string | null };
@@ -67,16 +70,16 @@ export async function removeRead(id: number): Promise<{ ok: true } | { error: st
 export type ShelfHit = {
   shelfId: string;
   shelfIds: string[];
-  area: CategoryId | null;
+  area: MapCategoryId | null;
   certain: boolean;
   message: string | null;
 };
 export type ShelfResult = ShelfHit | { message: string; kind: "info" | "err" };
 
 /** The honest one-liner for a book we've only narrowed to a category. */
-export function shelfAreaMessage(area: CategoryId | null): string {
+export function shelfAreaMessage(area: MapCategoryId | null): string {
   if (!area) return "It's on one of several shelves — the map shows which ones.";
-  const label = CATEGORIES[area].label;
+  const label = MAP_CATEGORIES[area].label;
   return `Somewhere in ${label} — check the ${label} shelves.`;
 }
 
@@ -89,7 +92,8 @@ export async function findShelf(b: ActionBook): Promise<ShelfResult> {
     const data = await res.json().catch(() => ({}));
     if (data.found && data.shelves?.length) {
       const shelfIds = (data.shelves as { id: string }[]).map((s) => s.id);
-      const area: CategoryId | null = data.tag && data.tag in CATEGORIES ? (data.tag as CategoryId) : null;
+      const area: MapCategoryId | null =
+        data.tag && data.tag in MAP_CATEGORIES ? (data.tag as MapCategoryId) : null;
       // ranged === false means "this is just the category's shelves"; with
       // one shelf in the category that's still a definite answer.
       const certain = data.ranged === true || shelfIds.length === 1;

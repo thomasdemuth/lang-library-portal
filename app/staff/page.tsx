@@ -2,6 +2,7 @@ import { currentSession } from "@/lib/server";
 import { db } from "@/lib/db";
 import { STATUS_LABELS } from "@/lib/labels";
 import { Ic } from "@/components/icons";
+import TeacherPicks from "@/components/TeacherPicks";
 import { withBase } from "@/lib/base";
 
 export const metadata = { title: "Home — Lang Library" };
@@ -30,6 +31,8 @@ export default async function StaffHome() {
     <div className="wrap">
       <h1>Welcome to the Lang Library</h1>
       <p className="sub">Request books for your class, browse the shelves, or leave feedback.</p>
+
+      <TeacherPicks />
 
       {requests.length > 0 && (
         <div className="card" style={{ marginBottom: 18 }}>

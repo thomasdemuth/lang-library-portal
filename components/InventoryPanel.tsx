@@ -2,10 +2,10 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { mergeBooks, mergeCollisions, rowToBook, type BookRecord } from "@/lib/match";
-import { CATEGORIES, CATEGORY_IDS, pillTextClass, type CategoryId } from "@/lib/categories";
+import { CATEGORIES, CATEGORY_IDS, pillTextClass, TEACHERS_COLOR, type CategoryId } from "@/lib/categories";
 import { announce } from "@/components/Announcer";
 import Modal from "@/components/Modal";
-import TagPicker, { TagPill } from "@/components/TagPicker";
+import TagPicker, { TagPill, TeachersPill, TeachersToggle } from "@/components/TagPicker";
 import TagReviewPanel from "@/components/TagReviewPanel";
 import BookEditModal, { type EditableBook } from "@/components/BookEditModal";
 import AddBookModal, { type AddedBook } from "@/components/AddBookModal";
@@ -43,10 +43,13 @@ type Book = {
   group_name: string | null;
   dedupe_key: string;
   tag: CategoryId | null;
+  /** Marked for teachers — students never see this book. */
+  teachers?: boolean;
 };
 
 /** "untagged" narrows to books with no tag yet; null is no filter. */
-type TagFilter = CategoryId | "untagged" | null;
+/** "teachers" isn't a category — it's the books-for-teachers slice. */
+type TagFilter = CategoryId | "untagged" | "teachers" | null;
 
 type BookDetail = {
   isbn13: string | null;
@@ -512,7 +515,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   }
 
   const filterParam = (tag: TagFilter) =>
-    tag === "untagged" ? "&untagged=1" : tag ? `&tag=${tag}` : "";
+    tag === "untagged" ? "&untagged=1" : tag === "teachers" ? "&teachers=only" : tag ? `&tag=${tag}` : "";
 
   async function search(e?: React.FormEvent, tagOverride?: TagFilter, qOverride?: string) {
     e?.preventDefault();
@@ -560,11 +563,20 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
 
   /** Apply (or clear) a tag on every selected book at once. */
   /** Write one tag across many books. No history — the do/undo/redo step. */
-  async function putBulk(keys: string[], tag: CategoryId | null): Promise<boolean> {
+  /** One bulk write. Fields left undefined are deliberately not touched. */
+  async function putBulk(
+    keys: string[],
+    tag: CategoryId | null | undefined,
+    teachers?: boolean
+  ): Promise<boolean> {
     const res = await fetch(withBase("/api/admin/books/tag/bulk"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ book_keys: keys, category: tag }),
+      body: JSON.stringify({
+        book_keys: keys,
+        ...(tag === undefined ? {} : { category: tag }),
+        ...(teachers === undefined ? {} : { teachers }),
+      }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -574,8 +586,51 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
       return false;
     }
     const hit = new Set(keys);
-    setResults((cur) => cur?.map((b) => (hit.has(b.dedupe_key) ? { ...b, tag } : b)) ?? cur);
+    setResults(
+      (cur) =>
+        cur?.map((b) =>
+          hit.has(b.dedupe_key)
+            ? { ...b, ...(tag === undefined ? {} : { tag }), ...(teachers === undefined ? {} : { teachers }) }
+            : b
+        ) ?? cur
+    );
     return true;
+  }
+
+  /** Move every selected book in or out of the teachers' collection. */
+  async function bulkTeachers(next: boolean) {
+    if (!results || selected.size === 0) return;
+    const picked = results.filter((b) => selected.has(b.id));
+    const keys = picked.map((b) => b.dedupe_key);
+    // The selection is usually a mixed bag, so undo restores each group to
+    // what it was rather than blanket-flipping everything back.
+    const before = new Map<boolean, string[]>();
+    for (const b of picked) {
+      const was = b.teachers === true;
+      before.set(was, [...(before.get(was) ?? []), b.dedupe_key]);
+    }
+
+    setBulk({ busy: true, msg: null });
+    try {
+      if (!(await putBulk(keys, undefined, next))) return;
+      const n = `${keys.length} book${keys.length === 1 ? "" : "s"}`;
+      const label = next
+        ? `Marked ${n} for teachers — students can't see ${keys.length === 1 ? "it" : "them"}`
+        : `Returned ${n} to the students' library`;
+      pushUndo({
+        label,
+        undo: async () => {
+          for (const [was, group] of before) await putBulk(group, undefined, was);
+        },
+        redo: async () => void (await putBulk(keys, undefined, next)),
+      });
+      setBulk({ busy: false, msg: label });
+      announce(label);
+      setTimeout(() => setBulk((b) => ({ ...b, msg: null })), 5000);
+    } catch {
+      setBulk({ busy: false, msg: "Couldn't update tags." });
+      announce("Couldn't update tags.", true);
+    }
   }
 
   async function bulkTag(tag: CategoryId | null) {
@@ -613,7 +668,9 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   function onEdited(u: EditableBook) {
     setResults((cur) =>
       cur?.map((b) =>
-        b.id === u.id ? { ...b, title: u.title, creators: u.creators, isbn13: u.isbn13, copies: u.copies, tag: u.tag } : b
+        b.id === u.id
+          ? { ...b, title: u.title, creators: u.creators, isbn13: u.isbn13, copies: u.copies, tag: u.tag, teachers: u.teachers === true }
+          : b
       ) ?? cur
     );
     setDetails((cur) => ({ ...cur, [u.id]: { isbn13: u.isbn13, isbn10: u.isbn10, description: u.description, notes: u.notes } }));
@@ -645,7 +702,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
       const existing = cur.findIndex((b) => b.id === book.id);
       if (existing >= 0) {
         const next = [...cur];
-        next[existing] = { ...next[existing], copies: book.copies, tag: book.tag };
+        next[existing] = { ...next[existing], copies: book.copies, tag: book.tag, teachers: book.teachers === true };
         return next;
       }
       return [book, ...cur];
@@ -732,19 +789,46 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
   }
 
   /** Write one book's tag. No history — the shared step for do/undo/redo. */
-  async function putTag(book: Book, tag: CategoryId | null): Promise<boolean> {
+  async function putTag(book: Book, tag: CategoryId | null, teachers?: boolean): Promise<boolean> {
     setTagError(null);
     const res = await fetch(withBase("/api/admin/books/tag"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ book_key: book.dedupe_key, category: tag }),
+      // teachers omitted → the route keeps whatever the book already had, so
+      // changing a category never silently puts a book back in front of
+      // students (or takes it away from them).
+      body: JSON.stringify({ book_key: book.dedupe_key, category: tag, ...(teachers === undefined ? {} : { teachers }) }),
     });
     if (!res.ok) {
       showTagError((await res.json().catch(() => ({}))).error ?? "Couldn't save the tag.");
       return false;
     }
-    setResults((cur) => cur?.map((b) => (b.dedupe_key === book.dedupe_key ? { ...b, tag } : b)) ?? cur);
+    setResults(
+      (cur) =>
+        cur?.map((b) =>
+          b.dedupe_key === book.dedupe_key
+            ? { ...b, tag, ...(teachers === undefined ? {} : { teachers }) }
+            : b
+        ) ?? cur
+    );
     return true;
+  }
+
+  /** Hide a book from students, or put it back. Undoable like the tag itself. */
+  async function setTeachers(book: Book, next: boolean) {
+    const previous = book.teachers === true;
+    if (!(await putTag(book, book.tag, next))) return;
+    const label = next
+      ? `“${book.title}” is now for teachers only`
+      : `“${book.title}” is back in the students' library`;
+    pushUndo({
+      label,
+      undo: async () => void (await putTag(book, book.tag, previous)),
+      redo: async () => void (await putTag(book, book.tag, next)),
+    });
+    setTagNote(label);
+    announce(label);
+    setTimeout(() => setTagNote((cur) => (cur === label ? null : cur)), 8000);
   }
 
   async function setTag(book: Book, tag: CategoryId | null) {
@@ -793,7 +877,10 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
           >
             {canImport ? (
               tagOpen === b.id ? (
-                <TagPicker value={b.tag} onChange={(t) => setTag(b, t)} dots />
+                <>
+                  <TagPicker value={b.tag} onChange={(t) => setTag(b, t)} dots />
+                  <TeachersToggle value={b.teachers === true} onChange={(v) => setTeachers(b, v)} />
+                </>
               ) : (
                 <button
                   type="button"
@@ -801,11 +888,15 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                   onClick={() => setTagOpen(b.id)}
                   aria-label={`Change tag for ${b.title}`}
                 >
-                  {b.tag ? <TagPill tag={b.tag} /> : <span className="tag-none">+ tag</span>}
+                  {b.tag ? <TagPill tag={b.tag} /> : !b.teachers && <span className="tag-none">+ tag</span>}
+                  {b.teachers && <TeachersPill small />}
                 </button>
               )
-            ) : b.tag ? (
-              <TagPill tag={b.tag} />
+            ) : b.tag || b.teachers ? (
+              <>
+                {b.tag && <TagPill tag={b.tag} />}
+                {b.teachers && <TeachersPill small />}
+              </>
             ) : (
               "—"
             )}
@@ -1256,6 +1347,22 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
           <button
             type="button"
             role="radio"
+            aria-checked={filter === "teachers"}
+            className={`tagchip${filter === "teachers" ? ` active ${pillTextClass("teachers")}` : ""}`}
+            style={
+              filter === "teachers"
+                ? { background: TEACHERS_COLOR, borderColor: TEACHERS_COLOR, color: "#fff" }
+                : undefined
+            }
+            onClick={() => setFilterAndSearch(filter === "teachers" ? null : "teachers")}
+            title="Books for Teachers — hidden from students"
+          >
+            {filter !== "teachers" && <span className="dot" style={{ background: TEACHERS_COLOR }} />}
+            <span className="tagchip-label">For Teachers</span>
+          </button>
+          <button
+            type="button"
+            role="radio"
             aria-checked={filter === "untagged"}
             className={`tagchip untagged${filter === "untagged" ? " active" : ""}`}
             onClick={() => setFilterAndSearch(filter === "untagged" ? null : "untagged")}
@@ -1282,6 +1389,26 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
             <b>{selected.size} selected</b>
             <span className="hint" style={{ margin: 0 }}>Set tag:</span>
             <TagPicker value={null} onChange={(t) => bulkTag(t)} dots disabled={bulk.busy} />
+            <button
+              type="button"
+              className="btn"
+              style={{ padding: "5px 10px", fontSize: 12, borderColor: TEACHERS_COLOR, color: TEACHERS_COLOR }}
+              disabled={bulk.busy}
+              onClick={() => bulkTeachers(true)}
+              title="Hide these from students; only teachers and management will see them"
+            >
+              For teachers
+            </button>
+            <button
+              type="button"
+              className="btn ghost"
+              style={{ padding: "5px 10px", fontSize: 12 }}
+              disabled={bulk.busy}
+              onClick={() => bulkTeachers(false)}
+              title="Put these back in the students' library"
+            >
+              Back to library
+            </button>
             <button type="button" className="btn ghost" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => setSelected(new Set())}>
               Deselect
             </button>
@@ -1402,6 +1529,7 @@ export default function InventoryPanel({ canImport }: { canImport: boolean }) {
                                           description: d?.description ?? null,
                                           notes: d?.notes ?? null,
                                           tag: b.tag,
+                                          teachers: b.teachers === true,
                                           dedupe_key: b.dedupe_key,
                                         })
                                       }

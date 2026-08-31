@@ -4,7 +4,7 @@ import { useState } from "react";
 import { announce } from "@/components/Announcer";
 import { type CategoryId } from "@/lib/categories";
 import Modal from "@/components/Modal";
-import TagPicker from "@/components/TagPicker";
+import TagPicker, { TeachersToggle } from "@/components/TagPicker";
 import CopyStepper from "@/components/CopyStepper";
 import { withBase } from "@/lib/base";
 
@@ -18,6 +18,7 @@ export type AddedBook = {
   group_name: string | null;
   dedupe_key: string;
   tag: CategoryId | null;
+  teachers?: boolean;
 };
 
 /**
@@ -38,6 +39,7 @@ export default function AddBookModal({
   const [isbn10, setIsbn10] = useState("");
   const [copies, setCopies] = useState(1);
   const [tag, setTag] = useState<CategoryId | null>(null);
+  const [teachers, setTeachers] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The add API clamps at MAX_COPIES: the title was already at the ceiling,
@@ -49,7 +51,7 @@ export default function AddBookModal({
 
   // Arms Modal's discard guard once anything has been entered.
   const dirty =
-    title !== "" || creators !== "" || isbn13 !== "" || isbn10 !== "" || copies !== 1 || tag !== null;
+    title !== "" || creators !== "" || isbn13 !== "" || isbn10 !== "" || copies !== 1 || tag !== null || teachers;
 
   async function add() {
     if (!title.trim()) {
@@ -86,14 +88,17 @@ export default function AddBookModal({
         return;
       }
       const book = data.book as AddedBook;
-      // Tag lives in book_tags (keyed by dedupe_key), applied after insert.
-      if (tag) {
+      // Tags live in book_tags (keyed by dedupe_key), applied after insert.
+      if (tag || teachers) {
         const tagRes = await fetch(withBase("/api/admin/books/tag"), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ book_key: book.dedupe_key, category: tag }),
+          body: JSON.stringify({ book_key: book.dedupe_key, category: tag, teachers }),
         });
-        if (tagRes.ok) book.tag = tag;
+        if (tagRes.ok) {
+          book.tag = tag;
+          book.teachers = teachers;
+        }
       }
       onAdded(book, Boolean(data.added));
     } finally {
@@ -144,6 +149,9 @@ export default function AddBookModal({
           <div className="field">
             <span className="lbl">Tag</span>
             <TagPicker value={tag} onChange={setTag} />
+            <div className="tagpicker" style={{ marginTop: 6 }}>
+              <TeachersToggle value={teachers} onChange={setTeachers} />
+            </div>
           </div>
         </div>
       </div>

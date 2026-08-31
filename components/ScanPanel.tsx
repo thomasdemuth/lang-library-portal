@@ -5,7 +5,7 @@ import { startScanner, beep, type ScannerHandle } from "@/lib/scan";
 import { announce } from "@/components/Announcer";
 import { upcAToEan13 } from "@/lib/isbn";
 import { CATEGORIES, type CategoryId } from "@/lib/categories";
-import TagPicker, { TagPill } from "@/components/TagPicker";
+import TagPicker, { TagPill, TeachersPill, TeachersToggle } from "@/components/TagPicker";
 import { Ic, Pin } from "@/components/icons";
 import { withBase } from "@/lib/base";
 
@@ -19,6 +19,7 @@ type Book = {
   group_name: string | null;
   dedupe_key: string;
   tag: CategoryId | null;
+  teachers?: boolean;
 };
 type External = {
   title: string;
@@ -35,7 +36,7 @@ type ShelfHit = { id: string; label: string; shelf_number: string | null; letter
 type WhereHit = { ranged: boolean; tag: CategoryId; shelves: ShelfHit[] };
 type Suggestion = { tag: CategoryId; confidence: number; reasons: string[] };
 /** One tag applied during a bulk stint, with the tag it replaced. */
-type BulkEntry = { key: string; previous: CategoryId | null };
+type BulkEntry = { key: string; previous: CategoryId | null; previousTeachers?: boolean };
 
 const COOLDOWN_MS = 3000;
 /** Above this many tags, "Undo session" asks first. */
@@ -81,6 +82,8 @@ export default function ScanPanel({
   // Null until this bulk stint is told which category — never inherited from
   // a previous stint, so nothing gets tagged from a category nobody chose.
   const [bulkTag, setBulkTag] = useState<CategoryId | null>(null);
+  /** Bulk session also marks every scanned book for teachers. */
+  const [bulkTeachers, setBulkTeachers] = useState(false);
   const [bulkSession, setBulkSession] = useState<BulkEntry[]>([]);
   const [undoingBulk, setUndoingBulk] = useState<number | null>(null);
   const [camError, setCamError] = useState<string | null>(null);
@@ -136,8 +139,10 @@ export default function ScanPanel({
   const pausedRef = useRef(false);
   const modeRef = useRef(mode);
   const bulkTagRef = useRef(bulkTag);
+  const bulkTeachersRef = useRef(bulkTeachers);
   modeRef.current = mode;
   bulkTagRef.current = bulkTag;
+  bulkTeachersRef.current = bulkTeachers;
 
   const say = useCallback((ok: boolean, text: string, undo?: () => Promise<void>) => {
     setToast({ ok, text, undo });
@@ -155,11 +160,18 @@ export default function ScanPanel({
     return res.json();
   }, []);
 
-  const tagBook = useCallback(async (book_key: string, category: CategoryId | null): Promise<boolean> => {
+  const tagBook = useCallback(async (
+    book_key: string,
+    category: CategoryId | null,
+    teachers?: boolean
+  ): Promise<boolean> => {
     const res = await fetch(withBase("/api/admin/books/tag"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ book_key, category }),
+      // teachers omitted → the route keeps whatever the book already had, so
+      // scanning to re-categorize never moves a book in or out of the
+      // students' view by accident.
+      body: JSON.stringify({ book_key, category, ...(teachers === undefined ? {} : { teachers }) }),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -261,12 +273,15 @@ export default function ScanPanel({
         const data = await lookup(code);
         if (data?.found && data.book) {
           const previous = data.book.tag;
+          const previousTeachers = data.book.teachers === true;
+          const forTeachers = bulkTeachersRef.current;
           const key = data.book.dedupe_key;
-          const ok = await tagBook(key, tag);
+          const ok = await tagBook(key, tag, forTeachers ? true : undefined);
           if (ok) {
-            setBulkSession((s) => [...s, { key, previous }]);
-            say(true, `${data.book.title} → ${CATEGORIES[tag].label}`, async () => {
-              await tagBook(key, previous);
+            setBulkSession((s) => [...s, { key, previous, previousTeachers }]);
+            const label = `${data.book.title} → ${CATEGORIES[tag].label}${forTeachers ? " · teachers" : ""}`;
+            say(true, label, async () => {
+              await tagBook(key, previous, forTeachers ? previousTeachers : undefined);
               setBulkSession((s) => {
                 const at = s.findLastIndex((e) => e.key === key);
                 return at < 0 ? s : [...s.slice(0, at), ...s.slice(at + 1)];
@@ -359,7 +374,7 @@ export default function ScanPanel({
     pausedRef.current = true;
     let done = 0;
     for (const entry of entries) {
-      if (await tagBook(entry.key, entry.previous)) done++;
+      if (await tagBook(entry.key, entry.previous, entry.previousTeachers)) done++;
       setUndoingBulk(done);
     }
     pausedRef.current = false;
@@ -401,6 +416,28 @@ export default function ScanPanel({
         if (await tagBook(key, previous)) {
           setResult((cur) =>
             cur?.book && cur.book.dedupe_key === key ? { ...cur, book: { ...cur.book, tag: previous } } : cur
+          );
+          say(true, "Undone.");
+        }
+      });
+    }
+    setBusy(false);
+  }
+
+  /** Mark the scanned book for teachers, or put it back. */
+  async function setResultTeachers(next: boolean) {
+    if (!result?.book || busy) return;
+    const key = result.book.dedupe_key;
+    const tag = result.book.tag;
+    setBusy(true);
+    if (await tagBook(key, tag, next)) {
+      setResult({ ...result, book: { ...result.book, teachers: next } });
+      say(true, next ? "Hidden from students" : "Back in the students' library", async () => {
+        if (await tagBook(key, tag, !next)) {
+          setResult((cur) =>
+            cur?.book && cur.book.dedupe_key === key
+              ? { ...cur, book: { ...cur.book, teachers: !next } }
+              : cur
           );
           say(true, "Undone.");
         }
@@ -558,6 +595,15 @@ export default function ScanPanel({
               {bulkTag ? "Every scan tags the book:" : "Which category is this session tagging?"}
             </span>
             <TagPicker value={bulkTag} onChange={(t) => t && setBulkTag(t)} disabled={undoingBulk !== null} />
+            <label className="check" style={{ marginTop: 8 }}>
+              <input
+                type="checkbox"
+                checked={bulkTeachers}
+                disabled={undoingBulk !== null}
+                onChange={(e) => setBulkTeachers(e.target.checked)}
+              />
+              Also mark every scan for teachers
+            </label>
             {bulkTag && (
               <div
                 className="scan-session"
@@ -685,6 +731,7 @@ export default function ScanPanel({
                 <div>
                   <div className="scan-title">
                     {result.book.title} {result.book.tag && <TagPill tag={result.book.tag} small />}
+                    {result.book.teachers && <TeachersPill small />}
                   </div>
                   <div className="scan-meta">
                     {result.book.creators ?? "Unknown author"} · {result.book.copies}{" "}
@@ -703,6 +750,13 @@ export default function ScanPanel({
                     disabled={busy}
                     suggested={suggestion?.tag ?? null}
                   />
+                  <div className="tagpicker" style={{ marginTop: 6 }}>
+                    <TeachersToggle
+                      value={result.book.teachers === true}
+                      onChange={setResultTeachers}
+                      disabled={busy}
+                    />
+                  </div>
                   <div className="scan-actions">
                     <button className="btn" disabled={busy} onClick={() => adjustCopies(1)}>
                       + Add copy
