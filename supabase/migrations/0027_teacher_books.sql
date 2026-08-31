@@ -42,7 +42,14 @@ create index if not exists book_tags_teachers on book_tags (book_key) where teac
 
 -- ── The view the catalog filters through ────────────────────────────────
 
-create or replace view books_tagged as
+-- Drop-and-recreate rather than create-or-replace: the live view predates
+-- columns later added to books (0010 details, 0014 author_sort, 0018
+-- search_tsv) and a view's b.* is frozen at creation time — re-expanding it
+-- here would shift "tag" out of its old position, which Postgres refuses
+-- (42P16). Nothing else depends on the view (the search functions are
+-- dropped and recreated below; PostgREST re-reads the schema).
+drop view if exists books_tagged;
+create view books_tagged as
 select b.*, t.category as tag, coalesce(t.teachers, false) as teachers
 from books b
 left join book_tags t on t.book_key = b.dedupe_key;
