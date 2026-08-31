@@ -1155,7 +1155,24 @@ html[data-theme="dark"] .play-hero {
 .play-hero .letter-avatar { box-shadow: 0 0 0 3px rgba(255, 255, 255, .5); }
 .play-me b { font-size: 21px; display: block; letter-spacing: -.01em; }
 .play-stats { display: block; font-size: 13px; color: rgba(255, 255, 255, .88); font-weight: 600; margin-top: 3px; }
-.play-cta { display: block; font-size: 12px; color: var(--brand-blue); font-weight: 700; margin-top: 5px; }
+/* On the gradient everything is white: the old brand-blue link was
+   unreadable against the blue end of it. */
+.play-cta {
+  display: inline-block; font-size: 12.5px; color: #fff; font-weight: 700; margin-top: 8px;
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(255, 255, 255, .55);
+}
+.play-cta:hover { color: #fff; text-decoration-color: #fff; }
+/* Quick stats in the My Page hero: white icon + number + label chips,
+   non-interactive siblings of the .play-links pills. */
+.me-statrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 9px; }
+.me-stat {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 700; color: #fff;
+  background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .38);
+  border-radius: 999px; padding: 7px 13px;
+}
+.me-stat b { font-size: 15px; }
+.me-stat svg { width: 15px; height: 15px; }
 .play-links { display: flex; gap: 8px; flex-wrap: wrap; }
 /* Quick links sit ON the gradient, so they are white-on-translucent rather
    than the usual bordered pill. Feedback lives here now that it is out of

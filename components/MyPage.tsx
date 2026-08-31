@@ -9,6 +9,8 @@ import { Heart, Ic } from "@/components/icons";
 import { announce } from "@/components/Announcer";
 import { displayName } from "@/lib/play";
 import { logRead, removeRead, type NoteKind } from "@/lib/book-actions-client";
+import { myCheckouts, type MyCheckout } from "@/lib/checkout-client";
+import { dueLabel, isOverdue } from "@/lib/circulation";
 import { toggleFavorite, type FavBook } from "@/lib/favorites-client";
 import { withBase } from "@/lib/base";
 
@@ -30,6 +32,8 @@ export default function MyPage({ email }: { email: string }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; kind: NoteKind; undo?: () => void } | null>(null);
   const [migration, setMigration] = useState(false);
+  // For the hero's "books out" chip; MyBooksCard below keeps its own copy.
+  const [out, setOut] = useState<MyCheckout[] | null>(null);
 
   const loadLog = useCallback(() => {
     fetch(withBase("/api/play/read"))
@@ -54,6 +58,9 @@ export default function MyPage({ email }: { email: string }) {
       .then((r) => r.json())
       .then((d) => setFavs(d.favorites ?? []))
       .catch(() => {});
+    myCheckouts().then((r) => {
+      if (!("error" in r)) setOut(r.open);
+    });
   }, [loadLog]);
 
   function say(text: string, kind: NoteKind = "ok", undo?: () => void) {
@@ -128,9 +135,25 @@ export default function MyPage({ email }: { email: string }) {
         <LetterAvatar name={name} size={104} src={profile.photo_url ?? undefined} />
         <div>
           <h1 style={{ margin: 0 }}>{name}</h1>
-          <p className="play-stats" style={{ marginTop: 6 }}>
-            Only you and the library team can see this page.
-          </p>
+          {/* Quick stats where the privacy note used to sit: white chips on
+              the gradient. The "out" chip carries the soonest due date so a
+              return reminder is the first thing on the page. */}
+          <div className="me-statrow">
+            <span className="me-stat">
+              <Ic name="book" size={15} /> <b>{counts?.year ?? 0}</b> {(counts?.year ?? 0) === 1 ? "book" : "books"} this year
+            </span>
+            {out !== null && out.length > 0 && (
+              <span className="me-stat">
+                <Ic name="backpack" size={15} /> <b>{out.length}</b> out ·{" "}
+                {out.some((c) => isOverdue(c.due_at))
+                  ? `${out.filter((c) => isOverdue(c.due_at)).length} overdue!`
+                  : dueLabel(out.reduce((a, c) => (c.due_at < a ? c.due_at : a), out[0].due_at))}
+              </span>
+            )}
+            <span className="me-stat">
+              <Heart filled size={14} /> <b>{favs.length}</b> {favs.length === 1 ? "favorite" : "favorites"}
+            </span>
+          </div>
           {profile.public_id && (
             <a className="play-cta" href={withBase(`/students/${profile.public_id}`)}>
               See my page like friends see it →
