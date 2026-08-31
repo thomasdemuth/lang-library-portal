@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import LetterAvatar from "@/components/LetterAvatar";
 import { Heart, Ic } from "@/components/icons";
 import { announce } from "@/components/Announcer";
+import { refreshBadges } from "@/lib/badges-client";
 import { withBase } from "@/lib/base";
 
 type Fav = { book_key: string; title: string; isbn13: string | null };
@@ -54,6 +55,7 @@ export default function StudentProfile({ id }: { id: string }) {
       return;
     }
     setData({ ...data, isFriend: d.isFriend });
+    if (d.isFriend) refreshBadges(); // a first friend earns Book Buddy
   }
 
   if (state === "loading")

@@ -6,6 +6,7 @@ import { announce } from "@/components/Announcer";
 import { myCheckouts, returnCheckout, type MyCheckout } from "@/lib/checkout-client";
 import { dueLabel, isOverdue } from "@/lib/circulation";
 import { fireConfetti } from "@/lib/confetti";
+import { refreshBadges } from "@/lib/badges-client";
 import { withBase } from "@/lib/base";
 
 /**
@@ -36,7 +37,10 @@ export default function MyBooksCard() {
       const text = "error" in result ? result.error : result.message;
       setMsg(text);
       announce(text, "error" in result && result.kind === "err");
-      if (!("error" in result)) fireConfetti(50);
+      if (!("error" in result)) {
+        fireConfetti(50);
+        refreshBadges(); // bringing one back earns Safe Return
+      }
       setTimeout(() => setMsg((cur) => (cur === text ? null : cur)), 3200);
       load();
     } finally {

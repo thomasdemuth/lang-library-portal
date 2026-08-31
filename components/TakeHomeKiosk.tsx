@@ -6,6 +6,8 @@ import { Check, Ic } from "@/components/icons";
 import { checkOut, myCheckouts, returnCheckout, type MyCheckout } from "@/lib/checkout-client";
 import { dueLabel, isOverdue } from "@/lib/circulation";
 import { fireConfetti } from "@/lib/confetti";
+import { badgeState, refreshBadges } from "@/lib/badges-client";
+import { praiseForTakeHome } from "@/lib/praise";
 import type { NoteKind } from "@/lib/book-actions-client";
 import { withBase } from "@/lib/base";
 
@@ -39,7 +41,14 @@ export default function TakeHomeKiosk() {
   // ── confirm / done ─────────────────────────────────────────────────────
   const [picked, setPicked] = useState<Suggestion | null>(null);
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<{ title: string; message: string; warnings: string[] } | null>(null);
+  const [done, setDone] = useState<{
+    title: string;
+    message: string;
+    warnings: string[];
+    isbn13: string | null;
+    /** Books taken home ever, including this one — for the "3rd book home" line. */
+    trip: number;
+  } | null>(null);
   const [note, setNote] = useState<{ text: string; kind: NoteKind } | null>(null);
   // ── my books ───────────────────────────────────────────────────────────
   const [mine, setMine] = useState<MyCheckout[] | null>(null);
@@ -133,8 +142,19 @@ export default function TakeHomeKiosk() {
         announce(result.error, result.kind === "err");
         return;
       }
-      setDone({ title: picked.title, message: result.message, warnings: result.warnings });
-      fireConfetti();
+      // The badge stats already know how many trips home came before this
+      // one; +1 is this checkout, which the refresh below will confirm.
+      const trip = badgeState().stats.takenHome + 1;
+      setDone({
+        title: picked.title,
+        message: result.message,
+        warnings: result.warnings,
+        isbn13: picked.isbn13,
+        trip,
+      });
+      // The kiosk is the biggest moment in the app — more paper than a card.
+      fireConfetti(140);
+      refreshBadges(); // a first trip home earns Book Traveler, popped by the layout
       setPicked(null);
       setQ("");
       setOptions([]);
@@ -152,7 +172,10 @@ export default function TakeHomeKiosk() {
       const text = "error" in result ? result.error : result.message;
       announce(text, "error" in result && result.kind === "err");
       setNote({ text, kind: "error" in result ? result.kind : "ok" });
-      if (!("error" in result)) fireConfetti(50); // bringing one back deserves a little paper too
+      if (!("error" in result)) {
+        fireConfetti(50); // bringing one back deserves a little paper too
+        refreshBadges();
+      }
       loadMine();
     } finally {
       setReturning(null);
@@ -306,11 +329,23 @@ export default function TakeHomeKiosk() {
 
       {/* ── done ────────────────────────────────────────────────────── */}
       {done && (
-        <div className="card" style={{ marginBottom: 18, textAlign: "center", padding: "28px 18px" }}>
-          <div aria-hidden style={{ fontSize: 40, lineHeight: 1 }}>
-            <Check done size={44} />
+        <div className="card kiosk-done" style={{ marginBottom: 18 }}>
+          {done.isbn13 && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              className="kiosk-cover"
+              src={withBase(`/api/catalog/cover?isbn=${done.isbn13}`)}
+              alt=""
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+            />
+          )}
+          <div aria-hidden className="kiosk-check">
+            <Check done size={56} />
           </div>
           <h2 style={{ margin: "10px 0 4px" }}>“{done.title}” is yours!</h2>
+          <p className="kiosk-trip">{praiseForTakeHome(done.trip)}</p>
           <p className="sub" style={{ margin: 0 }}>{done.message}</p>
           {done.warnings.map((w) => (
             <p key={w} className="notice warn" style={{ marginTop: 10, display: "inline-block" }}>

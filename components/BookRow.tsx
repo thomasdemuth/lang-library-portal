@@ -8,7 +8,9 @@ import { announce } from "@/components/Announcer";
 import { getFavorites, isFavorite, onFavoritesChange, toggleFavorite } from "@/lib/favorites-client";
 import { fetchDetail, findShelf, logRead, removeRead, shelfMapHref, type DetailResult, type NoteKind } from "@/lib/book-actions-client";
 import { checkOut } from "@/lib/checkout-client";
-import { fireConfetti } from "@/lib/confetti";
+import { fireConfetti, fireHearts } from "@/lib/confetti";
+import { bumpRead, readCount, refreshBadges } from "@/lib/badges-client";
+import { praiseForRead } from "@/lib/praise";
 import { withBase } from "@/lib/base";
 
 type Book = { id: number; title: string; creators: string | null; isbn13: string | null; dedupe_key: string; tag: CategoryId | null };
@@ -161,8 +163,13 @@ export default function BookRow({
     setLogged((cur) => new Set(cur).add(b.dedupe_key));
     fireConfetti(30); // a mini burst — logging a read is frequent, keep it light
     onLogged?.(1);
+    bumpRead(1);
+    refreshBadges(); // may earn a reading or genre badge — the layout pops it
     const { id } = result;
-    say(result.message, "ok", id === null ? undefined : () => undoRead(b, id));
+    // The praise line names the running total, so the toast IS the progress
+    // bar. Falls back to the server's plain message before badges have loaded.
+    const total = readCount();
+    say(total > 0 ? praiseForRead(total) : result.message, "ok", id === null ? undefined : () => undoRead(b, id));
   }
 
   async function undoRead(b: Book, id: number) {
@@ -174,6 +181,7 @@ export default function BookRow({
       return next;
     });
     onLogged?.(-1);
+    bumpRead(-1);
     say("Removed from your log", "info");
   }
 
@@ -187,14 +195,23 @@ export default function BookRow({
     }
     setBorrowed((cur) => new Set(cur).add(b.dedupe_key));
     fireConfetti();
+    refreshBadges();
     say([result.message, ...result.warnings].join(" "), result.warnings.length ? "warn" : "ok");
   }
 
   async function heart(e: React.MouseEvent, b: Book) {
     e.stopPropagation();
+    // Grab the button's position BEFORE awaiting — React pools nothing in 19,
+    // but the element can re-render out from under us while the POST is out.
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const result = await toggleFavorite({ book_key: b.dedupe_key, title: b.title, isbn13: b.isbn13 });
     if ("error" in result) say(result.error, result.kind);
-    else if (result.favorited) say("Added to your favorites!");
+    else if (result.favorited) {
+      // Hearts only on the way IN. Un-hearting is a correction, not a moment.
+      fireHearts({ x: box.left + box.width / 2, y: box.top + box.height / 2 });
+      refreshBadges();
+      say("Added to your favorites!");
+    }
   }
 
   async function where(e: React.MouseEvent, b: Book) {
