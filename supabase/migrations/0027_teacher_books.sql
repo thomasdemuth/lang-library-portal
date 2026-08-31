@@ -62,6 +62,13 @@ left join book_tags t on t.book_key = b.dedupe_key;
 -- Teachers surfaces. Dropped first because the argument list is changing:
 -- create-or-replace would leave the old signature behind as an overload.
 
+-- pg_trgm's settings only exist once its library is loaded in the running
+-- session, and a fresh SQL-editor session hasn't loaded it (0018 got the
+-- load for free from its own `create extension`). Without this, PG15+
+-- rejects the SET clause below with "permission denied to set parameter".
+create extension if not exists pg_trgm;
+select word_similarity('warm', 'up'); -- no-op that forces the library load
+
 drop function if exists search_books(text, text, bigint, text, boolean, int, int);
 drop function if exists search_books(text, text, bigint, text, boolean, boolean, boolean, int, int);
 
