@@ -1,9 +1,4 @@
-import {
-  emailAllowedFor,
-  isManagementExemptEmail,
-  STAFF_EMAIL_DOMAIN,
-  STUDENT_EMAIL_DOMAIN,
-} from "./hosts";
+import { emailAllowedFor, STAFF_EMAIL_DOMAIN, STUDENT_EMAIL_DOMAIN } from "./hosts";
 
 /**
  * Shared sign-in classifier: a verified school email → which user-facing
@@ -11,9 +6,10 @@ import {
  * fallback use this, so there's one source of truth for the domain rules.
  *
  * Management is deliberately NOT handled here — admins sign in on the
- * separate /admin/login password page, so a portal sign-in never elevates to
- * admin. (The one exempt student-domain account rides the staff portal and
- * still manages via /admin/login.)
+ * separate /admin/login password page, so a portal sign-in never elevates
+ * to admin. (There used to be one exempt student-domain address that rode
+ * the staff portal; with real admin accounts in place it's gone — the
+ * domain decides the portal, full stop.)
  */
 export type Classification =
   | { kind: "reject"; message: string }
@@ -23,16 +19,12 @@ export function classifyEmail(rawEmail: string): Classification {
   const email = rawEmail.trim().toLowerCase();
   const isStudent = emailAllowedFor("student", email);
   const isStaff = emailAllowedFor("staff", email);
-  const exempt = isManagementExemptEmail(email);
 
-  if (!isStudent && !isStaff && !exempt) {
+  if (!isStudent && !isStaff) {
     return {
       kind: "reject",
       message: `Please use your school Google account (@${STUDENT_EMAIL_DOMAIN} for students, @${STAFF_EMAIL_DOMAIN} for staff).`,
     };
   }
-  // Staff-domain emails and the exempt librarian account land in the staff
-  // portal; plain student-domain emails land in the student portal.
-  const aud: "student" | "staff" = isStaff || exempt ? "staff" : "student";
-  return { kind: "portal", aud, email };
+  return { kind: "portal", aud: isStaff ? "staff" : "student", email };
 }
