@@ -20,7 +20,7 @@ export type BadgeState = {
   stats: BadgeStats;
   earned: Set<string>;
   earnedAt: Map<string, string | null>;
-  /** 0027 hasn't run — "seen" is remembered in this browser instead. */
+  /** 0028 hasn't run — "seen" is remembered in this browser instead. */
   migrationPending: boolean;
 };
 
@@ -68,7 +68,7 @@ function emit(c: Celebration) {
   for (const fn of celebrateListeners) fn(c);
 }
 
-// ── The local "seen" ledger, used only until migration 0027 runs ──────────
+// ── The local "seen" ledger, used only until migration 0028 runs ──────────
 function localSeen(): Set<string> {
   try {
     const raw = window.localStorage.getItem(SEEN_KEY);
@@ -112,7 +112,7 @@ function apply(d: Payload): BadgeState {
   loaded = true;
 
   // Welcome first — it sets the scene for any badge that follows it. The
-  // local guard is what covers the pre-0027 case, where the server can't yet
+  // local guard is what covers the pre-0028 case, where the server can't yet
   // remember that this student has already been welcomed.
   if (d.welcome && !localSeenWelcome()) emit({ kind: "welcome" });
 
@@ -176,7 +176,7 @@ export async function refreshBadges(): Promise<BadgeState> {
 /** The celebration was shown — never fire it again, on any device. */
 export async function markSeen(slugs: string[]): Promise<void> {
   if (slugs.length === 0) return;
-  rememberLocally(slugs); // covers the pre-0027 case and a failed POST
+  rememberLocally(slugs); // covers the pre-0028 case and a failed POST
   try {
     await fetch(withBase("/api/play/badges"), {
       method: "POST",

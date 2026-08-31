@@ -139,7 +139,7 @@ async function syncLedger(
 }
 
 /**
- * Does this student still owe a welcome? Pre-0027 the column isn't there, and
+ * Does this student still owe a welcome? Pre-0028 the column isn't there, and
  * we answer `true` — the client then suppresses it from its own localStorage,
  * so a new student gets the welcome before the migration runs and a returning
  * one doesn't see it twice in the same browser.
@@ -171,7 +171,7 @@ export const GET = guarded(async (req: NextRequest) => {
   const [ledger, welcome] = await Promise.all([syncLedger(session.email, earned), loadWelcome(session.email)]);
 
   if (ledger === "missing-table") {
-    // Pre-0027: the shelf still works off derived badges, and the client
+    // Pre-0028: the shelf still works off derived badges, and the client
     // remembers what it has already celebrated in localStorage.
     return NextResponse.json(
       {
@@ -214,7 +214,7 @@ export const POST = guarded(async (req: NextRequest) => {
       .from("student_profiles")
       .update({ welcomed_at: new Date().toISOString() })
       .eq("email", session.email);
-    // Pre-0027 the column isn't there; the client's localStorage covers it.
+    // Pre-0028 the column isn't there; the client's localStorage covers it.
     return NextResponse.json({ ok: true, migrationPending: Boolean(error) });
   }
 

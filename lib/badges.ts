@@ -4,7 +4,7 @@
  * Badges are DERIVED, never stored. This module turns a `BadgeStats` snapshot
  * into "which badges are earned, and how close the next ones are". The
  * database keeps only a ledger of when each slug was earned and whether its
- * celebration has been seen (migration 0027), so the definitions below stay
+ * celebration has been seen (migration 0028), so the definitions below stay
  * editable in code — add a badge next term and everyone who already qualifies
  * gets it retroactively.
  *

@@ -1,4 +1,4 @@
--- 0027_badges.sql — the student badge ledger + the one-time welcome.
+-- 0028_badges.sql — the student badge ledger + the one-time welcome.
 -- Run once in the Supabase SQL editor. Non-destructive & idempotent.
 --
 -- Badges themselves are DERIVED in code (lib/badges.ts) from the reading log,
@@ -34,5 +34,5 @@ alter table student_badges enable row level security;
 -- The one-time "welcome to your library" moment, stamped on first dismissal.
 alter table student_profiles add column if not exists welcomed_at timestamptz;
 
-comment on table student_badges is 'Per-student badge ledger: when each derived badge was earned and celebrated (0027).';
-comment on column student_profiles.welcomed_at is 'When the student dismissed the first-visit welcome (0027).';
+comment on table student_badges is 'Per-student badge ledger: when each derived badge was earned and celebrated (0028).';
+comment on column student_profiles.welcomed_at is 'When the student dismissed the first-visit welcome (0028).';
