@@ -34,6 +34,12 @@ export const ICON_PATHS: Record<string, string> = {
   eyeoff:
     "M3 3l18 18M10.6 5.2c.46-.08.93-.2 1.4-.2 6.5 0 10 7 10 7a17.9 17.9 0 0 1-3.1 3.9M6.5 6.5C3.6 8.5 2 12 2 12s3.5 7 10 7c1.5 0 2.9-.3 4.1-.9M9.9 9.9a3 3 0 0 0 4.2 4.2",
   exit: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
+  // Badge medals (components/BadgeMedal.tsx). These are stroked like every
+  // other icon here so <Ic> can draw them in the medal's own ink.
+  medal: "M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM8.2 13.6 7 22l5-3 5 3-1.2-8.4",
+  globe: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3.5 9h17M3.5 15h17M12 3c2.6 2.8 2.6 15.2 0 18M12 3c-2.6 2.8-2.6 15.2 0 18",
+  stack: "M12 3 3 7.5 12 12l9-4.5L12 3zM3 12l9 4.5 9-4.5M3 16.5 12 21l9-4.5",
+  heart: "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z",
 };
 
 export function Ic({ name, size = 18, width = 2 }: { name: string; size?: number; width?: number }) {

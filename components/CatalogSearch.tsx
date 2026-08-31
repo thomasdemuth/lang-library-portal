@@ -25,7 +25,9 @@ import {
   type ShelfResult,
 } from "@/lib/book-actions-client";
 import { checkOut } from "@/lib/checkout-client";
-import { fireConfetti } from "@/lib/confetti";
+import { fireConfetti, fireHearts } from "@/lib/confetti";
+import { bumpRead, readCount, refreshBadges } from "@/lib/badges-client";
+import { praiseForRead } from "@/lib/praise";
 import StaffCheckout from "@/components/StaffCheckout";
 import { withBase } from "@/lib/base";
 
@@ -207,9 +209,15 @@ export default function CatalogSearch({
     const result = await logRead(b);
     if ("error" in result) return say(result.error, result.kind);
     setLogged((cur) => new Set(cur).add(b.dedupe_key));
-    if (isStudent) fireConfetti(30);
+    if (isStudent) {
+      fireConfetti(30);
+      bumpRead(1);
+      refreshBadges();
+    }
     const { id } = result;
-    say(result.message, "ok", id === null ? undefined : () => undoRead(b, id));
+    // Students get the warm, counting line; staff keep the plain confirmation.
+    const total = isStudent ? readCount() : 0;
+    say(total > 0 ? praiseForRead(total) : result.message, "ok", id === null ? undefined : () => undoRead(b, id));
   }
 
   async function undoRead(b: Book, id: number) {
@@ -220,6 +228,7 @@ export default function CatalogSearch({
       next.delete(b.dedupe_key);
       return next;
     });
+    if (isStudent) bumpRead(-1);
     say("Removed from your log", "info");
   }
 
@@ -231,14 +240,25 @@ export default function CatalogSearch({
       return say(result.error, result.kind);
     }
     setBorrowed((cur) => new Set(cur).add(b.dedupe_key));
-    if (isStudent) fireConfetti();
+    if (isStudent) {
+      fireConfetti();
+      refreshBadges();
+    }
     say([result.message, ...result.warnings].join(" "), result.warnings.length ? "warn" : "ok");
   }
 
-  async function heart(b: Book) {
+  async function heart(e: React.MouseEvent, b: Book) {
+    // Read the button's position before awaiting — the card can re-render
+    // while the POST is in flight.
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const result = await toggleFavorite({ book_key: b.dedupe_key, title: b.title, isbn13: b.isbn13 });
-    if ("error" in result) say(result.error, result.kind);
-    else say(result.favorited ? "Added to your favorites!" : "Removed from favorites");
+    if ("error" in result) return say(result.error, result.kind);
+    if (result.favorited && isStudent) {
+      // Only on the way in — un-hearting is a correction, not a moment.
+      fireHearts({ x: box.left + box.width / 2, y: box.top + box.height / 2 });
+      refreshBadges();
+    }
+    say(result.favorited ? "Added to your favorites!" : "Removed from favorites");
   }
 
   async function where(b: Book) {
@@ -404,7 +424,7 @@ export default function CatalogSearch({
                               <button
                                 type="button"
                                 className={`b-btn b-fav${isFavorite(b.dedupe_key) ? " on" : ""}`}
-                                onClick={() => heart(b)}
+                                onClick={(e) => heart(e, b)}
                                 aria-pressed={isFavorite(b.dedupe_key)}
                               >
                                 <Heart filled={isFavorite(b.dedupe_key)} size={13} />

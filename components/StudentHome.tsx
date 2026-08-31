@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import BookRow, { type RowKind } from "@/components/BookRow";
+import CountUp from "@/components/CountUp";
 import LetterAvatar from "@/components/LetterAvatar";
 import { displayName } from "@/lib/play";
+import { greeting, type Greeting } from "@/lib/greeting";
 import { type CategoryId } from "@/lib/categories";
 import { Ic } from "@/components/icons";
 import { withBase } from "@/lib/base";
@@ -39,9 +41,17 @@ const MAX_ROWS = EXPLORE_KINDS.length;
 /** The student homepage: a wall of book shelves plus quick links. */
 export default function StudentHome({ email }: { email: string }) {
   const [booksThisYear, setBooksThisYear] = useState<number | null>(null);
+  // The greeting is computed on the CLIENT only. The server's clock is UTC,
+  // so rendering it there would hand a hydration mismatch to every student
+  // whose afternoon is the server's evening — until it lands, plain "Hi".
+  const [hello, setHello] = useState<Greeting | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [extraRows, setExtraRows] = useState(1);
   const sentinel = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setHello(greeting(new Date()));
+  }, []);
 
   useEffect(() => {
     fetch(withBase("/api/play/profile"))
@@ -84,12 +94,21 @@ export default function StudentHome({ email }: { email: string }) {
         <div className="play-me">
           <LetterAvatar name={name} size={74} src={photoUrl ?? undefined} />
           <span>
-            <b>Hi, {name.split(" ")[0]}!</b>
+            <b>
+              {hello ?? "Hi"}, {name.split(" ")[0]}!{" "}
+              <span className="wave" aria-hidden>
+                <Ic name="sparkle" size={18} />
+              </span>
+            </b>
             <span className="play-stats">
               <Ic name="book" size={12} />{" "}
-              {booksThisYear === null
-                ? "Tap “I read this” on any book to keep your reading log"
-                : `${booksThisYear} book${booksThisYear === 1 ? "" : "s"} this year`}
+              {booksThisYear === null ? (
+                "Tap “I read this” on any book to keep your reading log"
+              ) : (
+                <>
+                  <CountUp value={booksThisYear} /> book{booksThisYear === 1 ? "" : "s"} this year
+                </>
+              )}
             </span>
           </span>
         </div>

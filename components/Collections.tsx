@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Ic, Pencil } from "@/components/icons";
 import { announce } from "@/components/Announcer";
 import { OFFLINE_MESSAGE, sessionExpired } from "@/lib/book-actions-client";
+import { refreshBadges } from "@/lib/badges-client";
 import { withBase } from "@/lib/base";
 
 type CollectionBook = { book_key: string; title: string; isbn13: string | null };
@@ -102,6 +103,7 @@ export default function Collections() {
     const book = { book_key: hit.dedupe_key, title: hit.title, isbn13: hit.isbn13 };
     if (await post({ action: "add", id: col.id, book })) {
       setCollections((cur) => cur.map((c) => (c.id === col.id ? { ...c, books: [...c.books, book] } : c)));
+      refreshBadges(); // a list's first book earns List Maker
     }
   }
 

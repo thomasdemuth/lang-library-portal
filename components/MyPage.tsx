@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import BadgeShelf from "@/components/BadgeShelf";
 import Collections from "@/components/Collections";
 import FriendsCard from "@/components/FriendsCard";
+import CountUp from "@/components/CountUp";
 import MyBooksCard from "@/components/MyBooksCard";
 import LetterAvatar from "@/components/LetterAvatar";
 import { Heart, Ic } from "@/components/icons";
@@ -11,6 +13,7 @@ import { displayName } from "@/lib/play";
 import { logRead, removeRead, type NoteKind } from "@/lib/book-actions-client";
 import { myCheckouts, type MyCheckout } from "@/lib/checkout-client";
 import { dueLabel, isOverdue } from "@/lib/circulation";
+import { bumpRead, refreshBadges } from "@/lib/badges-client";
 import { toggleFavorite, type FavBook } from "@/lib/favorites-client";
 import { withBase } from "@/lib/base";
 
@@ -90,6 +93,7 @@ export default function MyPage({ email }: { email: string }) {
     if ("error" in result) return say(result.error, result.kind);
     setLog((cur) => cur.filter((r) => r.id !== row.id));
     bumpCounts(row.created_at, -1);
+    bumpRead(-1);
     say("Removed from your log", "info", () => undoRemove(row));
   }
 
@@ -98,6 +102,7 @@ export default function MyPage({ email }: { email: string }) {
     if ("error" in result) return say(result.error, result.kind);
     loadLog(); // the re-logged row gets a fresh id + date — reload the list
     bumpCounts(new Date().toISOString(), 1);
+    bumpRead(1);
     say("Added back to your reading log");
   }
 
@@ -109,6 +114,7 @@ export default function MyPage({ email }: { email: string }) {
       setTimeout(() => setMsg(null), 2600);
     } else {
       setFavs((cur) => cur.filter((x) => x.book_key !== f.book_key));
+      refreshBadges();
     }
   }
 
@@ -164,6 +170,8 @@ export default function MyPage({ email }: { email: string }) {
 
       {msg && <div className="error">{msg}</div>}
 
+      <BadgeShelf />
+
       {/* v8 order on wide screens: reading (then friends) on the left,
           favorites + lists on the right; one column below 900px. */}
       <div className="me-grid">
@@ -171,7 +179,13 @@ export default function MyPage({ email }: { email: string }) {
           <MyBooksCard />
           <div className="card" style={{ marginBottom: 14 }}>
             <h2>
-              <Ic name="book" size={16} /> My reading{counts ? ` · ${counts.year} this year` : ""}
+              <Ic name="book" size={16} /> My reading
+              {counts && (
+                <>
+                  {" · "}
+                  <CountUp value={counts.year} /> this year
+                </>
+              )}
               {toast && (
                 <span className={`row-toast${toast.kind === "ok" ? "" : ` ${toast.kind}`}`}>
                   {toast.text}
@@ -185,7 +199,7 @@ export default function MyPage({ email }: { email: string }) {
             </h2>
             {counts && (
               <p className="hint" style={{ marginTop: 0 }}>
-                {counts.month} this month
+                <CountUp value={counts.month} /> this month
               </p>
             )}
             {log.length === 0 ? (

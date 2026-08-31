@@ -1,3 +1,4 @@
+import Celebrations from "@/components/Celebrations";
 import SiteHeader from "@/components/SiteHeader";
 import UpdateBanner from "@/components/UpdateBanner";
 import { currentSession } from "@/lib/server";
@@ -36,6 +37,10 @@ export default async function StudentLayout({ children }: { children: React.Reac
       <a className="skip-link" href="#main">
         Skip to content
       </a>
+      {/* Badge pop-ups and the first-visit welcome, for signed-in students
+          only. Mounted here so a badge earned anywhere — including the
+          take-home kiosk — celebrates on the page the student is on. */}
+      {session && !isGuest && <Celebrations email={session.email} />}
       {banner && <UpdateBanner banner={banner} />}
       <SiteHeader
         tagline={isGuest ? "guest" : "student portal"}

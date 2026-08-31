@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Check, Ic } from "@/components/icons";
 import Modal from "@/components/Modal";
+import { refreshBadges } from "@/lib/badges-client";
 import {
   type ClientCollection,
   type CollectBook,
@@ -70,6 +71,7 @@ function CollectModal({ book, onClose }: { book: CollectBook; onClose: () => voi
     const res = inList ? await removeFromCollection(col.id, book.book_key) : await addToCollection(col.id, book);
     setBusy(null);
     if ("error" in res) setErr(res.error);
+    else if (!inList) refreshBadges(); // a list's first book earns List Maker
   }
 
   async function create() {
@@ -80,7 +82,10 @@ function CollectModal({ book, onClose }: { book: CollectBook; onClose: () => voi
     const res = await createCollection(name, book);
     setBusy(null);
     if ("error" in res) setErr(res.error);
-    else setNewName("");
+    else {
+      setNewName("");
+      refreshBadges(); // the new list arrives with this book already in it
+    }
   }
 
   return (

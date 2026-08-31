@@ -1941,3 +1941,154 @@ html[data-theme="dark"] .widget-x { background: var(--panel-2); }
 @media (min-width: 900px) {
   .me-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   W9 additions — the student dopamine layer: badge medals, the badge
+   shelf on My Page, the celebration pop-ups, the kiosk success card,
+   and rolling counters. New rules only; nothing above was changed.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Medals ─────────────────────────────────────────────────────── */
+.badge-medal {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  border-radius: 999px; color: #fff; position: relative; overflow: hidden;
+}
+.badge-earned { box-shadow: 0 4px 12px rgba(16, 24, 40, .22), inset 0 -2px 6px rgba(0, 0, 0, .13); }
+/* A one-shot sweep of light across a freshly drawn medal. */
+.badge-earned::after {
+  content: ""; position: absolute; inset: -40%;
+  background: linear-gradient(72deg, transparent 42%, rgba(255, 255, 255, .55) 50%, transparent 58%);
+  animation: medal-shine 1.5s ease .25s 1 both;
+}
+/* The one badge per group we're actively inviting: outlined in its OWN color,
+   never grey, never a padlock. It reads as an invitation, not a lock. */
+.badge-revealed { background: transparent; border: 2px dashed currentColor; }
+/* Everything further out: a soft "?" to find, not a slot you're missing. */
+.badge-mystery {
+  background: var(--bg); border: 2px solid var(--line); color: var(--muted);
+  font-weight: 800;
+}
+html[data-theme="dark"] .badge-mystery { background: var(--panel-2); border-color: var(--line-strong); }
+
+@keyframes medal-shine {
+  from { transform: translateX(-120%) rotate(8deg); }
+  to { transform: translateX(120%) rotate(8deg); }
+}
+
+/* ── The shelf on My Page ───────────────────────────────────────── */
+.badge-grid {
+  display: grid; gap: 8px; margin-top: 12px; align-content: start;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+}
+/* Cells share a floor height so the grid keeps its rhythm whether a slot
+   carries a nudge and a bar or just a name — a ragged grid reads as broken
+   rather than as a collection. */
+.badge-cell {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 5px;
+  padding: 10px 5px; border-radius: 12px; border: 1px solid transparent;
+  min-width: 0; min-height: 104px;
+}
+.badge-cell b { font-size: 11.5px; line-height: 1.3; font-weight: 700; }
+.badge-cell.badge-hidden b { color: var(--muted); letter-spacing: 1px; }
+.badge-nudge { font-size: 10.5px; line-height: 1.35; color: var(--muted); }
+/* Earned medals are buttons (tap to re-live the moment) — strip the chrome. */
+button.badge-cell {
+  font: inherit; color: inherit; background: none; cursor: pointer;
+  transition: transform .12s, background .12s;
+}
+button.badge-cell:hover { transform: translateY(-2px); background: var(--bg); }
+button.badge-cell:focus-visible { outline: 3px solid var(--brand-blue); outline-offset: 2px; }
+html[data-theme="dark"] button.badge-cell:hover { background: var(--panel-2); }
+/* No border here on purpose: the revealed medal's own dashed ring already
+   says "not yet", and a second dashed outline around it just adds noise. */
+
+/* Progress toward the revealed badge. Always framed as how far you've COME —
+   there is no "empty" styling that could read as a deficit. */
+.badge-bar {
+  display: block; width: 100%; height: 5px; border-radius: 999px;
+  background: var(--line); overflow: hidden;
+}
+.badge-bar > i { display: block; height: 100%; border-radius: 999px; transition: width .5s ease; }
+
+/* ── Celebration pop-ups ────────────────────────────────────────── */
+.modal.badgepop { max-width: 380px; text-align: center; }
+.badgepop-body {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 28px 24px 24px;
+}
+.badgepop-body .badge-medal { animation: badge-in .5s cubic-bezier(.2, .9, .3, 1.5) both; }
+.badgepop-kicker {
+  margin: 4px 0 0; font-size: 12px; font-weight: 800; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--brand-blue);
+}
+html[data-theme="dark"] .badgepop-kicker { color: #9db1ee; }
+.badgepop-body h2 { margin: 0; font-size: 20px; }
+.badgepop-blurb { margin: 0; font-size: 13.5px; color: var(--muted); }
+.badgepop-go { margin-top: 8px; min-width: 140px; }
+
+@keyframes badge-in {
+  from { transform: scale(.55); opacity: 0; }
+  70% { transform: scale(1.08); opacity: 1; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* The first-visit welcome shares the pop-up shell. */
+.modal.welcomepop { max-width: 420px; }
+.welcome-spark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 62px; height: 62px; border-radius: 999px; color: #fff;
+  background: var(--brand-gradient); box-shadow: 0 6px 18px rgba(46, 80, 200, .3);
+  animation: badge-in .5s cubic-bezier(.2, .9, .3, 1.5) both;
+}
+.welcome-list {
+  list-style: none; margin: 4px 0 0; padding: 0; text-align: left;
+  display: flex; flex-direction: column; gap: 10px; width: 100%;
+}
+.welcome-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.45; }
+.welcome-list svg { flex: none; margin-top: 2px; color: var(--brand-blue); }
+html[data-theme="dark"] .welcome-list svg { color: #9db1ee; }
+
+/* ── The take-home kiosk's success card ─────────────────────────── */
+.kiosk-done { text-align: center; padding: 28px 18px; }
+.kiosk-cover {
+  display: block; margin: 0 auto 4px; max-height: 168px; width: auto; border-radius: 6px;
+  box-shadow: 0 12px 30px rgba(16, 24, 40, .28);
+  animation: pop-in .45s cubic-bezier(.2, .9, .3, 1.4) both;
+}
+.kiosk-check { line-height: 1; }
+.kiosk-trip { margin: 2px 0 6px; font-size: 15px; font-weight: 800; color: var(--brand-green); }
+html[data-theme="dark"] .kiosk-trip { color: #6fd3a6; }
+
+@keyframes pop-in {
+  from { transform: scale(.8) translateY(10px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* ── Rolling counters ───────────────────────────────────────────── */
+/* Keyed on its value, so a new number remounts and re-runs the pop. */
+.countup { display: inline-block; animation: count-pop .35s ease both; font-variant-numeric: tabular-nums; }
+@keyframes count-pop {
+  from { transform: scale(1); }
+  40% { transform: scale(1.22); }
+  to { transform: scale(1); }
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────── */
+/* The block near the top of this file already flattens every duration. These
+   celebrations also TRANSFORM, so a flattened animation could strand a medal
+   mid-scale — pin them off outright. Confetti and hearts no-op in JS
+   (lib/confetti.ts reducedMotion()), and CountUp snaps instead of rolling.
+   Nothing is missing at this setting, only quiet. */
+@media (prefers-reduced-motion: reduce) {
+  .badge-medal,
+  .badgepop-body .badge-medal,
+  .welcome-spark,
+  .kiosk-cover,
+  .countup {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+  .badge-earned::after { display: none; }
+  button.badge-cell:hover { transform: none; }
+}
