@@ -9,9 +9,8 @@ import { withBase } from "@/lib/base";
  *   • "Sign in with Google" — top-level navigation to /api/auth/google/start
  *     (server-side OAuth redirect flow; no client JS, so the CSP is untouched).
  *   • "Continue as a guest" — a restricted lookup+map-only session.
- *   • A dev-only email form (rendered only when `devLogin`) so the app is
- *     testable locally without Google credentials.
- * Management sign-in lives on the separate /admin/login page.
+ * Management sign-in lives on the separate /admin/login page. (The passwordless
+ * email break-glass still lives on the per-host /gate pages, not here.)
  */
 
 const ERROR_TEXT: Record<string, string> = {
@@ -31,13 +30,13 @@ const BOX: React.CSSProperties = {
   gap: 10,
   textDecoration: "none",
   borderRadius: 12,
-  padding: "13px 16px",
+  padding: "16px 18px",
   fontWeight: 700,
   fontSize: 16,
   boxSizing: "border-box",
 };
 
-export default function SignInForm({ google, devLogin }: { google: boolean; devLogin: boolean }) {
+export default function SignInForm({ google }: { google: boolean }) {
   const [nextQS, setNextQS] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -49,9 +48,10 @@ export default function SignInForm({ google, devLogin }: { google: boolean; devL
     if (err) setError(ERROR_TEXT[err] ?? "Something went wrong — please try again.");
   }, []);
 
-  // v8 (calm): the Google button is the one action; one caption under it;
-  // guest access is a quiet text link, not a competing button. Auth hrefs
-  // and params are untouched — presentation only.
+  // v8 (calm): the Google button is the one action; guest access is a quiet
+  // text link, not a competing button. The two links sit in their own group
+  // below a hairline so the button has room. Auth hrefs and params are
+  // untouched — presentation only.
   return (
     <>
       {error && <div className="error">{error}</div>}
@@ -62,75 +62,19 @@ export default function SignInForm({ google, devLogin }: { google: boolean; devL
         </a>
       )}
 
-      <p className="hint signin-caption">Use your school Google account</p>
+      {/* The hairline only makes sense under a primary button. */}
+      <div className={google ? "signin-links" : undefined}>
+        <p className="signin-guestrow">
+          <a className="signin-guest" href={withBase("/api/auth/guest")}>
+            Browse as a guest
+          </a>
+        </p>
 
-      <p className="signin-guestrow">
-        <a className="signin-guest" href={withBase("/api/auth/guest")}>
-          Browse as a guest
-        </a>
-      </p>
-
-      <p className="signin-alt">
-        <a href={withBase("/admin/login")}>Library management sign-in</a>
-      </p>
-
-      {devLogin && <DevEmailForm />}
-    </>
-  );
-}
-
-/** Local-only email login (production disables /api/gate). */
-function DevEmailForm() {
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setErr(null);
-    try {
-      const res = await fetch(withBase("/api/gate"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setErr(data.error ?? "Something went wrong — try again.");
-        return;
-      }
-      const next = new URLSearchParams(window.location.search).get("next");
-      // withBase passes absolute URLs (the cross-host handoff) through untouched.
-      window.location.href = withBase(safeNextPath(next, data.redirect ?? "/"));
-    } catch {
-      setErr("Couldn't reach the server — try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form onSubmit={submit} style={{ marginTop: 18, borderTop: "1px solid var(--line, #e5e7eb)", paddingTop: 14 }}>
-      <div className="hint" style={{ marginBottom: 8 }}>Dev sign-in (local testing, no Google):</div>
-      {err && <div className="error">{err}</div>}
-      <div className="field">
-        <label className="lbl" htmlFor="devemail">School email</label>
-        <input
-          id="devemail"
-          className="input"
-          type="email"
-          required
-          autoComplete="email"
-          placeholder="you@thelangschool.org"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        <p className="signin-alt">
+          <a href={withBase("/admin/login")}>Library management sign-in</a>
+        </p>
       </div>
-      <button className="btn ghost" type="submit" disabled={busy} style={{ width: "100%" }}>
-        {busy ? "Checking…" : "Continue (dev)"}
-      </button>
-    </form>
+    </>
   );
 }
 
