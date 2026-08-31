@@ -1827,16 +1827,28 @@ html[data-theme="dark"] .widget-x { background: var(--panel-2); }
 }
 .rboard-declinedlist .rboard-card { margin-bottom: 0; }
 
-/* ── Sign-in (calm v8 column) ── */
-.signin-hero { text-align: center; }
-.signin-caption { text-align: center; margin: 12px 0 0; }
-.signin-guestrow { text-align: center; margin: 18px 0 0; }
+/* ── Sign-in (calm v8 column) ──
+   Roomy by design: the three actions each get their own air, and the two
+   quiet links sit below a hairline so nothing crowds the Google button. */
+.wrap.narrow.signin { max-width: 460px; padding-bottom: 48px; }
+.signin-hero { text-align: center; padding: 56px 0 30px; }
+.signin-card { padding: 30px 28px 32px; }
+.signin-links { margin-top: 26px; padding-top: 24px; border-top: 1px solid var(--line-soft); }
+.signin-guestrow { text-align: center; margin: 0; }
 .signin-guest {
+  display: inline-block; padding: 6px 10px;
   font-size: 14px; font-weight: 600; color: var(--brand-blue);
   text-decoration: underline; text-underline-offset: 3px;
 }
-.signin-alt { text-align: center; margin: 14px 0 0; font-size: 12px; }
-.signin-alt a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.signin-alt { text-align: center; margin: 12px 0 0; font-size: 12px; }
+.signin-alt a {
+  display: inline-block; padding: 6px 10px;
+  color: var(--muted); text-decoration: underline; text-underline-offset: 3px;
+}
+@media (max-width: 480px) {
+  .signin-hero { padding: 34px 0 24px; }
+  .signin-card { padding: 24px 20px 26px; }
+}
 
 /* ═══ W4-C2 — student surface, v8 layouts (append-only section) ═══════════
    New layout rules only; no existing rule above is modified (the
