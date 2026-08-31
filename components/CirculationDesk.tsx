@@ -244,9 +244,11 @@ export default function CirculationDesk({
                       type="button"
                       onClick={() => selectBook(b)}
                       style={{
-                        display: "block",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
                         width: "100%",
-                        padding: "9px 10px",
+                        padding: "8px 10px",
                         border: 0,
                         borderRadius: 8,
                         background: "transparent",
@@ -255,9 +257,22 @@ export default function CirculationDesk({
                         font: "inherit",
                       }}
                     >
-                      <span style={{ fontWeight: 600 }}>{b.title}</span>
-                      <span className="hint" style={{ display: "block", margin: 0 }}>
-                        {b.creators ?? "Unknown author"} · {b.copies} in the library
+                      {b.isbn13 && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={withBase(`/api/catalog/cover?isbn=${b.isbn13}`)}
+                          alt=""
+                          width={34}
+                          height={50}
+                          style={{ borderRadius: 4, objectFit: "cover", flex: "none" }}
+                          onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+                        />
+                      )}
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: "block", fontWeight: 600 }}>{b.title}</span>
+                        <span className="hint" style={{ display: "block", margin: 0 }}>
+                          {b.creators ?? "Unknown author"} · {b.copies} in the library
+                        </span>
                       </span>
                     </button>
                   </li>
@@ -308,34 +323,69 @@ export default function CirculationDesk({
           </span>
         ) : (
           <>
-            <input
-              className="input"
-              style={{ fontSize: 16 }}
-              type="text"
-              autoComplete="off"
-              list={studentListId}
-              aria-label="Which student?"
-              placeholder="Which student? Type a name or school email"
-              value={studentQ}
-              onChange={(e) => setStudentQ(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  resolveStudent();
-                }
-              }}
-              onBlur={() => {
-                // A picked datalist option lands here as the full email.
-                if (studentQ.includes("@")) resolveStudent();
-              }}
-            />
-            <datalist id={studentListId}>
-              {studentOpts.map((s) => (
-                <option key={s.email} value={s.email}>
-                  {s.name}
-                </option>
-              ))}
-            </datalist>
+            <div style={{ position: "relative" }}>
+              <input
+                className="input"
+                style={{ fontSize: 16 }}
+                type="text"
+                autoComplete="off"
+                role="combobox"
+                aria-expanded={studentOpts.length > 0}
+                aria-controls={studentListId}
+                aria-label="Which student?"
+                placeholder="Which student? Type a name or school email"
+                value={studentQ}
+                onChange={(e) => setStudentQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    resolveStudent();
+                  }
+                }}
+              />
+              {studentOpts.length > 0 && (
+                <ul
+                  id={studentListId}
+                  role="listbox"
+                  aria-label="Matching students"
+                  style={{
+                    listStyle: "none",
+                    margin: "6px 0 0",
+                    padding: 4,
+                    border: "1px solid var(--line, #dcdfe6)",
+                    borderRadius: 10,
+                    background: "#fff",
+                    boxShadow: "0 8px 24px rgba(20,24,40,.10)",
+                    position: "absolute",
+                    insetInline: 0,
+                    zIndex: 20,
+                  }}
+                >
+                  {studentOpts.map((s) => (
+                    <li key={s.email} role="option" aria-selected={false}>
+                      <button
+                        type="button"
+                        onClick={() => pickStudent(s)}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          padding: "9px 10px",
+                          border: 0,
+                          borderRadius: 8,
+                          background: "transparent",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          font: "inherit",
+                        }}
+                      >
+                        <span style={{ fontWeight: 600 }}>{s.name}</span>
+                        <span className="hint" style={{ display: "block", margin: 0 }}>{s.email}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             {recent.length > 0 && (
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
                 {recent.map((s) => (

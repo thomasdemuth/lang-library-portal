@@ -79,23 +79,66 @@ export default function StaffCheckout({
   }
   return (
     <form onSubmit={submit} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", width: "100%" }}>
-      <input
-        className="input"
-        style={{ flex: "1 1 220px", minWidth: 180 }}
-        list={listId}
-        autoFocus
-        aria-label="Student name or school email"
-        placeholder="Student name or school email"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <datalist id={listId}>
-        {suggestions.map((s) => (
-          <option key={s.email} value={s.email}>
-            {s.name}
-          </option>
-        ))}
-      </datalist>
+      <div style={{ position: "relative", flex: "1 1 220px", minWidth: 180 }}>
+        <input
+          className="input"
+          style={{ width: "100%" }}
+          autoFocus
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={suggestions.length > 0}
+          aria-controls={listId}
+          aria-label="Student name or school email"
+          placeholder="Student name or school email"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        {suggestions.length > 0 && (
+          <ul
+            id={listId}
+            role="listbox"
+            aria-label="Matching students"
+            style={{
+              listStyle: "none",
+              margin: "6px 0 0",
+              padding: 4,
+              border: "1px solid var(--line, #dcdfe6)",
+              borderRadius: 10,
+              background: "#fff",
+              boxShadow: "0 8px 24px rgba(20,24,40,.10)",
+              position: "absolute",
+              insetInline: 0,
+              zIndex: 20,
+            }}
+          >
+            {suggestions.map((s) => (
+              <li key={s.email} role="option" aria-selected={false}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQ(s.email);
+                    setSuggestions([]);
+                  }}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    padding: "8px 10px",
+                    border: 0,
+                    borderRadius: 8,
+                    background: "transparent",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    font: "inherit",
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>{s.name}</span>
+                  <span className="hint" style={{ display: "block", margin: 0 }}>{s.email}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <button className="btn brand" type="submit" disabled={busy || q.trim().length < 2}>
         {busy ? "Checking out…" : "Check out"}
       </button>
