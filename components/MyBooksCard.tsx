@@ -5,6 +5,7 @@ import { Ic } from "@/components/icons";
 import { announce } from "@/components/Announcer";
 import { myCheckouts, returnCheckout, type MyCheckout } from "@/lib/checkout-client";
 import { dueLabel, isOverdue } from "@/lib/circulation";
+import { fireConfetti } from "@/lib/confetti";
 import { withBase } from "@/lib/base";
 
 /**
@@ -35,6 +36,7 @@ export default function MyBooksCard() {
       const text = "error" in result ? result.error : result.message;
       setMsg(text);
       announce(text, "error" in result && result.kind === "err");
+      if (!("error" in result)) fireConfetti(50);
       setTimeout(() => setMsg((cur) => (cur === text ? null : cur)), 3200);
       load();
     } finally {

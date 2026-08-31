@@ -4,11 +4,13 @@ import { currentSession } from "@/lib/server";
 import { activeBannerFor } from "@/lib/banners-store";
 import { withBase } from "@/lib/base";
 
-// v8: five items, not six — Feedback lives on the home screen's quick links
-// and the phone tab bar, so the header stays scannable for younger readers.
+// v8 kept this to five items for scannability; Take a Book Home earns the
+// sixth slot — self-checkout is the one thing a kid at the shelf needs fast.
+// (Feedback still lives on the home screen's quick links and the phone bar.)
 const STUDENT_LINKS = [
   { href: "/", label: "Home" },
   { href: "/search", label: "Find a Book" },
+  { href: "/take-home", label: "Take a Book Home" },
   { href: "/games", label: "Games" },
   { href: "/map", label: "Map" },
   { href: "/me", label: "My Page" },

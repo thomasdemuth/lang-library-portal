@@ -19,6 +19,7 @@ import {
   type ShelfResult,
 } from "@/lib/book-actions-client";
 import { checkOut } from "@/lib/checkout-client";
+import { fireConfetti } from "@/lib/confetti";
 import StaffCheckout from "@/components/StaffCheckout";
 import { withBase } from "@/lib/base";
 
@@ -175,6 +176,7 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
     const result = await logRead(b);
     if ("error" in result) return say(result.error, result.kind);
     setLogged((cur) => new Set(cur).add(b.dedupe_key));
+    if (isStudent) fireConfetti(30);
     const { id } = result;
     say(result.message, "ok", id === null ? undefined : () => undoRead(b, id));
   }
@@ -198,6 +200,7 @@ export default function CatalogSearch({ role = "student" }: { role?: "student" |
       return say(result.error, result.kind);
     }
     setBorrowed((cur) => new Set(cur).add(b.dedupe_key));
+    if (isStudent) fireConfetti();
     say([result.message, ...result.warnings].join(" "), result.warnings.length ? "warn" : "ok");
   }
 

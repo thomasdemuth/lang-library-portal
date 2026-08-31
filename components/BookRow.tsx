@@ -8,6 +8,7 @@ import { announce } from "@/components/Announcer";
 import { getFavorites, isFavorite, onFavoritesChange, toggleFavorite } from "@/lib/favorites-client";
 import { fetchDetail, findShelf, logRead, removeRead, shelfMapHref, type DetailResult, type NoteKind } from "@/lib/book-actions-client";
 import { checkOut } from "@/lib/checkout-client";
+import { fireConfetti } from "@/lib/confetti";
 import { withBase } from "@/lib/base";
 
 type Book = { id: number; title: string; creators: string | null; isbn13: string | null; dedupe_key: string; tag: CategoryId | null };
@@ -158,6 +159,7 @@ export default function BookRow({
     const result = await logRead(b);
     if ("error" in result) return say(result.error, result.kind);
     setLogged((cur) => new Set(cur).add(b.dedupe_key));
+    fireConfetti(30); // a mini burst — logging a read is frequent, keep it light
     onLogged?.(1);
     const { id } = result;
     say(result.message, "ok", id === null ? undefined : () => undoRead(b, id));
@@ -184,6 +186,7 @@ export default function BookRow({
       return say(result.error, result.kind);
     }
     setBorrowed((cur) => new Set(cur).add(b.dedupe_key));
+    fireConfetti();
     say([result.message, ...result.warnings].join(" "), result.warnings.length ? "warn" : "ok");
   }
 

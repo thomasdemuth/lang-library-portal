@@ -95,6 +95,7 @@ export default function StudentHome({ email }: { email: string }) {
         </div>
         <div className="play-links">
           <a href={withBase("/me")}><Ic name="smile" size={16} /> My Page</a>
+          <a href={withBase("/take-home")}><Ic name="backpack" size={16} /> Take a Book Home</a>
           <a href={withBase("/search")}><Ic name="search" size={16} /> Find a Book</a>
           <a href={withBase("/map")}><Ic name="map" size={16} /> Library Map</a>
           <a href={withBase("/feedback")}><Ic name="feedback" size={16} /> Feedback</a>
